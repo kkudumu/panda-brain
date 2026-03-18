@@ -4,11 +4,11 @@
 
 set -uo pipefail
 
-REPO="kkudumu/panda-skills"
+REPO="kkudumu/panda-brain"
 SKILLS_DIR="${HOME}/.claude/skills"
 VERSION_FILE="${SKILLS_DIR}/panda-version.txt"
 DOWNLOAD_DIR="/tmp/panda-upgrade"
-CACHE_FILE="${HOME}/.cache/panda-skills/version-check"
+CACHE_FILE="${HOME}/.cache/panda-brain/version-check"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

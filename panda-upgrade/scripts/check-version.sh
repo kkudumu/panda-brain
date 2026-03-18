@@ -4,10 +4,10 @@
 
 set -uo pipefail
 
-CACHE_DIR="${HOME}/.cache/panda-skills"
+CACHE_DIR="${HOME}/.cache/panda-brain"
 CACHE_FILE="${CACHE_DIR}/version-check"
 VERSION_FILE="${HOME}/.claude/skills/panda-version.txt"
-REPO="kkudumu/panda-skills"
+REPO="kkudumu/panda-brain"
 
 # Ensure cache directory exists
 mkdir -p "${CACHE_DIR}"

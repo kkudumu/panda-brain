@@ -212,7 +212,7 @@ skill: panda-brainstorm
 phase: 2
 phase_detail: "Research+Challenge turn 5, user chose microservices direction"
 timestamp: 2026-03-16T23:50:00
-project_dir: /Users/path/to/project
+project_dir: ~/path/to/project
 git_branch: main
 git_commit: abc1234
 ---

@@ -13,7 +13,7 @@ description: Self-upgrade mechanism for panda skills ecosystem. Checks GitHub Re
 
 # panda-upgrade
 
-Self-upgrade mechanism for the panda skills ecosystem. Fetches the latest release from `kkudumu/panda-skills` on GitHub, compares it to the locally installed version, and copies updated skill files in place.
+Self-upgrade mechanism for the panda skills ecosystem. Fetches the latest release from `kkudumu/panda-brain` on GitHub, compares it to the locally installed version, and copies updated skill files in place.
 
 ---
 
@@ -135,7 +135,7 @@ Map `CHECK_FAILED <reason>` codes to user-facing messages:
 |---|---|
 | `gh_not_installed` | GitHub CLI is not installed. Install it with: `brew install gh` (macOS) or see https://cli.github.com |
 | `no_internet` | Cannot reach GitHub. Check your internet connection and try again. |
-| `repo_not_found` | Repository `kkudumu/panda-skills` not found. Verify you have access to the repository. |
+| `repo_not_found` | Repository `kkudumu/panda-brain` not found. Verify you have access to the repository. |
 | `no_releases_found` | No releases found in the repository yet. Check back later. |
 | any other reason | Version check failed: `<reason>`. Try running manually: `bash ~/.claude/skills/panda-upgrade/scripts/check-version.sh` |
 
@@ -148,6 +148,6 @@ Map `CHECK_FAILED <reason>` codes to user-facing messages:
 | `~/.claude/skills/panda-upgrade/scripts/check-version.sh` | Query GitHub for latest release, cache result 60 min |
 | `~/.claude/skills/panda-upgrade/scripts/upgrade.sh` | Download and install latest release |
 
-**Cache location**: `~/.cache/panda-skills/version-check`
+**Cache location**: `~/.cache/panda-brain/version-check`
 **Version file**: `~/.claude/skills/panda-version.txt`
-**Repo**: `kkudumu/panda-skills`
+**Repo**: `kkudumu/panda-brain`

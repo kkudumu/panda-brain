@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate skill files
+        run: |
+          chmod +x tests/validate-skills.sh
+          tests/validate-skills.sh
+
+      - name: Validate eval files
+        run: |
+          chmod +x tests/validate-evals.sh
+          tests/validate-evals.sh
+
+      - name: Check for hardcoded paths
+        run: |
+          if grep -r '/Users/[a-zA-Z]' --include="*.md" --include="*.sh" --include="*.json" --include="*.yml" --include="*.ts" . | grep -v node_modules | grep -v '.git/' | grep -v 'docs/plans/' | grep -v CONTRIBUTING.md | grep -v CHANGELOG.md; then
+            echo "FAIL: Found hardcoded user home paths"
+            exit 1
+          else
+            echo "OK: No hardcoded paths found"
+          fi
+
+      - name: Validate JSON files
+        run: |
+          FAIL=0
+          for f in $(find . -name "*.json" -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/bun.lock"); do
+            if ! node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" 2>/dev/null; then
+              echo "FAIL: $f is not valid JSON"
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run shellcheck on scripts
+        run: |
+          FAIL=0
+          for f in $(find . -name "*.sh" -not -path "*/node_modules/*"); do
+            echo "Checking: $f"
+            if ! shellcheck -S warning "$f"; then
+              FAIL=1
+            fi
+          done
+          exit $FAIL
