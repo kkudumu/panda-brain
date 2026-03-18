@@ -25,10 +25,10 @@ Before dispatching any agents, read `~/.claude/panda-config.yml`:
 ## Blackboard Read
 
 Before starting, load context from the blackboard:
-1. Read `/Users/kioja.kudumu/.claude/panda-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
-2. Read `/Users/kioja.kudumu/.claude/panda-state/blackboard/experiences/index.json` — filter by task_type "feature"/"investigation"
+1. Read `~/.claude/panda-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
+2. Read `~/.claude/panda-state/blackboard/experiences/index.json` — filter by task_type "feature"/"investigation"
 3. Load top 3-5 matching experience files for past brainstorm lessons
-4. Read `/Users/kioja.kudumu/.claude/panda-state/blackboard/patterns.json` — check execution_patterns and user_behavior
+4. Read `~/.claude/panda-state/blackboard/patterns.json` — check execution_patterns and user_behavior
 
 If missing or empty, proceed without.
 
@@ -249,11 +249,11 @@ This state is what panda-pause captures and panda-resume restores. Keep it curre
 ## Blackboard Write
 
 After completing, update:
-1. `/Users/kioja.kudumu/.claude/panda-state/blackboard/context.json`:
+1. `~/.claude/panda-state/blackboard/context.json`:
    - Set current_task status to "complete"
    - Append decision summary to recent_decisions (cap at 10)
    - Update session_metadata.skills_invoked and last_updated
-2. Write experience file to `/Users/kioja.kudumu/.claude/panda-state/blackboard/experiences/YYYY-MM-DD_task-slug.json`:
+2. Write experience file to `~/.claude/panda-state/blackboard/experiences/YYYY-MM-DD_task-slug.json`:
    - task_type: "feature" or "investigation"
    - feature_type: detected type (UI, API, etc.)
    - architectural_direction: the approach chosen
