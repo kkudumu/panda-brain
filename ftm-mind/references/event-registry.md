@@ -67,6 +67,15 @@ Guidelines for writing clear declarations:
 
 ---
 
+### research_complete
+- **Description**: ftm-researcher finished its synthesis pipeline and structured output is ready for consumption
+- **Emitted by**: ftm-researcher
+- **Listened to by**: ftm-brainstorm (consume findings for current research sprint), ftm-mind (log research session on blackboard, optionally surface to user)
+- **Fast-path**: no
+- **Payload**: `{ query, mode, findings_count, consensus_count, contested_count, unique_count, sources_count, council_used, duration_ms }`
+
+---
+
 ### plan_approved
 - **Description**: The user has approved a plan for execution
 - **Emitted by**: ftm-executor (after user confirmation)
@@ -159,7 +168,7 @@ Guidelines for writing clear declarations:
 
 ### task_completed
 - **Description**: A task finished — including passing all verification gates (tests, audit, Codex gate)
-- **Emitted by**: ftm-executor, ftm-debug, ftm-audit, ftm-retro, ftm-brainstorm, ftm-council, ftm-codex-gate, ftm-intent, ftm-diagram, ftm-browse, ftm-pause, ftm-resume, ftm-upgrade, ftm-config
+- **Emitted by**: ftm-executor, ftm-debug, ftm-audit, ftm-retro, ftm-brainstorm, ftm-council, ftm-codex-gate, ftm-intent, ftm-diagram, ftm-browse, ftm-pause, ftm-resume, ftm-upgrade, ftm-config, ftm-researcher
 - **Listened to by**: ftm-retro (micro-reflection trigger — record the task outcome as an experience), ftm-mind (advance wave state, check if all tasks in wave are done)
 - **Fast-path**: yes — micro-reflection runs on every task completion unconditionally; no mind mediation needed
 - **Payload**: `{ task_number, task_title, plan_path, wave_number, duration_ms, audit_result, agent_name }`
@@ -257,6 +266,7 @@ Use this table to quickly look up which skills are involved when an event fires:
 |---|---|---|
 | task_received | executor | mind, brainstorm |
 | plan_generated | executor, brainstorm | mind |
+| research_complete | researcher | brainstorm, mind |
 | plan_approved | executor | executor |
 | code_changed | executor | mind |
 | code_committed | executor | intent, diagram, codex-gate |
@@ -267,7 +277,7 @@ Use this table to quickly look up which skills are involved when an event fires:
 | issue_found | audit, debug, codex-gate | mind |
 | documentation_updated | intent, diagram | mind |
 | review_complete | audit, debug, council, codex-gate | audit, mind |
-| task_completed | executor, debug, audit, retro, brainstorm, council, codex-gate, intent, diagram, browse, pause, resume, upgrade, config | retro, mind |
+| task_completed | executor, debug, audit, retro, brainstorm, council, codex-gate, intent, diagram, browse, pause, resume, upgrade, config, researcher | retro, mind |
 | error_encountered | executor, debug | debug, retro, mind |
 | session_paused | pause | mind |
 | session_resumed | resume | executor, mind |

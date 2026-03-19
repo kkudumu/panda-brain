@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T21:01:45.180Z",
+  "generated_at": "2026-03-19T21:06:50.384Z",
   "skills": [
     {
       "name": "ftm",
@@ -53,7 +53,8 @@
         "task_completed"
       ],
       "events_listens": [
-        "task_received"
+        "task_received",
+        "research_complete"
       ],
       "blackboard_reads": [
         "~/.claude/ftm-state/blackboard/context.json",
@@ -69,7 +70,7 @@
         "plan-template.md"
       ],
       "has_evals": true,
-      "size_bytes": 17776,
+      "size_bytes": 18865,
       "enabled": true
     },
     {
@@ -316,7 +317,7 @@
         "routing-scenarios.md"
       ],
       "has_evals": true,
-      "size_bytes": 39708,
+      "size_bytes": 39905,
       "enabled": true
     },
     {
@@ -351,7 +352,11 @@
       "blackboard_reads": [],
       "blackboard_writes": [],
       "references": [
-        "agent-prompts.md"
+        "adaptive-search.md",
+        "agent-prompts.md",
+        "council-integration.md",
+        "output-format.md",
+        "synthesis-pipeline.md"
       ],
       "has_evals": false,
       "size_bytes": 10899,
