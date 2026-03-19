@@ -20,3 +20,10 @@ Use these as behavioral tests for the Decide phase.
 | `open the page and tell me what looks broken` | visual/browser task | route to `ftm-browse` or use browser support if already in-flow |
 | `add error handling to the API routes` | medium task, multi-file, `plan_first` mode | present numbered plan for approval, wait for user response, then execute approved steps |
 | `refactor auth to support OAuth` (with `plan_first`) | medium-large, multi-file with dependencies | present plan with 5-7 steps, user says "skip 4, for step 3 use passport.js" → adjust and execute |
+| `research parallel agent architectures` | research task, factual inquiry, broad scope | route to `ftm-researcher` (deep) |
+| `what's the best way to handle auth in Next.js` | research task, specific technical question | route to `ftm-researcher` (standard) |
+| `quick look at how Stripe handles webhooks` | research task, explicit "quick" signal | route to `ftm-researcher` (quick) |
+| `compare Redis vs Memcached for our session store` | research task, comparative, codebase-relevant | route to `ftm-researcher` (deep, codebase-aware) |
+| `find me examples of rate limiting middleware` | research task, looking for implementations | route to `ftm-researcher` (standard) |
+| `I want to build a dashboard` | ideation, not research | route to `ftm-brainstorm` (calls researcher internally) |
+| `/ftm-researcher auth patterns in microservices` | explicit skill choice | respect explicit route to `ftm-researcher` |

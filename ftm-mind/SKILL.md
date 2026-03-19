@@ -244,7 +244,7 @@ If `experiences/index.json` has no usable matches:
 - lean harder on current repo state and direct inspection
 - record the resulting experience aggressively after completion
 
-### 4. Capability Inventory: 15 Panda Skills
+### 4. Capability Inventory: 16 Panda Skills
 
 Orient must know all ftm capabilities before deciding whether to route or act directly.
 
@@ -265,6 +265,7 @@ Orient must know all ftm capabilities before deciding whether to route or act di
 | `ftm-retro` | The user wants a post-run retrospective, lessons learned, or execution review. |
 | `ftm-config` | The user wants ftm settings, model profile, or feature configuration changed. |
 | `ftm-git` | Any git commit or push is about to happen, the user asks to scan for secrets/credentials/API keys, or wants to verify no secrets are hardcoded before sharing code. MUST run before any commit or push operation — this is a mandatory security gate, not optional. |
+| `ftm-researcher` | The user wants thorough research on a topic, comparison of approaches, state-of-the-art analysis, or evidence-based investigation. Not for ideation (that is ftm-brainstorm). |
 
 Routing heuristic:
 
@@ -721,6 +722,28 @@ Approve? Or adjust the approach.
 
 This gives the user control over the *strategy* even when delegating to skills.
 
+### Research tasks → ftm-researcher
+
+Route to ftm-researcher when the request is primarily about gathering information,
+comparing approaches, or understanding the state of the art on a topic.
+
+Signals:
+- "research X", "find out about Y", "what's the state of the art on Z"
+- "compare approaches to W", "how do others handle X"
+- "deep dive into X", "investigate Y", "look into Z"
+- "find me examples of X", "what's out there for Y"
+- The user wants facts and evidence, not ideation or planning
+
+Distinguish from ftm-brainstorm:
+- Brainstorm: user has an idea and wants to develop it → exploratory, iterative, extractive
+- Researcher: user wants information about a topic → factual, evidence-based, comprehensive
+- Ambiguous: if the user seems to want both exploration AND research, route to brainstorm (which calls researcher internally)
+
+Mode selection:
+- "quick look" / "briefly" → quick mode
+- Default → standard mode
+- "deep dive" / "thorough" / "comprehensive" → deep mode
+
 ### 2. Choose direct vs routed execution
 
 Use direct execution when:
@@ -899,6 +922,7 @@ Panda Skills:
   /ftm debug [description]   — Multi-vector deep debugging war room
   /ftm audit                 — Wiring verification
   /ftm council [question]    — Multi-model deliberation
+  /ftm research [topic]      — Deep parallel research engine
   /ftm intent                — Manage INTENT.md documentation
   /ftm diagram               — Manage architecture diagrams
   /ftm codex-gate            — Run adversarial Codex validation

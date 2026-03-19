@@ -96,3 +96,15 @@ Escalate only when:
 - the simple approach fails
 - the user explicitly asks for the larger workflow
 - the complexity is obvious from the start
+
+---
+
+## Research Tasks
+
+Research tasks don't follow the micro/small/medium/large sizing — they route directly
+to ftm-researcher regardless of complexity. The researcher's mode system (quick/standard/deep)
+handles the depth calibration internally.
+
+If a research request also implies implementation ("research X and then build it"),
+orient as a multi-phase workflow: research first (ftm-researcher), then plan (ftm-brainstorm
+or direct), then execute (ftm-executor).
