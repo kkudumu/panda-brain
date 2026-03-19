@@ -149,6 +149,35 @@ When ftm-mind routes a commit or push request, it should run ftm-git as a prereq
 ### With git-workflow agent
 The git-workflow agent should check with ftm-git before executing any commit or push command. If you're about to run `git commit` or `git push`, ftm-git goes first.
 
+## Post-Commit Experience Recording
+
+FTM includes a post-commit hook that guarantees every commit produces an experience entry in the blackboard.
+
+### How It Works
+
+1. After every `git commit`, the hook checks if an experience was recorded in the last 2 minutes
+2. If yes (the LLM already recorded a detailed experience) → skip, no duplicate
+3. If no → create a minimal experience from commit metadata (hash, message, files, branch)
+4. Update the experience index
+
+### Installation
+
+The hook is at `ftm-git/hooks/post-commit-experience.sh`. To install:
+
+```bash
+cp ~/.claude/skills/ftm-git/hooks/post-commit-experience.sh .git/hooks/post-commit
+chmod +x .git/hooks/post-commit
+```
+
+Or add to your project's husky config if using husky.
+
+### Minimal vs Rich Experiences
+
+- **Minimal** (from hook): commit metadata only, confidence 0.5, tags: `auto-recorded`
+- **Rich** (from LLM): full task context, lessons learned, higher confidence, domain-specific tags
+
+The hook ensures no commit goes unrecorded, while the LLM produces richer entries during active sessions.
+
 ## Blackboard Write
 
 After completing, update the blackboard:

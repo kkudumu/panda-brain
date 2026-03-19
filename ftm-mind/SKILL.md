@@ -159,6 +159,54 @@ Read in order: `context.json` → `experiences/index.json` → `patterns.json` u
 
 **Pattern registry**: Scan all four sections (codebase_insights, execution_patterns, user_behavior, recurring_issues). Apply only when they materially match the present case.
 
+### Pattern Decay Enforcement
+
+After loading `patterns.json`, apply decay rules to every pattern before using them in Orient:
+
+**Decay tiers** (based on `last_reinforced` timestamp):
+
+| Days Since Reinforcement | Confidence Adjustment | Status |
+|---|---|---|
+| 0-30 days | No change | Active |
+| 31-60 days | Reduce confidence by 1 tier (high→medium, medium→low) | Aging |
+| 61-90 days | Reduce confidence by 2 tiers | Stale |
+| 91+ days | Set confidence to 0 | Decayed |
+
+**Confidence tiers**: 1.0 (high) → 0.7 (medium) → 0.4 (low) → 0.0 (decayed)
+
+**Decay application:**
+
+```
+For each pattern in patterns.json:
+  1. Calculate days since last_reinforced
+  2. Apply tier reduction based on table above
+  3. If confidence reaches 0:
+     - Move pattern to an "archived" section (do not delete)
+     - Log: "Pattern '[name]' decayed — archived after [N] days without reinforcement"
+  4. If confidence was reduced but > 0:
+     - Update confidence in-memory for this Orient pass
+     - Log: "Pattern '[name]' aging — confidence reduced to [X]"
+```
+
+**Pattern conflict detection:**
+
+When loading experiences, check if any recent experience (last 7 days) CONTRADICTS an active pattern:
+- Experience outcome differs from pattern's predicted behavior
+- Experience explicitly notes a pattern was wrong
+
+When a conflict is detected:
+1. Flag the conflicting pattern: "⚠ Pattern '[name]' conflicts with recent experience from [date]"
+2. Reduce the pattern's effective confidence by an additional tier for this session
+3. If the pattern has been contradicted 3+ times, promote a replacement pattern from the contradicting experiences
+
+**Write-back:**
+
+After Orient completes, write updated `patterns.json` back with:
+- Updated `last_reinforced` timestamps for patterns that were actively used this session
+- Archived patterns moved to an `archived` array
+- Any new patterns promoted from experiences
+- Conflict flags noted in pattern metadata
+
 ### 3. Cold-Start Behavior
 
 When the blackboard is empty: do not apologize, do not say capability is reduced. Operate at full capability using live observation, codebase state, and base heuristics. Cold start is a smart engineer on day 1, not degraded mode.
@@ -193,6 +241,61 @@ Incorporate what is true in the repo. Check dirty worktree, recent commits, acti
 ### 8. Complexity Sizing
 
 Read `references/protocols/COMPLEXITY-SIZING.md` for the full sizing guide (micro/small/medium/large) and the ADaPT escalation rule.
+
+### Complexity Calibration
+
+When the experience index contains 20+ entries, run a calibration check during Orient to improve future sizing accuracy.
+
+**Calibration analysis:**
+
+1. **Filter relevant experiences** — select entries matching the current task's `task_type` and overlapping `tags`
+2. **Compare estimated vs actual** — for each matching experience, check `complexity_estimated` against `complexity_actual`
+3. **Detect systematic bias** — if >60% of matching experiences show underestimation (actual > estimated), the system has a sizing bias for this task type + tag combination
+
+**Bias detection thresholds:**
+
+| Sample Size | Underestimation Rate | Action |
+|---|---|---|
+| 20-30 experiences | >70% underestimate | Promote weak correction pattern |
+| 30-50 experiences | >60% underestimate | Promote strong correction pattern |
+| 50+ experiences | >50% underestimate | Promote strong correction pattern |
+
+**Correction pattern format:**
+
+When a bias is detected, promote a new pattern to `patterns.json` under `execution_patterns`:
+
+```json
+{
+  "name": "sizing_correction_[task_type]_[primary_tag]",
+  "description": "Tasks of type [task_type] with tag [tag] are consistently underestimated. Bump complexity by one tier.",
+  "confidence": 0.7,
+  "last_reinforced": "[current date]",
+  "source": "calibration_analysis",
+  "correction": {
+    "task_type": "[task_type]",
+    "tags": ["[matching tags]"],
+    "bump_direction": "up",
+    "bump_amount": 1,
+    "sample_size": N,
+    "underestimation_rate": "X%"
+  }
+}
+```
+
+**Applying corrections:**
+
+During Complexity Sizing (step 8), after initial estimation:
+1. Check `patterns.json` for any `sizing_correction_*` patterns matching the current task_type + tags
+2. If a correction pattern exists and its confidence > 0.4, bump the estimated complexity up by the specified amount
+3. Log: "Complexity adjusted from [original] to [bumped] based on calibration pattern (N experiences, X% underestimation)"
+
+**Reinforcement:**
+
+After task completion, if the corrected estimate was accurate (matches actual), reinforce the correction pattern (update `last_reinforced`). If the correction overshot (actual was lower than corrected estimate), reduce the pattern's confidence by one tier.
+
+**Scope:**
+
+This calibration applies to both IT ops tasks and dev tasks — any task_type with sufficient experience data. The same mechanism works regardless of domain.
 
 ### 9. Approval Gates
 
@@ -458,6 +561,93 @@ FTM Skills:
 
 Or just describe what you need and ftm-mind will figure out the smallest correct next move.
 ```
+
+## Error Recovery Protocol
+
+When any FTM skill fails mid-execution, follow this structured recovery sequence. The goal is to learn from every failure and never repeat the same mistake.
+
+### Step 1: Record failure immediately
+
+Before attempting any recovery, create an experience entry:
+```json
+{
+  "task_type": "[current task type]",
+  "description": "FAILURE: [what was being attempted]",
+  "outcome": "failure",
+  "error_message": "[the actual error]",
+  "failed_step": "[which step/phase failed]",
+  "approach_attempted": "[what was tried]",
+  "tags": ["failure", "[task_type]", "[relevant domain tags]"],
+  "confidence": 0.8,
+  "lessons": ["[initial assessment of what went wrong]"]
+}
+```
+
+This ensures the failure is captured even if recovery also fails.
+
+### Step 2: Search blackboard for similar past failures
+
+Query `experiences/index.json` for entries with:
+- `outcome: "failure"`
+- Matching `task_type` OR overlapping `tags`
+- Similar `error_message` pattern (substring match)
+
+If a match is found with a subsequent successful recovery:
+1. Read the recovery experience for the approach that worked
+2. Try that approach first
+3. If it works, reinforce the recovery pattern (update confidence)
+
+### Step 3: Escalate one complexity tier
+
+If no past solution exists or the past solution didn't work:
+
+| Current Approach | Escalation |
+|---|---|
+| Direct action (micro task) | Generate a 2-3 step plan and retry |
+| Small plan (2-3 steps) | Expand to medium plan with verification steps |
+| Medium plan | Route to ftm-debug for deep investigation |
+| ftm-debug | Invoke ftm-council for multi-model perspective |
+| ftm-council | Save state and present diagnosis to user |
+
+### Step 4: Save state on unrecoverable failure
+
+If escalation through all tiers fails:
+1. Invoke ftm-pause to save full session state
+2. Present a structured diagnosis to the user:
+   ```
+   ⚠ Unrecoverable failure in [skill]:
+
+   Error: [error message]
+   Step: [which step failed]
+   Attempts: [list of approaches tried and why each failed]
+
+   Suggested next steps:
+   - [suggestion based on error pattern]
+   - [alternative approach]
+
+   Session saved. Resume with /ftm-resume to continue.
+   ```
+3. Do NOT silently retry indefinitely — 3 attempts max per escalation tier
+
+### Step 5: Record successful recovery
+
+When a recovery succeeds (at any tier):
+1. Create a HIGH-VALUE experience entry:
+   ```json
+   {
+     "task_type": "[type]",
+     "description": "RECOVERY: [original failure] → [what fixed it]",
+     "outcome": "success",
+     "confidence": 0.9,
+     "tags": ["recovery", "high-value", "[domain tags]"],
+     "lessons": [
+       "Original error: [error]",
+       "Failed approaches: [list]",
+       "Working solution: [what worked and why]"
+     ]
+   }
+   ```
+2. These recovery experiences are prioritized in future blackboard searches
 
 ## Anti-Patterns
 

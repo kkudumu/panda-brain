@@ -211,11 +211,28 @@ Runs automatically after options 1, 2, and 4. Does NOT run for option 3. Remove 
 ## Edge Cases
 
 - **No dependency map**: Infer from file lists — same files = sequential, different domains = parallel
-- **Agent fails or gets stuck**: Read output, fix in worktree or respawn with more context
+- **Agent fails or gets stuck**: See Agent Failure Recovery below
 - **Merge conflicts**: Resolve manually using context from both agents' work
 - **Large plans (20+ tasks)**: Show wave structure upfront, report progress between waves
 - **No tests**: Diff review becomes the primary quality gate
 - **Single-task plans**: Skip wave-boundary Codex gate; run it immediately after task completion with `mode: "single-task"`
+
+---
+
+### Agent Failure Recovery
+
+When a task agent returns with errors or unfinished work:
+
+1. **Record the failure** — create experience entry with error details, agent type, task context
+2. **Check blackboard** — search for similar past agent failures and their resolutions
+3. **Retry with context** — if retrying, include in the agent's prompt:
+   - What failed and why
+   - The specific error message
+   - What NOT to try (from DEBUG.md and past failures)
+4. **Escalate if retry fails** — after 2 failed retries:
+   - Try a different agent type for the same task
+   - If that fails, flag for manual intervention
+5. **Never silently drop tasks** — every task must either complete, be explicitly skipped by the user, or be flagged as blocked
 
 ---
 
