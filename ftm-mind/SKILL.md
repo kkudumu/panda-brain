@@ -85,6 +85,45 @@ Orient is the crown jewel. Spend most of the reasoning budget here. Build the be
 
 Orient answers: `What is actually going on, what matters most, what is the smallest correct move, and what capability mix fits this situation?`
 
+### Context Budget Check
+
+Before loading anything, estimate the conversation's context usage:
+
+**Estimation method:** Count approximate tokens from conversation history. Use message count as proxy:
+- Messages 0-30: context ~20% used → **Full Orient**
+- Messages 31-60: context ~40% used → **Full Orient** (still under threshold)
+- Messages 61-90: context ~55% used → **Light Orient**
+- Messages 91+: context ~70%+ used → **Minimal Orient**
+
+**Full Orient** (< 40% context used — default for fresh conversations):
+- Load all blackboard state: context.json, experiences/index.json, patterns.json
+- Load top 3-5 matching experience files
+- Full codebase snapshot (git status, recent commits)
+- Read ftm-manifest.json for skill inventory
+- Read MCP inventory
+- Full complexity sizing and approval gate checks
+
+**Light Orient** (40-65% context used):
+- Load context.json only (skip experience files and patterns.json)
+- Extract recent_decisions and current_task from context
+- Skip experience file loading — use only what's already in conversation context
+- Skip pattern loading — rely on conversation history for pattern awareness
+- Abbreviated codebase snapshot (git status only, no log)
+- Skip manifest re-read if already loaded this session
+
+**Minimal Orient** (> 65% context used):
+- Load ONLY the user's current request + any external_context from Observe
+- No blackboard reads at all
+- No codebase snapshot
+- Route based on request text and conversation context alone
+- If the task requires deep context that's been compressed away, suggest: "Context is getting long. Want to /ftm-pause and continue in a fresh session?"
+
+**Rules:**
+- Never degrade plan quality for short/fresh conversations — Full Orient always fires when context is plentiful
+- The context check adds ~0 overhead (just counting messages)
+- Log which Orient mode was used in the blackboard update
+- If a task clearly needs full context but we're in Minimal mode, prefer to pause rather than produce a low-quality plan
+
 ### Orient Priority Order
 
 When signals conflict, trust them in this order:

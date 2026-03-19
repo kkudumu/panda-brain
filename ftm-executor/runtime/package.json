@@ -1,0 +1,8 @@
+{
+  "name": "ftm-runtime",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "ftm-runtime": "./ftm-runtime.mjs"
+  }
+}

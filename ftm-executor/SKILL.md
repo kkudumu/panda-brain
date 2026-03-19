@@ -71,9 +71,28 @@ Read `references/protocols/MODEL-PROFILE.md` for config loading rules and model-
 
 ### Phase 1: Analyze the Plan
 
-Read the plan document and extract: all tasks (number, description, files, dependencies), the dependency graph, domain clusters (frontend/backend/infra/testing/etc.), and parallelism opportunities.
+Instead of parsing the plan manually, use the ftm-runtime module for mechanical orchestration.
 
-Output a brief execution summary before proceeding — plan title, task count, agents needed with reasoning, and the wave breakdown showing which tasks run in each wave and their dependencies.
+1. **Index the plan** — Run:
+   ```bash
+   node ~/.claude/skills/ftm-executor/runtime/ftm-runtime.mjs plan-index <plan-path>
+   ```
+   This returns JSON with: all tasks (id, title, description, files, dependencies, agent_type), computed waves, and task count.
+
+2. **Review the runtime's output** — Verify the wave structure makes sense. Check for:
+   - Tasks that should be parallel but aren't (missing from same wave)
+   - Tasks in the same wave that touch the same files (should be sequential)
+   - Adjust by re-running with modified plan if needed
+
+3. **Output the execution summary** — Use the runtime's wave structure:
+   ```
+   Plan: [title]
+   Tasks: [N] total across [W] waves
+
+   Wave 1: Tasks [list] (parallel)
+   Wave 2: Tasks [list] (depends on wave 1)
+   ...
+   ```
 
 ---
 
@@ -103,7 +122,18 @@ If `progress_tracking` is enabled in `~/.claude/ftm-config.yml` (default: true),
 
 ### Phase 4: Dispatch Agents
 
-Launch agents for all tasks in the current wave **in parallel**. Read `references/phases/PHASE-4-DISPATCH.md` for the complete dispatch prompt template.
+Before dispatching each wave, call:
+```bash
+node ~/.claude/skills/ftm-executor/runtime/ftm-runtime.mjs next-wave
+```
+to get the current wave's tasks. This returns the task list for the next pending wave.
+
+Launch agents for all tasks in that wave **in parallel**. Read `references/phases/PHASE-4-DISPATCH.md` for the complete dispatch prompt template.
+
+After each task agent completes successfully, call:
+```bash
+node ~/.claude/skills/ftm-executor/runtime/ftm-runtime.mjs mark-complete <task-id>
+```
 
 ---
 
@@ -117,7 +147,22 @@ After every task agent returns, run ftm-audit before marking complete. Skip for 
 
 As each agent completes: read its summary, review commits via `git log`, then merge into the main branch one worktree at a time using `--no-ff`. Run full verification (tests, build, lint) after each merge. Fix any merge issues before proceeding.
 
-For multi-wave plans: after merging wave N, verify everything works, then create fresh worktrees from the updated branch for wave N+1 before dispatch.
+For multi-wave plans: after merging wave N:
+1. Call `ftm-runtime status` to check overall progress and confirm all wave N tasks are marked complete.
+2. Call `ftm-runtime next-wave` to get the next batch of tasks.
+3. If `next-wave` returns `complete: true`, all waves are done — proceed to Phase 6.
+4. Otherwise, verify everything works, then create fresh worktrees from the updated branch for wave N+1 before dispatch.
+
+---
+
+### Resume Support
+
+If the conversation is interrupted mid-execution:
+- The runtime state persists in `~/.claude/ftm-state/runtime-state.json`
+- On resume (via ftm-resume), call `ftm-runtime status` to see what's done
+- Call `ftm-runtime next-wave` to pick up where execution left off
+- Already-completed tasks are never re-executed
+- Failed tasks can be retried by dispatching a new agent for that task
 
 ---
 
