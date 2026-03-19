@@ -1,16 +1,191 @@
-# FTM Skills
+# Feed The Machine
 
-A unified intelligence layer for Claude Code. Sixteen skills that give Claude persistent memory, OODA-based reasoning, and autonomous execution — turning one-shot responses into a system that gets smarter with every session.
+You have a pile of work. An IT ops ticket nobody wants to touch. A feature spec that needs to become code. A bug that's been open for three days. A half-formed idea rattling around your head.
 
-## Quick Start
+Stop managing it. Feed it to the machine.
+
+FTM is a cognitive skill ecosystem for Claude Code. Drop anything in — a Jira ticket, a feature spec, a bug report, a brainstorm, a full app build — and it reads everything, proposes a plan, waits for your approval, then executes end-to-end. Every successful execution becomes a playbook. Every playbook makes the next similar task faster. The machine hungers. You feed it. It takes care of you.
+
+---
+
+## The Loop
+
+Every task, every time:
+
+```
+FEED → PLAN → APPROVE → EXECUTE → LEARN
+  ↑                                  |
+  └──────────── (next task) ─────────┘
+```
+
+**FEED** — Paste anything. A ticket URL. A spec doc. An error stack trace. Plain English. The machine reads it all.
+
+**PLAN** — ftm-mind runs an OODA loop: reads your blackboard (memory across sessions), sizes the task, assembles the right skills, proposes a concrete plan with wave-by-wave steps.
+
+**APPROVE** — You review the plan. One word: go. Or you push back and it adjusts.
+
+**EXECUTE** — Parallel agent teams work through the plan. Each wave completes, validates, and checks in before the next begins. Browser automation, git ops, test runs, API calls — all coordinated.
+
+**LEARN** — Every outcome writes back to the blackboard: what worked, what failed, what pattern to remember. Next time you bring a similar task, the machine already knows the shape of it.
+
+Two modes, same loop:
+
+- **IT ops mode** — Ticket → read internal docs → browser-based admin execution → draft ticket updates back to Jira or Freshservice
+- **Dev mode** — Spec → brainstorm → plan → parallel code in worktrees → test → adversarial review → ship
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    User["User Input\n(ticket / spec / idea / error)"] --> Mind
+
+    subgraph Core["FTM Core"]
+        Mind["ftm-mind\n(OODA Cognitive Loop)"]
+        BB["Blackboard\ncontext.json\nexperiences/\npatterns.json"]
+        Mesh["Event Mesh\n18 typed events"]
+    end
+
+    Mind <-->|read / write| BB
+    Mind -->|route| Mesh
+
+    subgraph Skills["Skill Layer"]
+        Storm["ftm-brainstorm\nSocratic ideation\n+ parallel research"]
+        Debug["ftm-debug\nMulti-vector\ndebugging war room"]
+        Exec["ftm-executor\nAutonomous plan\nexecution"]
+        Council["ftm-council\nClaude + Codex + Gemini\n2-of-3 consensus"]
+        Browse["ftm-browse\nHeadless browser\n+ ARIA inspection"]
+        Git["ftm-git\nSecret scanning\n+ credential gate"]
+        Audit["ftm-audit\nKnip + adversarial\nLLM wiring check"]
+    end
+
+    Mesh --> Storm
+    Mesh --> Debug
+    Mesh --> Exec
+    Mesh --> Council
+    Mesh --> Browse
+    Mesh --> Git
+    Mesh --> Audit
+
+    subgraph Integrations["External Integrations"]
+        Jira["Jira MCP"]
+        FS["Freshservice MCP"]
+        Slack["Slack MCP"]
+        Gmail["Gmail MCP"]
+    end
+
+    Browse --> Jira
+    Browse --> FS
+    Mind --> Slack
+    Mind --> Gmail
+
+    Exec -->|code_committed| Intent["ftm-intent\nINTENT.md layer"]
+    Exec -->|code_committed| Diagram["ftm-diagram\nARCHITECTURE.mmd"]
+    Exec -->|task_completed| Retro["ftm-retro\nmicro-reflection"]
+    Exec -->|wave boundary| Gate["ftm-codex-gate\nadversarial validation"]
+    Gate --> Exec
+```
+
+---
+
+## First 5 Minutes
+
+Install:
 
 ```bash
 npx ftm-skills@latest
 ```
 
-Symlinks all skills into `~/.claude/skills/` where Claude Code discovers them automatically.
+Symlinks all 16+ skills into `~/.claude/skills/` where Claude Code discovers them automatically. That's it.
 
-## Development Install
+**Three things to try right now:**
+
+**1. Drop a ticket:**
+```
+/ftm
+```
+Paste a Jira or Freshservice ticket. Watch it read the ticket, pull relevant docs from your blackboard, propose a plan with concrete steps, and wait for your go.
+
+**2. Develop an idea:**
+```
+/ftm-brainstorm
+```
+Describe something you're trying to figure out. It runs parallel web and GitHub research agents, challenges your assumptions Socratically, and surfaces options you hadn't considered.
+
+**3. Kill a bug:**
+```
+/ftm-debug
+```
+Paste an error message, stack trace, or just describe unexpected behavior. It opens a multi-vector war room — static analysis, runtime hypothesis testing, dependency auditing — running in parallel.
+
+---
+
+## Before / After
+
+### IT Ops: Setting up SSO SAML configuration
+
+**Without FTM** — 45 minutes. Find the vendor docs. Navigate the admin panel manually. Cross-reference the IdP metadata. Copy-paste entity IDs and ACS URLs without fat-fingering them. Update the ticket. Hope you didn't miss a field.
+
+**With FTM** — 5 minutes. Paste the ticket. FTM reads your Freshservice config docs, opens a headless browser session, navigates the admin panel, fills the SAML fields from the ticket spec, screenshots the result for verification, and drafts the ticket update. You review and approve each step.
+
+---
+
+### Dev Feature: Adding a new API endpoint
+
+**Without FTM** — You open five files, context-switch between the spec and the codebase, write the route, realize the middleware pattern is different from what you remembered, check another file, write tests separately, forget to update the INTENT docs, ship it and wonder why the audit is failing.
+
+**With FTM** — You paste the spec. FTM reads the existing endpoint patterns in your codebase (blackboard knows your stack), proposes a plan: route → handler → validation → tests → INTENT update → audit check. Parallel agents handle the implementation waves. ftm-codex-gate validates at each boundary. ftm-intent and ftm-diagram update automatically on commit. The whole thing is coherent from the start.
+
+---
+
+## Skill Inventory
+
+| Skill | What It Does |
+|-------|-------------|
+| **ftm-mind** | OODA cognitive loop — the universal entry point; reads context, sizes tasks, routes everything |
+| **ftm-executor** | Autonomous plan execution with dynamically assembled agent teams and wave-by-wave progress |
+| **ftm-debug** | Multi-vector debugging war room — parallel hypothesis testing, static + runtime + dependency analysis |
+| **ftm-brainstorm** | Socratic ideation with parallel web and GitHub research agents; challenges assumptions, surfaces options |
+| **ftm-audit** | Wiring verification — knip static analysis plus adversarial LLM audit of skill connections |
+| **ftm-council** | Multi-model deliberation — Claude, Codex, and Gemini debate to 2-of-3 consensus on hard decisions |
+| **ftm-codex-gate** | Adversarial Codex validation at executor wave boundaries before proceeding |
+| **ftm-retro** | Post-execution retrospectives and continuous micro-reflections after every task |
+| **ftm-intent** | INTENT.md documentation layer — function-level contracts, auto-updated on every commit |
+| **ftm-diagram** | ARCHITECTURE.mmd mermaid diagrams — auto-regenerated after commits |
+| **ftm-browse** | Headless browser — screenshots, ARIA inspection, form automation, visual verification |
+| **ftm-git** | Secret scanning and credential safety gate for all git operations |
+| **ftm-pause** | Save current session state to the blackboard mid-task |
+| **ftm-resume** | Restore a paused session and continue exactly where you left off |
+| **ftm-upgrade** | Self-upgrade from GitHub releases |
+| **ftm-config** | Configure model profiles and execution preferences |
+| **ftm** | Bare invocation — equivalent to `/ftm-mind` with plain-language input |
+
+---
+
+## How It Learns
+
+The blackboard is a three-tier knowledge store that persists across every session:
+
+| Tier | What's Stored | When It's Read |
+|------|--------------|----------------|
+| `context.json` | Current task, recent decisions, your stated preferences | Every single request |
+| `experiences/*.json` | Per-task learnings — one file per completed task, tagged by type | Orient phase, filtered by similarity to current task |
+| `patterns.json` | Insights promoted after 3+ confirming experiences — durable heuristics | Orient phase, matched to the current situation |
+
+Cold start is fine. The blackboard bootstraps aggressively in the first ten interactions and reaches useful density fast. By session twenty, FTM knows your stack, your team's conventions, the quirks of your external services, and what kinds of plans you tend to push back on.
+
+Every skill writes back. ftm-executor writes task outcomes. ftm-debug writes what the root cause turned out to be. ftm-retro promotes patterns when it sees the same learning three times. The machine gets better whether you're doing IT ops or shipping features.
+
+---
+
+## Install & Config
+
+**Quick start:** See [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
+**Configuration reference:** See [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+
+**Development install:**
 
 ```bash
 git clone https://github.com/kkudumu/ftm-brain.git ~/ftm-brain
@@ -18,111 +193,11 @@ cd ~/ftm-brain
 ./install.sh
 ```
 
-Pull updates anytime with `git pull && ./install.sh`. To remove: `./uninstall.sh` (removes symlinks only, keeps your data).
+Pull updates anytime: `git pull && ./install.sh`
 
-## What's Included
+Remove: `./uninstall.sh` (removes symlinks only, keeps your blackboard data)
 
-| Skill | Description |
-|-------|-------------|
-| **ftm-mind** | OODA cognitive loop — the default entry point for all freeform input |
-| **ftm-executor** | Autonomous plan execution with dynamically assembled agent teams |
-| **ftm-debug** | Multi-vector debugging war room with parallel hypothesis testing |
-| **ftm-brainstorm** | Socratic ideation with parallel web and GitHub research agents |
-| **ftm-audit** | Wiring verification — knip static analysis plus adversarial LLM audit |
-| **ftm-council** | Multi-model deliberation — Claude, Codex, and Gemini debate to 2-of-3 consensus |
-| **ftm-codex-gate** | Adversarial Codex validation at executor wave boundaries |
-| **ftm-retro** | Post-execution retrospectives and continuous micro-reflections |
-| **ftm-intent** | INTENT.md documentation layer — function-level contracts, auto-updated |
-| **ftm-diagram** | ARCHITECTURE.mmd mermaid diagrams — auto-updated after commits |
-| **ftm-browse** | Headless browser — screenshots, ARIA inspection, visual verification |
-| **ftm-git** | Secret scanning and credential safety gate for git operations |
-| **ftm-pause** | Save current session state to blackboard |
-| **ftm-resume** | Restore a paused session and continue where you left off |
-| **ftm-upgrade** | Self-upgrade from GitHub releases |
-| **ftm-config** | Configure model profiles and execution preferences |
-
-## Architecture
-
-```mermaid
-graph TD
-    User["User Input"] --> Mind["ftm-mind\n(OODA Loop)"]
-
-    Mind -->|Observe| BB_R["Blackboard Read\ncontext.json\nexperiences/\npatterns.json"]
-    BB_R --> Mind
-
-    Mind -->|Orient| Size{"Complexity\nSizing"}
-    Size -->|Micro/Small| Direct["Direct Execution"]
-    Size -->|Medium| Plan["Lightweight Plan\n+ Execute"]
-    Size -->|Large| Route["Route to Skill"]
-
-    Route --> Exec["ftm-executor"]
-    Route --> Debug["ftm-debug"]
-    Route --> Storm["ftm-brainstorm"]
-    Route --> Council["ftm-council"]
-    Route --> Audit["ftm-audit"]
-
-    Direct --> BB_W["Blackboard Write\n(experience)"]
-    Plan --> BB_W
-    Exec --> BB_W
-
-    BB_W -->|code_committed| Intent["ftm-intent"]
-    BB_W -->|code_committed| Diagram["ftm-diagram"]
-    BB_W -->|task_completed| Retro["ftm-retro\n(micro-reflection)"]
-
-    Exec -->|wave boundary| Gate["ftm-codex-gate"]
-    Gate --> Exec
-```
-
-## How It Works
-
-Every request runs through an **Observe → Orient → Decide → Act** loop:
-
-**Observe** — Capture your input, read session state from the blackboard, check git status.
-
-**Orient** — Load memory tiers (current context, past experiences, promoted patterns), scan the 16 available skills, assess codebase reality. This is where the reasoning happens — not keyword matching but contextual judgment.
-
-**Decide** — Size the task (micro / small / medium / large) and pick the smallest correct move. Simple things stay simple. Complex things escalate automatically.
-
-**Act** — Execute directly or route to the right skill, write the outcome back to the blackboard, then loop back to Observe.
-
-### Persistent Memory
-
-The blackboard is a three-tier knowledge store that accumulates across sessions:
-
-| Tier | Stores | Read When |
-|------|--------|-----------|
-| `context.json` | Current task, recent decisions, preferences | Every request |
-| `experiences/*.json` | Per-task learnings (one file each) | Orient phase, filtered by type and tags |
-| `patterns.json` | Insights promoted after 3+ confirming experiences | Orient phase, matched to current situation |
-
-Cold start works fine. The blackboard bootstraps aggressively in the first ~10 interactions and reaches useful density quickly.
-
-### Event Mesh
-
-Skills communicate through 18 typed events. Two fire automatically on every relevant action:
-
-- `code_committed` → triggers ftm-intent and ftm-diagram
-- `task_completed` → triggers micro-reflection in ftm-retro
-
-All other events are mediated by ftm-mind based on context.
-
-## Usage
-
-```
-/ftm [anything]          # Mind figures out what to do
-/ftm debug [problem]     # Deep debugging war room
-/ftm brainstorm [idea]   # Research-backed ideation
-/ftm execute [plan.md]   # Autonomous plan execution
-/ftm audit               # Wiring verification
-/ftm council [question]  # Multi-model deliberation
-/ftm help                # Full command menu
-```
-
-Or just describe what you need in plain language. Panda-mind reads the situation and picks the right approach.
-
-## Configuration
-
-`install.sh` copies `ftm-config.default.yml` to `~/.claude/ftm-config.yml`. Edit it to set your preferred model profile:
+**Model profiles** — edit `~/.claude/ftm-config.yml`:
 
 ```yaml
 profile: balanced    # quality | balanced | budget
@@ -134,27 +209,16 @@ profiles:
     review: sonnet      # audit, debug review
 ```
 
-Three profiles are included out of the box. Add your own or modify the defaults.
+**Optional dependencies** for the full stack:
 
-## Requirements
+- [Codex CLI](https://github.com/openai/codex) — required for `ftm-council` and `ftm-codex-gate`
+- [Gemini CLI](https://github.com/google/gemini-cli) — required for `ftm-council`
+- Playwright MCP (`npx @playwright/mcp@latest`) — required for `ftm-browse`
 
-- [Claude Code](https://claude.ai/code) CLI
-- **ftm-council**: [Codex CLI](https://github.com/openai/codex) + [Gemini CLI](https://github.com/google/gemini-cli)
-- **ftm-codex-gate**: Codex CLI
-- **ftm-browse**: Playwright MCP (`npx @playwright/mcp@latest`)
+All other skills run on Claude Code alone.
 
-All other skills work with Claude Code alone.
-
-## Contributing
-
-Pull requests welcome. The architecture is intentional — each skill is self-contained, communicates through typed events, and writes learnings back to the blackboard. Before adding a new skill, read through `ftm-mind/SKILL.md` to understand how routing and memory work.
-
-Bug reports and feature requests go in [GitHub Issues](https://github.com/kkudumu/ftm-brain/issues).
+---
 
 ## License
 
 MIT
-
----
-
-> TAG AND RELEASE: Deferred until after commit. Run: `git tag v1.0.0 && gh release create v1.0.0 --title 'v1.0.0' --notes-file CHANGELOG.md`
