@@ -315,6 +315,46 @@ Silently synthesize: outcome wanted, task type, session continuity, codebase con
 
 Every task gets a plan before execution. The plan's depth scales with complexity, but the flow is always: present plan → user approves/modifies → execute.
 
+### 0. Check for matching playbooks
+
+Before generating a fresh plan, scan `~/.ftm/playbooks/` for existing playbooks that match the current task.
+
+**Matching criteria:**
+1. **task_type match** — playbook's `task_type` matches Orient's classification
+2. **Tag overlap** — at least 2 tags overlap between the playbook and the current task's inferred tags
+3. **Recency** — prefer playbooks created more recently (sort by `created_at`)
+
+**Scan process:**
+1. List all `.yml` files in `~/.ftm/playbooks/`
+2. For each file, read the YAML frontmatter (name, task_type, tags)
+3. Score each playbook: +1 per matching tag, +2 for task_type match, +1 for recency (last 30 days)
+4. If any playbook scores >= 3, it's a match
+
+**On match found:**
+```
+Found a playbook from [date]: "[playbook name]"
+
+Steps:
+1. [step 1]
+2. [step 2]
+...
+
+Use this playbook? Say "go" to execute, "modify" to edit first, or "fresh" to generate a new plan.
+```
+
+**User responses:**
+- **"go"** — execute the playbook as-is (same as approving a plan)
+- **"modify"** — enter plan modification mode with the playbook's steps loaded
+- **"fresh"** / **"new plan"** — skip the playbook, generate a fresh plan from scratch
+- All plan modification commands work on playbook-loaded plans
+
+**On no match:**
+- Proceed directly to step 1 (Generate a plan) as normal
+- No message shown — the playbook check is silent when nothing matches
+
+**Multiple matches:**
+If 2+ playbooks match, show the top match and note: "Also found: [other playbook names]. Say 'show alternatives' to see them."
+
 ### 1. Generate a plan
 
 Based on Orient's synthesis, generate a plan appropriate to the task's complexity:
@@ -532,6 +572,154 @@ For **Jira**: call `jira_add_comment` with the ticket key and approved comment b
 For **Freshservice**: call `send_ticket_reply` with the ticket ID and approved reply body.
 
 After successful posting, note it in the blackboard context as a recent_decision: "Posted completion comment to [source] [id]".
+
+### 6. Playbook Save Offer
+
+After successful plan execution (all steps completed, verification passed), offer to save the plan as a reusable playbook.
+
+**When to offer:**
+- Plan executed successfully (all steps passed)
+- The plan had 3+ steps (micro tasks aren't worth saving as playbooks)
+- The user hasn't declined playbook saves 3+ times this session
+
+**Prompt:**
+```
+✓ Plan executed successfully.
+
+Save as playbook for future reuse? This plan can be loaded automatically
+when you encounter a similar task.
+
+Name: [auto-generated from plan title]
+Tags: [inferred from task_type + domain tags]
+
+Say "save" to create playbook, or "skip".
+```
+
+**On "save":**
+
+1. Generate a slug from the plan title: lowercase, hyphens, no special chars, max 50 chars
+2. Create the playbooks directory if it doesn't exist: `~/.ftm/playbooks/`
+3. Save as YAML to `~/.ftm/playbooks/[slug].yml`:
+
+```yaml
+name: [plan title]
+description: [one-line summary]
+created_from: [original task description]
+created_at: [ISO timestamp]
+task_type: [inferred task type]
+tags: [list of relevant tags]
+source_ticket: [ticket ID if task was ticket-driven, null otherwise]
+
+steps:
+  - number: 1
+    description: [step description]
+    files: [file list]
+    verification: [how to verify this step]
+  - number: 2
+    description: [step description]
+    files: [file list]
+    depends_on: [1]
+    verification: [verification]
+
+verification:
+  - [overall verification criteria]
+
+notes:
+  - [any decisions or lessons from execution]
+```
+
+4. Confirm: "Playbook saved to ~/.ftm/playbooks/[slug].yml"
+5. Record in blackboard: add to recent_decisions "Saved playbook: [name]"
+
+**On "skip":**
+- Note the decline (for the 3-decline suppression)
+- Continue normally
+
+**v1.0 limitations:**
+- No parameterization — saves the literal plan as-is
+- No sharing format — personal playbooks only
+- Playbook is valid YAML and parseable but not templated
+
+### 7. Playbook Parameterization (v1.5)
+
+After a playbook has been loaded and executed successfully 3 or more times (tracked via a `use_count` field in the playbook YAML), offer to parameterize it for broader reuse.
+
+**When to trigger:**
+- A playbook was loaded via "Check for matching playbooks" (step 0 in Decide)
+- The playbook executed successfully
+- The playbook's `use_count` reaches 3 (or any multiple of 3 thereafter for re-parameterization)
+
+**Prompt:**
+```
+This playbook "[name]" has been used successfully [N] times.
+
+Parameterize it? This replaces specific values with {{placeholders}},
+making it reusable across different projects/tickets.
+
+Say "parameterize" to proceed, or "skip".
+```
+
+**On "parameterize":**
+
+Execute the APC two-step generalization:
+
+**Step 1: Rule-based filter** — Strip execution-specific content:
+- Remove reasoning comments and rationale paragraphs
+- Remove timestamps, session IDs, commit hashes
+- Remove absolute file paths (replace with relative or placeholder)
+- Keep: step descriptions, verification criteria, dependency structure
+
+**Step 2: LLM-driven entity extraction** — Identify values that are specific to one execution and replace with typed placeholders:
+
+| Value Type | Example | Placeholder |
+|---|---|---|
+| Project name | `my-app` | `{{project_name}}` |
+| Ticket ID | `PROJ-123` | `{{ticket_id}}` |
+| File paths | `src/auth/login.ts` | `{{target_file}}` |
+| User/requester | `john@company.com` | `{{requester_email}}` |
+| Domain/URL | `admin.company.com` | `{{admin_url}}` |
+| Config values | `us-east-1` | `{{aws_region}}` |
+| Repo name | `panda-brain` | `{{repo_name}}` |
+
+**Updated playbook format:**
+
+```yaml
+name: [same name]
+version: 2  # bumped from 1
+parameterized: true
+use_count: [N]
+parameters:
+  project_name:
+    type: string
+    description: "Name of the target project"
+    example: "my-app"
+  ticket_id:
+    type: string
+    description: "Source ticket identifier"
+    example: "PROJ-123"
+  # ... more parameters
+
+steps:
+  - number: 1
+    description: "Set up {{project_name}} authentication module"
+    files: ["{{target_file}}"]
+    verification: "Tests pass for {{project_name}} auth"
+```
+
+**Backup:** Save the original (v1) playbook as `[slug].v1.yml` before overwriting with the parameterized version.
+
+**On future use:**
+When a parameterized playbook is loaded in step 0 of Decide:
+1. Detect `parameterized: true` in the YAML
+2. Prompt for parameter values: "This playbook needs: project_name, ticket_id. Provide values or I'll infer from context."
+3. Infer what's possible from the current task context (ticket ID from Observe, project name from cwd)
+4. Ask only for values that can't be inferred
+5. Substitute all `{{placeholders}}` with actual values before presenting the plan
+
+**Metrics (from APC research):**
+- 50% cost reduction from plan reuse
+- 27% latency reduction from skipping plan generation
+- Parameterized playbooks become more valuable with each use
 
 ## Routing Scenarios
 
