@@ -18,6 +18,28 @@ Two-level diagram system: a root subway map of modules and per-module street map
 
 ---
 
+## Graph-Powered Mode (ftm-map integration)
+
+Before running the standard analysis, check if the project has a code knowledge graph:
+
+```bash
+if [ -f ".ftm-map/map.db" ]; then
+    # Use graph for faster, more consistent diagram generation
+    ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/views.py generate-diagrams "$PROJECT_ROOT"
+else
+    # Fall back to standard analysis below
+fi
+```
+
+When `.ftm-map/map.db` exists:
+1. Delegate to `views.py generate-diagrams` which reads the graph and produces .mmd files
+2. Diagrams from the graph are structurally accurate (real edges from parsing, not heuristic guesses)
+3. Supports `--files` flag for incremental updates
+
+When `.ftm-map/map.db` does NOT exist:
+- Fall back to the existing modes below
+- No breaking change — behavior is identical without the graph
+
 ## Mental Model
 
 | Level | File | Layout | Node = | Purpose |
