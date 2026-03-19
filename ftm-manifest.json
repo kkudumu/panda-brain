@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T21:06:50.384Z",
+  "generated_at": "2026-03-19T21:47:02.571Z",
   "skills": [
     {
       "name": "ftm",
@@ -317,7 +317,7 @@
         "routing-scenarios.md"
       ],
       "has_evals": true,
-      "size_bytes": 39905,
+      "size_bytes": 40959,
       "enabled": true
     },
     {
@@ -358,7 +358,7 @@
         "output-format.md",
         "synthesis-pipeline.md"
       ],
-      "has_evals": false,
+      "has_evals": true,
       "size_bytes": 10899,
       "enabled": true
     },
