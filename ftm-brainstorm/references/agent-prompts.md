@@ -1,3 +1,9 @@
+# Agent Prompts (Legacy)
+
+> **NOTE:** As of ftm-researcher integration, brainstorm research sprints are handled
+> by ftm-researcher. These prompts are retained for reference and fallback if
+> ftm-researcher is unavailable.
+
 # Research Agent Prompts
 
 Load this file when dispatching research sprints. Each turn, spawn all 3 agents in parallel with the accumulated context injected.

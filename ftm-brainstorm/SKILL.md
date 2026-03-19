@@ -14,6 +14,8 @@ description: Research-powered Socratic brainstorming that dispatches parallel ag
 ### Listens To
 - `task_received` — begin ideation when ftm-mind routes an incoming task for exploration
   - Expected payload: `{ task_description, plan_path, wave_number, task_number }`
+- `research_complete` — consume structured findings from ftm-researcher for the current research sprint
+  - Expected payload: `{ query, mode, findings_count, consensus_count, contested_count, unique_count, sources_count, council_used, duration_ms }`
 
 ## Config Read
 
@@ -21,6 +23,25 @@ Before dispatching any agents, read `~/.claude/ftm-config.yml`:
 - Use the `planning` model from the active profile for all research agents
 - Example: if profile is `balanced`, agents get `model: opus`
 - If config missing, use session default
+
+## Research Sprint Dispatch
+
+Each research sprint invokes ftm-researcher rather than dispatching agents directly.
+
+Interface:
+- Pass: { research_question: [derived from current turn], context_register: [all prior findings], depth_mode: [based on turn number] }
+- Receive: { findings, disagreement_map, confidence_scores }
+
+Depth mode mapping:
+- Turns 1-2 (BROAD): ftm-researcher quick mode (3 finders)
+- Turns 3-5 (FOCUSED): ftm-researcher standard mode (7 finders + reconciler)
+- Turns 6+ (IMPLEMENTATION): ftm-researcher deep mode (full pipeline with council)
+
+The brainstorm skill consumes the researcher's structured output and weaves it into:
+- 3-5 numbered suggestions with evidence and source URLs
+- A recommended option with rationale
+- Challenges based on contested claims from the disagreement map
+- Targeted questions based on research gaps
 
 ## Blackboard Read
 
@@ -40,7 +61,7 @@ This skill is a **multi-turn research conversation**. Every single turn after th
 
 ```
 EVERY TURN (after initial intake):
-  1. RESEARCH SPRINT  — 3 agents search in parallel from different vectors
+  1. RESEARCH SPRINT  — invoke ftm-researcher with context
   2. SYNTHESIZE       — merge findings into suggestions with evidence
   3. CHALLENGE        — push back on weak assumptions, surface trade-offs
   4. ASK              — 1-2 targeted questions to extract more from the user
