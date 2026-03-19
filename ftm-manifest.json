@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T15:57:35.219Z",
+  "generated_at": "2026-03-19T21:01:45.180Z",
   "skills": [
     {
       "name": "ftm",
@@ -242,21 +242,13 @@
       "events_listens": [
         "plan_approved"
       ],
-      "blackboard_reads": [
-        "~/.claude/ftm-state/blackboard/context.json",
-        "~/.claude/ftm-state/blackboard/experiences/index.json",
-        "~/.claude/ftm-state/blackboard/patterns.json"
-      ],
-      "blackboard_writes": [
-        "~/.claude/ftm-state/blackboard/context.json",
-        "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json",
-        "~/.claude/ftm-state/blackboard/experiences/index.json"
-      ],
+      "blackboard_reads": [],
+      "blackboard_writes": [],
       "references": [
         "STYLE-TEMPLATE.md"
       ],
       "has_evals": false,
-      "size_bytes": 21067,
+      "size_bytes": 31684,
       "enabled": true
     },
     {
@@ -324,7 +316,7 @@
         "routing-scenarios.md"
       ],
       "has_evals": true,
-      "size_bytes": 38165,
+      "size_bytes": 39708,
       "enabled": true
     },
     {
@@ -342,6 +334,27 @@
       "references": [],
       "has_evals": false,
       "size_bytes": 6058,
+      "enabled": true
+    },
+    {
+      "name": "ftm-researcher",
+      "description": "Deep parallel research engine with 7 domain-specialized finder agents, adversarial review via ftm-council, adaptive wave-based search, structured reconciliation with disagreement maps, credibility scoring, and conversational iteration. Use when the user wants thorough research on any topic — \"research X\", \"find out about Y\", \"what's the state of the art on Z\", \"compare approaches to W\", \"deep dive into X\", \"look into Y\". Also invoked by ftm-brainstorm for its research sprints. Triggers on \"research\", \"investigate\", \"deep dive\", \"state of the art\", \"compare\", \"find examples of\", \"what's out there for\", \"how do others handle\", \"find me evidence\", \"look into\". For idea exploration and brainstorming, use ftm-brainstorm instead (which calls ftm-researcher internally for research).",
+      "trigger_file": "ftm-researcher.yml",
+      "skill_directory": "ftm-researcher/",
+      "events_emits": [
+        "research_complete",
+        "task_completed"
+      ],
+      "events_listens": [
+        "task_received"
+      ],
+      "blackboard_reads": [],
+      "blackboard_writes": [],
+      "references": [
+        "agent-prompts.md"
+      ],
+      "has_evals": false,
+      "size_bytes": 10899,
       "enabled": true
     },
     {
