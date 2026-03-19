@@ -9,7 +9,7 @@ If `progress_tracking` is enabled in `~/.claude/ftm-config.yml` (default: true),
 Create the file with this structure, filling in plan details:
 
 ```markdown
-# Panda Executor — Progress
+# FTM Executor — Progress
 
 **Plan:** [plan title]
 **Started:** [timestamp]

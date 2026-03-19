@@ -26,7 +26,7 @@ Before starting, load context from the blackboard:
 
 If index.json is empty or no matches found, proceed normally without experience-informed shortcuts.
 
-# Panda Git — Secret Scanning & Credential Safety Gate
+# FTM Git — Secret Scanning & Credential Safety Gate
 
 This skill exists because secrets pushed to GitHub are compromised the instant they hit the remote — even if you force-push a clean history seconds later. Bots scrape public repos continuously, and private repos are one permissions mistake away from exposure. The only safe secret is one that never enters git history.
 

@@ -7,7 +7,7 @@ The final output structure for a completed ftm-audit run.
 ## Summary Report
 
 ```
-## Panda Audit Report — [YYYY-MM-DD HH:MM]
+## FTM Audit Report — [YYYY-MM-DD HH:MM]
 
 ### Layer 1: Static Analysis (knip)
 - Findings: [N]
@@ -35,7 +35,7 @@ The final output structure for a completed ftm-audit run.
 Produced alongside the summary report when Layer 3 runs.
 
 ```
-### Panda Audit Changelog — [YYYY-MM-DD HH:MM]
+### FTM Audit Changelog — [YYYY-MM-DD HH:MM]
 
 #### Findings
 | # | Type | Location | Description |

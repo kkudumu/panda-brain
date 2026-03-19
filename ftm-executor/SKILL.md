@@ -248,7 +248,7 @@ If `progress_tracking` is enabled in `~/.claude/ftm-config.yml` (default: true),
 **Create the initial file:**
 
 ```markdown
-# Panda Executor — Progress
+# FTM Executor — Progress
 
 **Plan:** [plan title]
 **Started:** [timestamp]
@@ -405,7 +405,7 @@ A task is NOT marked complete until all four checks pass (check 5 is optional). 
 
 2. **Interpret results:**
    - **PASS (no findings):** Mark task complete, proceed to next task
-   - **PASS after auto-fix:** Panda-audit found issues and fixed them automatically. Commit the fixes in the agent's worktree with message "Auto-fix: wire [description]". Mark task complete.
+   - **PASS after auto-fix:** FTM-audit found issues and fixed them automatically. Commit the fixes in the agent's worktree with message "Auto-fix: wire [description]". Mark task complete.
    - **FAIL (manual intervention needed):** Task stays in-progress. Report the findings to the user:
      ```
      ⚠ Task [N] audit failed — manual intervention needed:

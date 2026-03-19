@@ -15,19 +15,19 @@ description: Post-execution self-assessment skill. Automatically triggered after
 - `error_encountered` — failure analysis: record the error context as a failure experience for pattern learning
 - `bug_fixed` — success recording: record the fix details as a positive experience (what worked, what the root cause was)
 
-# Panda Retro — Post-Execution Self-Assessment
+# FTM Retro — Post-Execution Self-Assessment
 
 Structured retrospective system for ftm-executor plans. Scores execution across 5 evidence-based dimensions, surfaces bottlenecks with specifics, and builds a cumulative pattern library that makes each future execution smarter.
 
 ## Why This Exists
 
-Execution without reflection is a loop with no exit. Panda-retro closes the feedback cycle: every plan run generates a scored report, every report feeds a pattern library, and recurring issues get escalated until they're fixed. The goal is measurable improvement across executions, not vibes.
+Execution without reflection is a loop with no exit. FTM-retro closes the feedback cycle: every plan run generates a scored report, every report feeds a pattern library, and recurring issues get escalated until they're fixed. The goal is measurable improvement across executions, not vibes.
 
 ## Operating Modes
 
 ### Mode 1: Auto-triggered by ftm-executor (Phase 6.5)
 
-Panda-executor calls this skill after all waves complete and the final commit is made. It passes execution context directly:
+FTM-executor calls this skill after all waves complete and the final commit is made. It passes execution context directly:
 
 - Plan title and absolute path
 - Task count and wave count

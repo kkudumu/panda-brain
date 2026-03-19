@@ -37,7 +37,7 @@ Use `review` model from ftm-config when spawning audit agents.
 
 **PASS (no findings):** Mark task complete, proceed to next task.
 
-**PASS after auto-fix:** Panda-audit found issues and fixed them automatically. Commit the fixes in the agent's worktree with message "Auto-fix: wire [description]". Mark task complete.
+**PASS after auto-fix:** FTM-audit found issues and fixed them automatically. Commit the fixes in the agent's worktree with message "Auto-fix: wire [description]". Mark task complete.
 
 **FAIL (manual intervention needed):** Task stays in-progress. Report to the user:
 ```

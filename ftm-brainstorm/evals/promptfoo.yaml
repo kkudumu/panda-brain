@@ -1,4 +1,4 @@
-description: "panda-brainstorm behavior across multi-turn brainstorming sessions"
+description: "ftm-brainstorm behavior across multi-turn brainstorming sessions"
 
 prompts:
   - "{{input}}"

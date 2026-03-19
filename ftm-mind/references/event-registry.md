@@ -1,4 +1,4 @@
-# Panda Event Registry
+# FTM Event Registry
 
 This document defines the full event vocabulary for the ftm skill system. The mind reads this during its Decide phase to determine which skills to trigger after any action completes.
 

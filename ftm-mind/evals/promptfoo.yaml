@@ -1,33 +1,33 @@
-description: "panda-mind routing accuracy"
+description: "ftm-mind routing accuracy"
 
 prompts:
-  - "You are panda-mind. Given this user request, which panda skill should handle it? Reply with just the skill name.\n\nUser: {{input}}"
+  - "You are ftm-mind. Given this user request, which ftm skill should handle it? Reply with just the skill name.\n\nUser: {{input}}"
 
 providers:
   - id: "exec:claude --print"
     label: "claude-code"
 
 tests:
-  - description: "debug request routes to panda-debug"
+  - description: "debug request routes to ftm-debug"
     vars:
       input: "debug this flaky test"
     assert:
       - type: contains
-        value: "panda-debug"
+        value: "ftm-debug"
 
-  - description: "design thinking routes to panda-brainstorm"
+  - description: "design thinking routes to ftm-brainstorm"
     vars:
       input: "help me think through auth design"
     assert:
       - type: contains
-        value: "panda-brainstorm"
+        value: "ftm-brainstorm"
 
-  - description: "plan execution routes to panda-executor"
+  - description: "plan execution routes to ftm-executor"
     vars:
       input: "execute ~/.claude/plans/foo.md"
     assert:
       - type: contains
-        value: "panda-executor"
+        value: "ftm-executor"
 
   - description: "trivial rename routes to micro or direct handling"
     vars:
@@ -36,107 +36,107 @@ tests:
       - type: regex
         value: "micro|direct"
 
-  - description: "multi-model deliberation routes to panda-council"
+  - description: "multi-model deliberation routes to ftm-council"
     vars:
       input: "what would other AIs think about this approach"
     assert:
       - type: contains
-        value: "panda-council"
+        value: "ftm-council"
 
-  - description: "wiring audit routes to panda-audit"
+  - description: "wiring audit routes to ftm-audit"
     vars:
       input: "audit the wiring"
     assert:
       - type: contains
-        value: "panda-audit"
+        value: "ftm-audit"
 
-  - description: "pause request routes to panda-pause"
+  - description: "pause request routes to ftm-pause"
     vars:
       input: "pause"
     assert:
       - type: contains
-        value: "panda-pause"
+        value: "ftm-pause"
 
-  - description: "save state request routes to panda-pause"
+  - description: "save state request routes to ftm-pause"
     vars:
       input: "save state"
     assert:
       - type: contains
-        value: "panda-pause"
+        value: "ftm-pause"
 
-  - description: "resume request routes to panda-resume"
+  - description: "resume request routes to ftm-resume"
     vars:
       input: "resume"
     assert:
       - type: contains
-        value: "panda-resume"
+        value: "ftm-resume"
 
-  - description: "continue request routes to panda-resume"
+  - description: "continue request routes to ftm-resume"
     vars:
       input: "continue where we left off"
     assert:
       - type: contains
-        value: "panda-resume"
+        value: "ftm-resume"
 
-  - description: "upgrade request routes to panda-upgrade"
+  - description: "upgrade request routes to ftm-upgrade"
     vars:
-      input: "upgrade panda"
+      input: "upgrade ftm"
     assert:
       - type: contains
-        value: "panda-upgrade"
+        value: "ftm-upgrade"
 
-  - description: "config check routes to panda-config"
+  - description: "config check routes to ftm-config"
     vars:
       input: "check my config"
     assert:
       - type: contains
-        value: "panda-config"
+        value: "ftm-config"
 
-  - description: "panda settings routes to panda-config"
+  - description: "ftm settings routes to ftm-config"
     vars:
-      input: "panda settings"
+      input: "ftm settings"
     assert:
       - type: contains
-        value: "panda-config"
+        value: "ftm-config"
 
-  - description: "intent doc update routes to panda-intent"
+  - description: "intent doc update routes to ftm-intent"
     vars:
       input: "update the intent docs"
     assert:
       - type: contains
-        value: "panda-intent"
+        value: "ftm-intent"
 
-  - description: "architecture diagram update routes to panda-diagram"
+  - description: "architecture diagram update routes to ftm-diagram"
     vars:
       input: "update architecture diagram"
     assert:
       - type: contains
-        value: "panda-diagram"
+        value: "ftm-diagram"
 
-  - description: "browser task routes to panda-browse"
+  - description: "browser task routes to ftm-browse"
     vars:
       input: "open browser and check the page"
     assert:
       - type: contains
-        value: "panda-browse"
+        value: "ftm-browse"
 
-  - description: "codex validation routes to panda-codex-gate"
+  - description: "codex validation routes to ftm-codex-gate"
     vars:
       input: "run codex validation"
     assert:
       - type: contains
-        value: "panda-codex-gate"
+        value: "ftm-codex-gate"
 
-  - description: "retrospective routes to panda-retro"
+  - description: "retrospective routes to ftm-retro"
     vars:
       input: "how did that go"
     assert:
       - type: contains
-        value: "panda-retro"
+        value: "ftm-retro"
 
-  - description: "retro keyword routes to panda-retro"
+  - description: "retro keyword routes to ftm-retro"
     vars:
       input: "retro"
     assert:
       - type: contains
-        value: "panda-retro"
+        value: "ftm-retro"

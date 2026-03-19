@@ -1,4 +1,4 @@
-# Reflexion Protocol — Verbal RL for Panda-Mind
+# Reflexion Protocol — Verbal RL for FTM-Mind
 
 **Location**: `~/.claude/skills/ftm-mind/references/reflexion-protocol.md`
 **Purpose**: Defines how ftm-mind stores and reuses execution experience through the Reflexion pattern — a lightweight verbal reinforcement learning loop that improves behavior across sessions without fine-tuning.

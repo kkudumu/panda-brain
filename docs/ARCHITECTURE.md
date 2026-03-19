@@ -1,6 +1,6 @@
-# Panda Architecture
+# FTM Architecture
 
-Panda is a skill orchestration layer for Claude Code. It adds persistent memory, intelligent routing, and multi-model deliberation on top of Claude Code's base capabilities. Every request is interpreted, sized, and dispatched through a unified cognitive loop before any work is done.
+FTM is a skill orchestration layer for Claude Code. It adds persistent memory, intelligent routing, and multi-model deliberation on top of Claude Code's base capabilities. Every request is interpreted, sized, and dispatched through a unified cognitive loop before any work is done.
 
 ---
 
@@ -43,7 +43,7 @@ The entry point is always `ftm-mind`. It loads memory, consults the manifest, si
 
 ## OODA Loop
 
-Panda-mind runs an Observe-Orient-Decide-Act loop on every request. Most requests finish in one pass. Complex requests loop several times.
+FTM-mind runs an Observe-Orient-Decide-Act loop on every request. Most requests finish in one pass. Complex requests loop several times.
 
 ```mermaid
 flowchart TD

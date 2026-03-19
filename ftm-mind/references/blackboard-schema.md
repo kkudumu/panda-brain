@@ -1,4 +1,4 @@
-# Panda-Mind Blackboard Schema Reference
+# FTM-Mind Blackboard Schema Reference
 
 **Location**: `~/.claude/ftm-state/blackboard/`
 **Purpose**: Shared persistent memory for the ftm-mind unified intelligence system. Skills read from and write to these files using the Read and Write tools directly — no code libraries, no APIs.

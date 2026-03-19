@@ -119,9 +119,9 @@ function findSkillFiles() {
     if (!statSync(fullPath).isDirectory()) continue;
     if (entry === 'ftm-state') continue;
 
-    const isPandaDir =
+    const isFtmDir =
       entry === 'ftm' || (entry.startsWith('ftm-') && entry !== 'ftm-state');
-    if (!isPandaDir) continue;
+    if (!isFtmDir) continue;
 
     const skillMd = join(fullPath, 'SKILL.md');
     if (existsSync(skillMd)) {

@@ -1,4 +1,4 @@
-description: "panda-git secret detection and remediation"
+description: "ftm-git secret detection and remediation"
 
 prompts:
   - "{{input}}"

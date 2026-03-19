@@ -12,7 +12,7 @@ description: Resume a previously paused ftm skill session from saved state. Use 
 ### Listens To
 (none — ftm-resume is explicitly invoked by the user and does not respond to events)
 
-# Panda Resume — Session State Restoration
+# FTM Resume — Session State Restoration
 
 Read a saved ftm session state file and seamlessly continue the workflow in a fresh conversation. The user should feel like they never left — same context, same decisions, same progress, picking up at exactly the right step.
 

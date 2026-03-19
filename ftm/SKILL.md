@@ -3,7 +3,7 @@ name: ftm
 description: Universal entry point for all ftm skills. Routes freeform text to the right ftm skill. ftm-mind is the default cognitive entry point for all unclassified input.
 ---
 
-# Panda — Universal Skill Router
+# Feed The Machine — Universal Skill Router
 
 You are the entry point for the ftm skill system. Your job is routing — fast, thin, decisive.
 

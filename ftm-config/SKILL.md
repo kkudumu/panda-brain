@@ -11,7 +11,7 @@ description: Configure ftm skill settings including model profiles, execution pr
 ### Listens To
 (none — ftm-config is explicitly invoked by the user and does not respond to events)
 
-# Panda Config
+# FTM Config
 
 Manage configuration for all ftm skills, including model profiles, execution preferences, and session settings.
 
@@ -93,7 +93,7 @@ Parse the user's input to determine what they want:
 When displaying the config, format it clearly:
 
 ```
-Panda Configuration
+FTM Configuration
 ====================
 
 Active Profile: balanced

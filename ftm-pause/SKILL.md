@@ -12,7 +12,7 @@ description: Save the current ftm skill session state so work can be resumed in 
 ### Listens To
 (none — ftm-pause is explicitly invoked by the user and does not respond to events)
 
-# Panda Pause — Session State Capture
+# FTM Pause — Session State Capture
 
 Save the full state of any active ftm skill session to disk so it can be resumed in a new conversation with zero context loss.
 
@@ -70,7 +70,7 @@ git_branch: <branch>       # omit if no git repo
 git_commit: <short-hash>   # omit if no git repo
 ---
 
-# Panda Session State
+# FTM Session State
 
 ## Active Skill
 [One paragraph: skill, phase, path, turn, and current direction]
@@ -124,7 +124,7 @@ Tailor the counts to the skill: brainstorm shows decisions + turns, executor sho
 
 **Very early session:** Save what exists — even a Phase 0 scan is worth capturing. "Next Step" should say the user needs to answer the first intake question.
 
-**State file already exists:** Overwrite it. Prior state was either consumed or abandoned. Panda-resume archives before loading if the user needs the old one.
+**State file already exists:** Overwrite it. Prior state was either consumed or abandoned. FTM-resume archives before loading if the user needs the old one.
 
 **No git repo:** Omit `git_branch` and `git_commit` fields. Record `project_dir` only.
 

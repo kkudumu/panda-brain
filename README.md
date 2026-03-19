@@ -191,8 +191,8 @@ Every skill writes back. ftm-executor writes task outcomes. ftm-debug writes wha
 **Development install:**
 
 ```bash
-git clone https://github.com/kkudumu/panda-brain.git ~/ftm-brain
-cd ~/ftm-brain
+git clone https://github.com/kkudumu/feed-the-machine.git ~/feed-the-machine
+cd ~/feed-the-machine
 ./install.sh
 ```
 

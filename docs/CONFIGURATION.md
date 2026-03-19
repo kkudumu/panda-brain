@@ -1,4 +1,4 @@
-# Panda Configuration Reference
+# FTM Configuration Reference
 
 Configuration lives in `~/.claude/ftm-config.yml`. This file controls model selection, execution behavior, skill routing, and session management.
 

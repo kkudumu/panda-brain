@@ -23,7 +23,7 @@ Before starting, load context from the blackboard:
 
 If index.json is empty or no matches found, proceed normally without experience-informed shortcuts.
 
-# Panda Council
+# FTM Council
 
 Three peers — a subagent investigator, Codex, and Gemini — independently research the codebase and deliberate on a problem through structured rounds of debate. No single model is the authority. Each model explores the code on its own, forms its own conclusions from what it finds, and only then enters deliberation. The council converges through majority vote: when 2 of 3 agree, that's the decision. If 5 rounds pass without majority agreement, the orchestrator synthesizes the best elements from all three positions and presents the user with a clear summary of where the models agreed, where they diverged, and a recommended path forward.
 

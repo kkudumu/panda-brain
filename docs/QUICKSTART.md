@@ -1,4 +1,4 @@
-# Quickstart — Your First 5 Minutes with Panda
+# Quickstart — Your First 5 Minutes with FTM
 
 ## Install
 
@@ -26,7 +26,7 @@ Shows all 16 skills and what they do.
 /ftm I need to add error handling to my API routes
 ```
 
-Panda-mind reads your codebase, sizes the task, and either handles it directly or routes to the right skill. You don't need to pick the skill — it picks for you.
+FTM-mind reads your codebase, sizes the task, and either handles it directly or routes to the right skill. You don't need to pick the skill — it picks for you.
 
 ### 3. Brainstorm a feature
 

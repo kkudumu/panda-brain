@@ -13,7 +13,7 @@ Save to: `~/.claude/ftm-retros/{plan-slug}-{YYYY-MM-DD}.md`
 Take the plan title, lowercase it, replace spaces with hyphens, strip all non-alphanumeric characters except hyphens.
 
 Examples:
-- "Panda Ecosystem Expansion" → `ftm-ecosystem-expansion`
+- "FTM Ecosystem Expansion" → `ftm-ecosystem-expansion`
 - "Fix Auth Bug + Rate Limiting" → `fix-auth-bug-rate-limiting`
 - "v2.0 API Refactor" → `v20-api-refactor`
 

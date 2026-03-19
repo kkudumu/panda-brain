@@ -1,17 +1,17 @@
 # Large binaries — distribute via GitHub releases
-panda-browse/bin/panda-browse
+ftm-browse/bin/ftm-browse
 
 # Node modules — install via npm/bun
 **/node_modules/
 
 # User-specific runtime state (templates are committed, runtime data is not)
-# panda-state/ templates ARE committed — they're empty schemas
+# ftm-state/ templates ARE committed — they're empty schemas
 # But if someone runs locally, don't track their actual data
 
 # macOS
 .DS_Store
 
-# Worktrees (panda-executor isolation)
+# Worktrees (ftm-executor isolation)
 .worktrees/
 
 # Eval results

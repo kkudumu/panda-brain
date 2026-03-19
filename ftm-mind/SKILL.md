@@ -3,7 +3,7 @@ name: ftm-mind
 description: Unified OODA cognitive loop for the ftm system. Use for freeform `/ftm` or `/ftm-mind` requests, vague asks, mixed-tool workflows, Jira/ticket-driven work, or any request that should be understood before routing. Also handles explicit ftm skill invocations by honoring the requested skill while still doing a fast orientation pass for context, prerequisites, and approval gates. Triggers on open-ended requests like "help me think through this", bug reports, plan execution asks, Jira URLs, "make this better", mixed MCP asks like "check my calendar and draft a Slack message", and direct skill invocations like "/ftm-debug ..." or "/ftm-brainstorm ...". Do NOT use only when another ftm skill is already actively handling the task and no re-orientation is needed.
 ---
 
-# Panda Mind
+# FTM Mind
 
 `ftm-mind` is the reasoning core of the ftm ecosystem. It does not route by keyword alone. It observes the request, orients against live state and accumulated memory, decides the smallest correct next move, acts, then loops.
 
@@ -244,7 +244,7 @@ If `experiences/index.json` has no usable matches:
 - lean harder on current repo state and direct inspection
 - record the resulting experience aggressively after completion
 
-### 4. Capability Inventory: 16 Panda Skills
+### 4. Capability Inventory: 16 FTM Skills
 
 Orient must know all ftm capabilities before deciding whether to route or act directly.
 
@@ -934,7 +934,7 @@ Use these as behavioral tests.
 When the user asks for help, shows empty input, or says `?` or `menu`, show:
 
 ```text
-Panda Skills:
+FTM Skills:
   /ftm brainstorm [idea]     — Research-backed idea development
   /ftm execute [plan-path]   — Autonomous plan execution with agent teams
   /ftm debug [description]   — Multi-vector deep debugging war room
