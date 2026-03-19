@@ -103,6 +103,15 @@ Guidelines for writing clear declarations:
 
 ---
 
+### map_updated
+- **Description**: The code knowledge graph has been updated — either from a full bootstrap scan or an incremental re-index of changed files
+- **Emitted by**: ftm-map
+- **Listened to by**: ftm-mind (log on blackboard, update session context with latest graph stats), ftm-intent (trigger INTENT.md regeneration from graph), ftm-diagram (trigger DIAGRAM.mmd regeneration from graph)
+- **Fast-path**: yes — downstream view generation should happen immediately without mind mediation
+- **Payload**: `{ project_path, symbols_count, edges_count, files_parsed, duration_ms, mode: "bootstrap" | "incremental" }`
+
+---
+
 ### test_passed
 - **Description**: The test suite (or a targeted subset) ran and all tests passed
 - **Emitted by**: ftm-executor, ftm-debug
@@ -253,6 +262,7 @@ Guidelines for writing clear declarations:
 |---|---|
 | `code_committed` | ftm-intent (INTENT.md sync), ftm-diagram (DIAGRAM.mmd sync) |
 | `task_completed` | ftm-retro (micro-reflection / experience recording) |
+| `map_updated` | ftm-intent (INTENT.md regeneration), ftm-diagram (DIAGRAM.mmd regeneration) |
 
 All other events are mediated by the mind's Decide phase.
 
@@ -286,3 +296,4 @@ Use this table to quickly look up which skills are involved when an event fires:
 | secrets_found | git | executor, mind |
 | secrets_clear | git | executor, mind |
 | secrets_remediated | git | executor, mind |
+| map_updated | map | mind, intent, diagram |

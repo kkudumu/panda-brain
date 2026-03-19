@@ -27,3 +27,9 @@ Use these as behavioral tests for the Decide phase.
 | `find me examples of rate limiting middleware` | research task, looking for implementations | route to `ftm-researcher` (standard) |
 | `I want to build a dashboard` | ideation, not research | route to `ftm-brainstorm` (calls researcher internally) |
 | `/ftm-researcher auth patterns in microservices` | explicit skill choice | respect explicit route to `ftm-researcher` |
+| `what breaks if I change handleAuth` | structural query, blast radius, specific symbol | route to `ftm-map` (query: blast-radius) |
+| `map this codebase` | indexing request, no map.db exists | route to `ftm-map` (bootstrap mode) |
+| `where do we handle authentication` | code search, structural | route to `ftm-map` (query: search) |
+| `what depends on the UserService class` | dependency chain, specific symbol | route to `ftm-map` (query: deps) |
+| `show me everything about the parseConfig function` | symbol info request | route to `ftm-map` (query: info) |
+| `/ftm-map blast-radius handlePayment` | explicit skill choice | respect explicit route to `ftm-map` |

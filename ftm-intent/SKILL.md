@@ -16,6 +16,30 @@ description: Manages the hierarchical INTENT.md documentation layer — root ind
 
 Manages the hierarchical INTENT.md documentation layer. This is the contract layer that Codex reads during code review and that enables conflict detection between Claude's intent and Codex's fixes. The "Why" field is what prevents Codex from reverting deliberate design choices.
 
+## Graph-Powered Mode (ftm-map integration)
+
+Before running the standard analysis, check if the project has a code knowledge graph:
+
+```bash
+if [ -f ".ftm-map/map.db" ]; then
+    # Use graph for faster, more consistent analysis
+    ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/views.py generate-intent "$PROJECT_ROOT"
+else
+    # Fall back to standard file-by-file analysis below
+fi
+```
+
+When `.ftm-map/map.db` exists:
+1. Delegate to `views.py generate-intent` which reads the graph and produces INTENT.md files
+2. The graph path is faster (single DB query vs. reading every file) and more consistent (same analysis for every commit)
+3. Supports `--files` flag for incremental: `views.py generate-intent --files changed1.ts,changed2.py`
+
+When `.ftm-map/map.db` does NOT exist:
+- Fall back to the existing Bootstrap/Incremental modes below
+- The behavior is identical to the current skill — no breaking change
+
+This integration means ftm-intent automatically gets better when ftm-map is available, without requiring migration.
+
 ## Two Modes of Operation
 
 ### Bootstrap Mode (no INTENT.md exists)

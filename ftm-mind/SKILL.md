@@ -266,6 +266,7 @@ Orient must know all ftm capabilities before deciding whether to route or act di
 | `ftm-config` | The user wants ftm settings, model profile, or feature configuration changed. |
 | `ftm-git` | Any git commit or push is about to happen, the user asks to scan for secrets/credentials/API keys, or wants to verify no secrets are hardcoded before sharing code. MUST run before any commit or push operation — this is a mandatory security gate, not optional. |
 | `ftm-researcher` | The user wants thorough research on a topic, comparison of approaches, state-of-the-art analysis, or evidence-based investigation. Not for ideation (that is ftm-brainstorm). |
+| `ftm-map` | The user wants structural code queries: blast radius ("what breaks if I change X"), dependency chains ("what depends on Y"), code search ("where do we handle auth"), or codebase indexing ("map this codebase", "index this project"). Not for documentation updates (that is ftm-intent/ftm-diagram). |
 
 Routing heuristic:
 
@@ -743,6 +744,23 @@ Mode selection:
 - "quick look" / "briefly" → quick mode
 - Default → standard mode
 - "deep dive" / "thorough" / "comprehensive" → deep mode
+
+### Structural code queries → ftm-map
+
+Route to ftm-map when the request involves understanding code structure and dependencies:
+
+**Strong signals (route immediately):**
+- "what breaks if I change X" / "blast radius"
+- "what depends on X" / "dependency chain"
+- "what calls X" / "who calls X"
+- "where do we handle X" (code search, not docs)
+- "map this codebase" / "index this project"
+
+**Disambiguation:**
+- "document this function" → ftm-intent (documentation), NOT ftm-map
+- "show the architecture diagram" → ftm-diagram, NOT ftm-map
+- "search for X in the codebase" → could be ftm-map (if structural) or Grep (if text-literal)
+- If `.ftm-map/map.db` doesn't exist and the query is structural, suggest bootstrapping first
 
 ### 2. Choose direct vs routed execution
 

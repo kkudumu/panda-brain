@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T21:06:50.384Z",
+  "generated_at": "2026-03-19T21:50:36.917Z",
   "skills": [
     {
       "name": "ftm",
@@ -221,7 +221,7 @@
       "blackboard_writes": [],
       "references": [],
       "has_evals": false,
-      "size_bytes": 7537,
+      "size_bytes": 8348,
       "enabled": true
     },
     {
@@ -296,7 +296,27 @@
       "blackboard_writes": [],
       "references": [],
       "has_evals": false,
-      "size_bytes": 8671,
+      "size_bytes": 9704,
+      "enabled": true
+    },
+    {
+      "name": "ftm-map",
+      "description": "Persistent code knowledge graph powered by tree-sitter and SQLite with FTS5 full-text search. Builds structural dependency graphs for blast radius analysis, dependency chains, and keyword search. Use when user asks \"what breaks if I change X\", \"blast radius\", \"what depends on\", \"where do we handle\", \"map codebase\", \"index project\", \"what calls\", \"dependency chain\", \"ftm-map\".",
+      "trigger_file": "ftm-map.yml",
+      "skill_directory": "ftm-map/",
+      "events_emits": [
+        "map_updated",
+        "task_completed"
+      ],
+      "events_listens": [
+        "code_committed",
+        "task_received"
+      ],
+      "blackboard_reads": [],
+      "blackboard_writes": [],
+      "references": [],
+      "has_evals": false,
+      "size_bytes": 8649,
       "enabled": true
     },
     {
@@ -317,7 +337,7 @@
         "routing-scenarios.md"
       ],
       "has_evals": true,
-      "size_bytes": 39905,
+      "size_bytes": 42006,
       "enabled": true
     },
     {
@@ -358,7 +378,7 @@
         "output-format.md",
         "synthesis-pipeline.md"
       ],
-      "has_evals": false,
+      "has_evals": true,
       "size_bytes": 10899,
       "enabled": true
     },

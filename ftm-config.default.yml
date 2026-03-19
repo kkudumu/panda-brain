@@ -72,6 +72,7 @@ skills:
   ftm-git: { enabled: true }
   ftm-mind: { enabled: true }
   ftm-researcher: { enabled: true }   # deep parallel research engine
+  ftm-map: { enabled: true }          # persistent code knowledge graph
 
 # Session management
 session:
