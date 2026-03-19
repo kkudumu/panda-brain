@@ -69,6 +69,34 @@ if [ ! -f "$CONFIG_DIR/ftm-config.yml" ] && [ -f "$REPO_DIR/ftm-config.default.y
   echo "  INIT ftm-config.yml (from default template)"
 fi
 
+# Install hooks (copy to ~/.claude/hooks/, don't overwrite existing)
+HOOKS_DIR="$HOME/.claude/hooks"
+if [ -d "$REPO_DIR/hooks" ]; then
+  mkdir -p "$HOOKS_DIR"
+  HOOK_COUNT=0
+  for hook in "$REPO_DIR/hooks"/ftm-*.sh; do
+    [ -f "$hook" ] || continue
+    name=$(basename "$hook")
+    target="$HOOKS_DIR/$name"
+    if [ -f "$target" ]; then
+      # Overwrite — hooks should always be the latest version
+      cp "$hook" "$target"
+      chmod +x "$target"
+      echo "  UPDATE $name"
+    else
+      cp "$hook" "$target"
+      chmod +x "$target"
+      echo "  INSTALL $name"
+    fi
+    HOOK_COUNT=$((HOOK_COUNT + 1))
+  done
+  if [ "$HOOK_COUNT" -gt 0 ]; then
+    echo ""
+    echo "  $HOOK_COUNT hooks installed to $HOOKS_DIR"
+    echo "  To activate, add them to ~/.claude/settings.json (see docs/HOOKS.md)"
+  fi
+fi
+
 echo ""
 echo "Done. $(ls "$REPO_DIR"/ftm*.yml 2>/dev/null | wc -l | tr -d ' ') skills linked."
 echo "Try: /ftm help"

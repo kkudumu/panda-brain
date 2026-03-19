@@ -29,102 +29,74 @@ When this happens:
 2. Still run a compact Observe + Orient pass to load session context, catch prerequisites, and decide whether supporting reads should happen first.
 3. Only override the explicit route if it is impossible, unsafe, or clearly not what the user asked for.
 
+Examples:
+
+- `/ftm-debug flaky auth test` -> route to `ftm-debug`
+- `/ftm-brainstorm auth design` -> route to `ftm-brainstorm`
+- `/ftm-executor ~/.claude/plans/foo.md` -> route to `ftm-executor`
+- `/ftm-debug send a Slack message` -> ask whether they meant debug or Slack workflow, because the explicit route conflicts with the literal request
+
 ## Observe
 
 Observe is fast and literal. Do not solve yet. Just collect the raw state.
 
 ### 1. Capture the request exactly
 
-Preserve: the full user text, explicit skill names, file paths, URLs, ticket IDs, error messages, stack traces, branch names, time signals, and whether the user sounds blocked, exploratory, urgent, or mid-flight.
+Preserve:
+
+- the full user text
+- any explicit skill names
+- file paths, URLs, ticket IDs, issue keys, error messages, stack traces, branch names
+- any time signal such as "today", "after lunch", "before deploy"
+- whether the user sounds blocked, exploratory, urgent, or already mid-flight
 
 ### 2. Detect the task shape
 
-Note but do not finalize: likely task type (`feature`, `bug`, `refactor`, `investigation`, `configuration`, `documentation`, `test`, `deploy`, `communication`, `research`, `multi`), likely scope (answer, edit, workflow, orchestration), and whether this continues the current session or branches.
+At Observe time, note but do not finalize:
 
-**Routine detection:** If the user's input matches a known routine name (check `~/.ftm/routines/*.yml` filenames), or the user says "run routine", "routine", or a phrase matching a routine's `name` field, route to ftm-routine instead of generating a fresh plan.
+- likely task type: `feature`, `bug`, `refactor`, `investigation`, `configuration`, `documentation`, `test`, `deploy`, `communication`, `research`, `multi`
+- likely scope: answer, edit, workflow, orchestration
+- whether this looks like a continuation of the current session or a fresh branch of work
 
 ### 3. Load active session state
 
-Read `~/.claude/ftm-state/blackboard/context.json`. Extract: `current_task`, `recent_decisions`, `active_constraints`, `user_preferences`, `session_metadata.skills_invoked`. If missing or malformed, treat as empty state.
+Read:
+
+- `/Users/kioja.kudumu/.claude/ftm-state/blackboard/context.json`
+
+Extract:
+
+- `current_task`
+- `recent_decisions`
+- `active_constraints`
+- `user_preferences`
+- `session_metadata.skills_invoked`
+
+If the file is missing, empty, or malformed, treat it as empty state and continue normally.
 
 ### 4. Snapshot codebase reality
 
-Run `git status --short` and `git log --oneline -5`. Note uncommitted changes, recent commits, current branch, worktree cleanliness. Do not infer meaning yet.
+Check local codebase state before interpreting implementation requests:
 
-### 5. Pre-load external ticket context
+- `git status --short`
+- `git log --oneline -5`
 
-When the captured request contains recognizable external references, fetch their full context now — before Orient begins. This ensures Orient has complete information for synthesis.
+Note:
 
-**Detection patterns:**
-- **Jira ticket**: URL containing `/browse/` or `/jira/` (e.g., `https://company.atlassian.net/browse/PROJ-123`), or standalone key matching `[A-Z]+-\d+` pattern (e.g., `PROJ-123`, `INGEST-42`)
-- **Freshservice ticket**: Numeric ID preceded by "ticket", "FS#", "#", or URL containing `/helpdesk/tickets/` (e.g., `FS#12345`, `ticket 12345`)
-- **Slack thread**: URL containing `slack.com/archives/` with a thread timestamp
+- uncommitted changes
+- recent commits
+- current branch
+- whether the worktree is clean or mid-change
 
-**Fetch protocol:**
-
-For **Jira tickets** — use MCP tools in sequence:
-1. `jira_get_issue` — read full description, status, assignee, priority, labels
-2. `jira_get_issue` comments — read all comments for context and discussion history
-3. Check for subtasks and sprint state if the issue is an epic or story
-
-For **Freshservice tickets** — use MCP tools in sequence:
-1. `get_ticket_by_id` — read ticket description, status, priority, requester
-2. `get_requested_items` — read any service request items attached
-3. `list_all_ticket_conversation` — read all replies and notes for full context
-
-For **Slack threads** — use MCP tools:
-1. `slack_get_thread_replies` — read the full thread including all replies
-
-**Rules:**
-- Only fetch when the user's input CONTAINS a recognizable reference. Never speculatively search for tickets.
-- If the MCP tool fails (server not configured, auth error), note the failure in Observe output and continue — do not block Orient.
-- Store fetched context as `external_context` in the Observe output, structured as: `{ source: "jira"|"freshservice"|"slack", id: "...", summary: "...", full_data: {...} }`
-- Multiple references in one message → fetch all of them in parallel.
+Do not infer meaning yet. Just collect.
 
 ## Orient
 
-Orient is the crown jewel. Spend most of the reasoning budget here. Build the best possible mental model before touching anything.
+Orient is the crown jewel. Spend most of the reasoning budget here. The job is not to fill a checklist. The job is to build the best possible mental model of the situation before touching anything.
 
-Orient answers: `What is actually going on, what matters most, what is the smallest correct move, and what capability mix fits this situation?`
+Orient answers:
 
-### Context Budget Check
-
-Before loading anything, estimate the conversation's context usage:
-
-**Estimation method:** Count approximate tokens from conversation history. Use message count as proxy:
-- Messages 0-30: context ~20% used → **Full Orient**
-- Messages 31-60: context ~40% used → **Full Orient** (still under threshold)
-- Messages 61-90: context ~55% used → **Light Orient**
-- Messages 91+: context ~70%+ used → **Minimal Orient**
-
-**Full Orient** (< 40% context used — default for fresh conversations):
-- Load all blackboard state: context.json, experiences/index.json, patterns.json
-- Load top 3-5 matching experience files
-- Full codebase snapshot (git status, recent commits)
-- Read ftm-manifest.json for skill inventory
-- Read MCP inventory
-- Full complexity sizing and approval gate checks
-
-**Light Orient** (40-65% context used):
-- Load context.json only (skip experience files and patterns.json)
-- Extract recent_decisions and current_task from context
-- Skip experience file loading — use only what's already in conversation context
-- Skip pattern loading — rely on conversation history for pattern awareness
-- Abbreviated codebase snapshot (git status only, no log)
-- Skip manifest re-read if already loaded this session
-
-**Minimal Orient** (> 65% context used):
-- Load ONLY the user's current request + any external_context from Observe
-- No blackboard reads at all
-- No codebase snapshot
-- Route based on request text and conversation context alone
-- If the task requires deep context that's been compressed away, suggest: "Context is getting long. Want to /ftm-pause and continue in a fresh session?"
-
-**Rules:**
-- Never degrade plan quality for short/fresh conversations — Full Orient always fires when context is plentiful
-- The context check adds ~0 overhead (just counting messages)
-- Log which Orient mode was used in the blackboard update
-- If a task clearly needs full context but we're in Minimal mode, prefer to pause rather than produce a low-quality plan
+`What is actually going on, what matters most, what is the smallest correct move, and what capability mix fits this situation?`
 
 ### Orient Priority Order
 
@@ -141,661 +113,787 @@ Experience and patterns are accelerators, not authorities. They should never ove
 
 ### 1. Request Geometry
 
-Turn the user's words into a sharper internal model. Ask: What outcome do they want? What work type is this? Information, implementation, validation, orchestration, or external side effect? Is there an explicit shortcut?
+Start by turning the user's words into a sharper internal model.
+
+Ask internally:
+
+- What outcome does the user actually want?
+- What work type is this really?
+- Is this a request for information, implementation, validation, orchestration, or an external side effect?
+- Is the user asking for a result, a recommendation, or a route?
+- Is there an explicit shortcut they want honored?
+- Is there hidden intent behind terse wording?
 
 Interpretation rules:
-- "make this better" needs anchoring to code/tests/UX/architecture
+
+- "make this better" is not actionable until anchored to code, tests, UX, or architecture
 - a stack trace with no extra text is usually a debug request
 - a plan path plus "go" is an execution request
-- a Jira ticket URL is a fetch-and-orient request
-- "what would other AIs think" is a council request
-- "rename this variable" is a micro direct task
+- a Jira ticket URL is a fetch-and-orient request before any route is chosen
+- "what would other AIs think" is a council request, not generic brainstorming
+- "rename this variable" is usually a micro direct task, not a routed skill
 
 ### 2. Blackboard Loading Protocol
 
-Read in order: `context.json` → `experiences/index.json` → `patterns.json` using paths under `~/.claude/ftm-state/blackboard/`.
+Read the blackboard in this order:
 
-**context.json**: Pull out current_task, recent_decisions, active_constraints, user_preferences, skills_invoked. Trajectory matters more than isolated wording.
+1. `context.json`
+2. `experiences/index.json`
+3. `patterns.json`
 
-**Experience retrieval**: Filter index entries by matching task_type or overlapping tags. Sort by recency. Load top 3-5 experience files. Prefer successful, high-confidence, recent entries. Synthesize into concrete adjustments. Never blindly repeat old approaches when live context differs.
+Use these exact paths:
 
-**Pattern registry**: Scan all four sections (codebase_insights, execution_patterns, user_behavior, recurring_issues). Apply only when they materially match the present case.
+- `/Users/kioja.kudumu/.claude/ftm-state/blackboard/context.json`
+- `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json`
+- `/Users/kioja.kudumu/.claude/ftm-state/blackboard/patterns.json`
 
-### Pattern Decay Enforcement
+#### 2.1 `context.json`
 
-After loading `patterns.json`, apply decay rules to every pattern before using them in Orient:
+Use `context.json` for live session state only.
 
-**Decay tiers** (based on `last_reinforced` timestamp):
+Pull out:
 
-| Days Since Reinforcement | Confidence Adjustment | Status |
-|---|---|---|
-| 0-30 days | No change | Active |
-| 31-60 days | Reduce confidence by 1 tier (high→medium, medium→low) | Aging |
-| 61-90 days | Reduce confidence by 2 tiers | Stale |
-| 91+ days | Set confidence to 0 | Decayed |
+- `current_task`: does the request continue the active thread or branch away from it?
+- `recent_decisions`: what did we already decide this session?
+- `active_constraints`: no auto-commit, avoid production, stay terse, etc.
+- `user_preferences`: communication and approval preferences
+- `session_metadata.skills_invoked`: what workflow is already underway?
 
-**Confidence tiers**: 1.0 (high) → 0.7 (medium) → 0.4 (low) → 0.0 (decayed)
+Key heuristic:
 
-**Decay application:**
+- trajectory matters more than isolated wording
 
-```
-For each pattern in patterns.json:
-  1. Calculate days since last_reinforced
-  2. Apply tier reduction based on table above
-  3. If confidence reaches 0:
-     - Move pattern to an "archived" section (do not delete)
-     - Log: "Pattern '[name]' decayed — archived after [N] days without reinforcement"
-  4. If confidence was reduced but > 0:
-     - Update confidence in-memory for this Orient pass
-     - Log: "Pattern '[name]' aging — confidence reduced to [X]"
-```
+If the last sequence was brainstorm -> plan -> execute, then "go ahead" means something different than if the session began 10 seconds ago.
 
-**Pattern conflict detection:**
+#### 2.2 Experience Retrieval
 
-When loading experiences, check if any recent experience (last 7 days) CONTRADICTS an active pattern:
-- Experience outcome differs from pattern's predicted behavior
-- Experience explicitly notes a pattern was wrong
+Experience retrieval must be concrete, not hand-wavy.
 
-When a conflict is detected:
-1. Flag the conflicting pattern: "⚠ Pattern '[name]' conflicts with recent experience from [date]"
-2. Reduce the pattern's effective confidence by an additional tier for this session
-3. If the pattern has been contradicted 3+ times, promote a replacement pattern from the contradicting experiences
+Protocol:
 
-**Write-back:**
+1. Read `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json`
+2. Parse `entries`
+3. Derive a current `task_type`
+4. Derive current tags from the request and codebase context
+5. Filter entries where:
+   - `task_type` matches the current task type, or
+   - there is at least one overlapping tag
+6. Sort filtered entries by `recorded_at` descending
+7. Load the top 3-5 matching experience files from:
+   - `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/{filename}`
+8. Prefer lessons from entries with:
+   - `outcome: success`
+   - higher `confidence`
+   - recent dates
+9. Synthesize the lessons into concrete adjustments to the current approach
 
-After Orient completes, write updated `patterns.json` back with:
-- Updated `last_reinforced` timestamps for patterns that were actively used this session
-- Archived patterns moved to an `archived` array
-- Any new patterns promoted from experiences
-- Conflict flags noted in pattern metadata
+Derive tags from:
+
+- language or framework names
+- domain nouns like `auth`, `poller`, `slack`, `database`, `deploy`, `calendar`, `jira`
+- task shape like `flaky-test`, `refactor`, `ticket-triage`, `plan-execution`
+
+Use retrieved experience for:
+
+- complexity calibration
+- known pitfalls
+- better sequencing
+- better routing
+- faster first checks
+
+Never use experience to blindly repeat an old approach when the live context has changed.
+
+#### 2.3 Pattern Registry
+
+Read `patterns.json` after experience retrieval.
+
+Scan all four sections:
+
+- `codebase_insights`
+- `execution_patterns`
+- `user_behavior`
+- `recurring_issues`
+
+Apply patterns only when they materially match the present case.
+
+Examples:
+
+- matching `file_pattern` on touched files
+- recurring issue symptoms that fit the current failure
+- user behavior that affects response style or approval expectations
+- execution patterns that suggest a proven sequence
+
+Patterns are promoted summaries. They should speed up orientation, not replace it.
 
 ### 3. Cold-Start Behavior
 
-When the blackboard is empty: do not apologize, do not say capability is reduced. Operate at full capability using live observation, codebase state, and base heuristics. Cold start is a smart engineer on day 1, not degraded mode.
+Cold start is normal.
 
-### 4. Skill Inventory (from manifest)
+When the blackboard is empty:
 
-Read `ftm-manifest.json` at the project root. For each skill where `enabled` is `true`, consider it as a routing target. The manifest contains:
-- `name`: skill identifier
-- `description`: what the skill does and when to use it (use this for routing decisions)
-- `events_emits` / `events_listens`: event mesh connections
-- `trigger_file`: the .yml file to invoke the skill
+- do not apologize
+- do not say capability is reduced
+- do not surface that memory is empty unless the user asked
+- operate at full capability using live observation, codebase state, MCP awareness, and base heuristics
 
-Filter by enabled status from user's ftm-config `skills:` section. If a skill is disabled, skip it during routing.
+Warm start adds shortcuts. Cold start is still a smart engineer on day 1 at a new job.
+
+If `experiences/index.json` has no usable matches:
+
+- continue normally
+- lean harder on current repo state and direct inspection
+- record the resulting experience aggressively after completion
+
+### 4. Capability Inventory: 15 Panda Skills
+
+Orient must know all ftm capabilities before deciding whether to route or act directly.
+
+| Skill | Reach for it when... |
+|---|---|
+| `ftm-brainstorm` | The user is exploring ideas, designing a system, comparing approaches, or needs research-backed planning before build work exists. |
+| `ftm-executor` | The user has a plan doc or clearly wants autonomous implementation across multiple tasks or waves. |
+| `ftm-debug` | The core problem is broken behavior, an error, flaky tests, a crash, regression, race, or "why is this failing?" |
+| `ftm-audit` | The user wants wiring checks, dead code analysis, structural verification, or adversarial code hygiene review. |
+| `ftm-council` | The user wants multiple AI perspectives, debate, second opinions, or multi-model convergence. |
+| `ftm-codex-gate` | The user wants adversarial Codex review, validation, or a correctness stress test from Codex specifically. |
+| `ftm-intent` | The user wants function/module purpose documented or `INTENT.md` updated or reconciled. |
+| `ftm-diagram` | The user wants diagrams, architecture visuals, dependency maps, or Mermaid assets updated. |
+| `ftm-browse` | The task requires a browser, screenshots, DOM inspection, or visual verification. |
+| `ftm-pause` | The user wants to park the session and save resumable state. |
+| `ftm-resume` | The user wants to restore paused context and continue prior work. |
+| `ftm-upgrade` | The user wants ftm skills checked or upgraded. |
+| `ftm-retro` | The user wants a post-run retrospective, lessons learned, or execution review. |
+| `ftm-config` | The user wants ftm settings, model profile, or feature configuration changed. |
+| `ftm-git` | Any git commit or push is about to happen, the user asks to scan for secrets/credentials/API keys, or wants to verify no secrets are hardcoded before sharing code. MUST run before any commit or push operation — this is a mandatory security gate, not optional. |
 
 Routing heuristic:
+
 - If a task is self-contained and small enough, do it directly.
 - Route to a skill only when the skill's workflow adds clear value.
 - Explicit skill invocation is a strong route signal.
 
-### 5. MCP Inventory
+### 5. MCP Inventory Reference
 
-Read `references/mcp-inventory.md` for the full MCP server table. Read `references/protocols/MCP-HEURISTICS.md` for matching rules and multi-MCP chaining patterns.
+Read:
+
+- `/Users/kioja.kudumu/.claude/skills/ftm-mind/references/mcp-inventory.md`
+
+Orient must know the available MCPs and their contextual triggers.
+
+| MCP server | Reach for it when... |
+|---|---|
+| `git` | You need repo state, diffs, history, branches, staging, or commits. |
+| `playwright` | You need browser automation, screenshots, UI interaction, console logs, or visual checks. |
+| `sequential-thinking` | The problem genuinely needs multi-step reflective reasoning or trade-off analysis. |
+| `chrome-devtools` | You need lower-level browser debugging, network, or performance inspection. |
+| `slack` | You need to read Slack context, inspect channels or threads, or send a Slack update. |
+| `gmail` | You need inbox search, email reading, drafting, sending, labels, or filters. |
+| `mcp-atlassian-personal` | Personal Jira or Confluence reads and writes: tickets, sprints, docs, comments, status changes. Default Atlassian account. |
+| `mcp-atlassian` | Admin-scope Jira or Confluence operations that must run with elevated org credentials. |
+| `freshservice-mcp` | IT ticketing, requesters, agent groups, products, or service requests. |
+| `context7` | External library and framework documentation. |
+| `glean_default` | Internal company docs, policies, runbooks, and institutional knowledge. |
+| `apple-doc-mcp` | Apple platform docs for Swift, SwiftUI, UIKit, AppKit, and related APIs. |
+| `lusha` | Contact or company lookup and enrichment. |
+| `google-calendar` | Schedule inspection, free/busy checks, event search, drafting scheduling actions, and calendar changes. |
+
+#### MCP matching heuristics
+
+Use the smallest relevant MCP set.
+
+- Jira issue key or Atlassian URL -> `mcp-atlassian-personal`
+- "internal docs", "runbook", "Klaviyo", "Glean" -> `glean_default`
+- "how do I use X library" -> `context7`
+- "calendar", "meeting", "free time" -> `google-calendar`
+- "Slack", "channel", "thread", "notify" -> `slack`
+- "email", "Gmail", "draft" -> `gmail`
+- "ticket", "hardware", "access request" -> `freshservice-mcp`
+- "browser", "screenshot", "look at the page" -> `playwright`
+- "profile performance in browser" -> `chrome-devtools`
+- "talk through trade-offs" -> `sequential-thinking`
+- "SwiftUI" or Apple framework names -> `apple-doc-mcp`
+- "find contact/company" -> `lusha`
+
+#### Multi-MCP chaining
+
+Detect mixed-domain requests early.
+
+Examples:
+
+- "check my calendar and draft a Slack message" -> `google-calendar` + `slack`
+- "read the Jira ticket, inspect the repo, then propose a fix" -> `mcp-atlassian-personal` + `git`
+- "search internal docs, then update a Confluence page" -> `glean_default` + `mcp-atlassian-personal`
+
+Rules:
+
+- parallelize reads when safe
+- gather state before proposing writes
+- chain writes sequentially
 
 ### 6. Session Trajectory
 
-Look for the arc: What happened before? Is the user moving from ideation → execution → validation? Trajectory cues: brainstorm → "ok go" = executor, debug → "check it now" = verify/audit, executor → "pause" = checkpoint.
+Do not orient from the last user message alone.
+
+Look for the arc:
+
+- What skill or action happened just before this?
+- What did we learn?
+- Is the user moving from ideation -> execution -> validation?
+- Did we already choose an approach that this request assumes?
+
+Trajectory cues:
+
+- brainstorm -> "ok go" usually means plan or executor
+- debug -> "check it now" usually means verify, test, or audit
+- executor -> "pause" means checkpoint, not new work
+- resume -> "what's next?" means restore and continue
+
+If a request branches away from the active thread, note that mentally and avoid corrupting the current session model.
 
 ### 7. Codebase State
 
-Incorporate what is true in the repo. Check dirty worktree, recent commits, active branch, user changes in progress. Answer: is this safe to do directly? Do we need to avoid stepping on unfinished work?
+Orient must incorporate what is true in the repo right now.
+
+Check:
+
+- dirty worktree
+- recent commits
+- active branch
+- user changes in progress
+- whether the request conflicts with local state
+
+Use codebase state to answer:
+
+- is this safe to do directly?
+- do we need to avoid stepping on unfinished work?
+- is this request actually about the last commit or current unstaged diff?
+- should we inspect a particular module first because recent changes point there?
+
+Repo heuristics:
+
+- uncommitted changes imply continuity and risk
+- a clean tree lowers the cost of direct action
+- a just-landed commit suggests review or regression-check behavior
+- a ticket-linked branch suggests the user expects ticket-driven execution
 
 ### 8. Complexity Sizing
 
-Read `references/protocols/COMPLEXITY-SIZING.md` for the full sizing guide (micro/small/medium/large) and the ADaPT escalation rule.
+Size the task from observed evidence, not vibes.
 
-### Complexity Calibration
+#### Micro
 
-When the experience index contains 20+ entries, run a calibration check during Orient to improve future sizing accuracy.
+`just do it`
 
-**Calibration analysis:**
+Signals:
 
-1. **Filter relevant experiences** — select entries matching the current task's `task_type` and overlapping `tags`
-2. **Compare estimated vs actual** — for each matching experience, check `complexity_estimated` against `complexity_actual`
-3. **Detect systematic bias** — if >60% of matching experiences show underestimation (actual > estimated), the system has a sizing bias for this task type + tag combination
+- one coherent local action
+- trivial blast radius
+- rollback is obvious
+- no meaningful uncertainty
+- no dedicated verification step needed
 
-**Bias detection thresholds:**
+Typical examples:
 
-| Sample Size | Underestimation Rate | Action |
-|---|---|---|
-| 20-30 experiences | >70% underestimate | Promote weak correction pattern |
-| 30-50 experiences | >60% underestimate | Promote strong correction pattern |
-| 50+ experiences | >50% underestimate | Promote strong correction pattern |
+- rename a variable
+- fix a typo
+- answer a factual question after one read
+- add an import
+- tweak a comment
 
-**Correction pattern format:**
+#### Small
 
-When a bias is detected, promote a new pattern to `patterns.json` under `execution_patterns`:
+`do + test`
 
-```json
-{
-  "name": "sizing_correction_[task_type]_[primary_tag]",
-  "description": "Tasks of type [task_type] with tag [tag] are consistently underestimated. Bump complexity by one tier.",
-  "confidence": 0.7,
-  "last_reinforced": "[current date]",
-  "source": "calibration_analysis",
-  "correction": {
-    "task_type": "[task_type]",
-    "tags": ["[matching tags]"],
-    "bump_direction": "up",
-    "bump_amount": 1,
-    "sample_size": N,
-    "underestimation_rate": "X%"
-  }
-}
-```
+Signals:
 
-**Applying corrections:**
+- 1-3 files
+- one concern
+- clear done state
+- at least one verification step is warranted
+- still reversible without planning overhead
 
-During Complexity Sizing (step 8), after initial estimation:
-1. Check `patterns.json` for any `sizing_correction_*` patterns matching the current task_type + tags
-2. If a correction pattern exists and its confidence > 0.4, bump the estimated complexity up by the specified amount
-3. Log: "Complexity adjusted from [original] to [bumped] based on calibration pattern (N experiences, X% underestimation)"
+Typical examples:
 
-**Reinforcement:**
+- implement a simple helper
+- patch a bug in one area
+- add or update a focused test
+- update docs plus one code path
 
-After task completion, if the corrected estimate was accurate (matches actual), reinforce the correction pattern (update `last_reinforced`). If the correction overshot (actual was lower than corrected estimate), reduce the pattern's confidence by one tier.
+#### Medium
 
-**Scope:**
+`lightweight plan`
 
-This calibration applies to both IT ops tasks and dev tasks — any task_type with sufficient experience data. The same mechanism works regardless of domain.
+Signals:
+
+- multiple changes with ordering
+- moderate uncertainty
+- multi-file or multi-step
+- a bug or feature spans layers but not a full program of work
+- benefits from an explicit short plan before execution
+
+**Forced medium escalation** — if ANY of these are true, the task is medium at minimum regardless of how simple it feels:
+
+- touches more than 3 files
+- modifies automation, CI/CD, or infrastructure code
+- involves external system changes (Jira, Slack, Freshservice, calendar, email)
+- requires coordinating with other people (drafting messages, checking with stakeholders)
+- changes routing, integration, or cross-system references (API endpoints, project keys, board IDs)
+- the codebase being changed is unfamiliar or hasn't been read yet this session
+- the task involves both code changes AND communication/coordination
+
+The reason forced escalation exists: tasks that touch external systems or multiple files feel simple in the moment but have hidden ordering dependencies, stakeholder coordination needs, and blast radius that only becomes visible after you've already started grinding. A 2-minute plan catches these. Grinding without one wastes the user's time when you go in the wrong direction.
+
+Typical examples:
+
+- fix a flaky test with several hypotheses
+- add UI + API + tests for one feature
+- refactor a module with dependent updates
+- reroute an automation from one Jira project to another
+- update references across a codebase after a system migration
+- change API integration endpoints or credentials
+
+#### Large
+
+`brainstorm + plan + executor`
+
+Signals:
+
+- cross-domain work
+- major uncertainty or architectural choice
+- a plan document already exists
+- many files or multiple independent workstreams
+- would benefit from orchestration, parallel execution, or audit passes
+
+Typical examples:
+
+- build a feature from scratch
+- implement a long plan doc
+- re-architect a subsystem
+
+#### Boundary: where micro ends and small begins
+
+Micro ends the moment any of these become true:
+
+- more than one meaningful edit is required
+- a test or build check is needed to trust the change
+- the correct change is not self-evident
+- the blast radius is larger than the immediate line or local block
+
+That is the boundary. If it needs verification or carries plausible regression risk, it is at least small.
+
+#### Boundary: where small ends and medium begins
+
+Small ends the moment any of these become true:
+
+- more than 3 files will be touched
+- external systems are involved (Jira, Slack, email, calendar, Freshservice, APIs)
+- the task requires reading and understanding unfamiliar code before changing it
+- changes span multiple concerns (code + communication, automation + configuration)
+- there are ordering dependencies between the changes
+- the user mentioned coordination with other people
+- the change affects routing, integration points, or cross-system references
+
+That is the boundary. If external systems are involved or the user needs to see the plan before you execute, it is at least medium. This boundary is not optional — do not downsize past it.
+
+#### ADaPT rule
+
+Try the simpler tier first — but never downsize past a forced boundary.
+
+- If it looks small and no forced-medium signals are present, start small.
+- If it looks medium and no forced-large signals are present, try medium.
+- If it looks large, ask whether a medium plan-plus-execute path is enough before invoking full orchestration.
+
+**Critical constraint**: ADaPT allows you to *start* at a simpler tier and escalate if needed. It does NOT allow you to skip the plan approval gate when `approval_mode` is `plan_first` and forced escalation signals are present. If forced-medium signals fired during sizing, you must present a plan — ADaPT cannot override that.
+
+Escalate when:
+
+- the simple approach fails
+- the user explicitly asks for the larger workflow
+- the complexity is obvious from the start
+- forced escalation signals are present (see Medium and Large sections above)
 
 ### 9. Approval Gates
 
-Approval required for external-facing actions: Slack messages, emails, Jira/Confluence/Freshservice mutations, calendar changes, browser form submissions, deploys, remote pushes.
+Ask for approval only for external-facing actions.
 
-Auto-proceed: local code edits, documentation, tests, local git, reading from any MCP, blackboard reads/writes.
+External-facing means actions that leave the local workspace and affect people, systems of record, or deployed environments.
+
+Approval required:
+
+- sending Slack messages
+- sending emails
+- creating or mutating Jira, Confluence, or Freshservice records
+- changing calendar events
+- submitting browser forms or uploads
+- deploys and production-affecting operations
+- remote pushes or other outward publication steps
+
+Auto-proceed without approval:
+
+- local code edits
+- local documentation updates
+- tests, lint, builds, audits
+- local git inspection
+- local branches and local commits
+- reading from any MCP
+- blackboard reads and writes
+- saving drafts to `.ftm-drafts/` (the draft is local; sending is what needs approval)
+
+If the user has explicitly requested stricter gates, honor that preference.
+
+If authentication or permission is missing, ask instead of guessing.
 
 ### 10. Ask-the-User Heuristic
 
-Ask only when: two materially different interpretations are plausible, an external action needs approval, a required identifier is missing, or the user asked for options. Ask one focused question with concrete choices.
+Ask the user only when one of these is true:
+
+- two materially different interpretations are both plausible
+- an external-facing action needs approval
+- a required credential, path, or identifier is missing
+- the user explicitly asked for options before action
+- **the task is medium+ and involves external systems, stakeholder coordination, or unfamiliar code** (see Discovery Interview below)
+
+When asking, ask one focused question with concrete choices.
+
+Good:
+
+- "Do you want me to treat this as a bug fix or a refactor?"
+- "I can draft the Slack message or send it. Which do you want?"
+
+Bad:
+
+- "What do you want to do?"
+
+#### Discovery Interview (medium+ tasks with external systems)
+
+When a task hits forced-medium or higher AND involves external systems, stakeholder coordination, or code you haven't read yet this session, run a brief discovery interview BEFORE generating the plan. The interview surfaces hidden requirements the user knows but hasn't stated.
+
+The interview should be 2-4 focused questions, not open-ended. Ask about things you cannot determine from the codebase alone:
+
+- Who else needs to know about this change?
+- Are there downstream systems or automations that depend on what's changing?
+- Is there a timeline or dependency on someone else's approval?
+- Should we also draft a message to anyone about this?
+- Are there parts of this you want left alone for now vs. changed?
+
+Present the questions as a numbered list so the user can answer efficiently:
+
+```
+Before I plan this out, a few quick questions:
+
+1. Who else needs to know about this change? (Slack message, email, etc.)
+2. Are there downstream systems that depend on [thing being changed]?
+3. Anything you want left as-is for now that I should avoid touching?
+```
+
+Then incorporate their answers into the plan. This takes 30 seconds and prevents the "oh wait, we also needed to do X" moment that comes after 5 minutes of grinding.
+
+**When to skip the interview:**
+- The user already provided comprehensive context (e.g., pasted a Slack thread with full background)
+- The task is purely local with no external dependencies
+- The user explicitly says "just do it" or "no questions, go"
 
 ### 11. Orient Synthesis
 
-Silently synthesize: outcome wanted, task type, session continuity, codebase constraints, relevant lessons, capability mix, smallest correct task size, whether approval or clarification is needed. If `external_context` was populated in Observe (from a Jira ticket, Freshservice ticket, or Slack thread), incorporate it as primary input here — treat the fetched ticket description, status, comments, and conversation as first-class context alongside codebase and session state. Orient is complete only when the next move feels obvious.
+Before leaving Orient, silently synthesize all signals into one internal picture:
+
+- current outcome the user wants
+- current task type
+- session continuity
+- codebase constraints
+- relevant lessons
+- relevant patterns
+- capability mix
+- smallest correct task size
+- whether approval or clarification is needed
+
+Orient is complete only when the next move feels obvious.
 
 ## Decide
 
-Every task gets a plan before execution. The plan's depth scales with complexity, but the flow is always: present plan → user approves/modifies → execute.
+Decide turns the orientation model into one concrete next move.
 
-### 0. Check for matching playbooks
+### 1. Choose the smallest correct execution mode
 
-Before generating a fresh plan, scan `~/.ftm/playbooks/` for existing playbooks that match the current task.
+- `micro` -> direct action
+- `small` -> pre-flight summary, then direct action plus verification
+- `medium` -> numbered plan, wait for approval, then execute
+- `large` -> `ftm-brainstorm` if no plan exists, or `ftm-executor` if a plan exists
 
-**Matching criteria:**
-1. **task_type match** — playbook's `task_type` matches Orient's classification
-2. **Tag overlap** — at least 2 tags overlap between the playbook and the current task's inferred tags
-3. **Recency** — prefer playbooks created more recently (sort by `created_at`)
+**Double-check before committing to a size**: Re-read the forced escalation signals from the Complexity Sizing section. If any forced-medium signals fired, the task is medium regardless of how it feels. Do not rationalize past this — "it's basically just find-and-replace" is exactly how the Jira rerouting task looked before it turned into 15 edits across a 1700-line file plus stakeholder coordination plus a Slack draft. Present the plan.
 
-**Scan process:**
-1. List all `.yml` files in `~/.ftm/playbooks/`
-2. For each file, read the YAML frontmatter (name, task_type, tags)
-3. Score each playbook: +1 per matching tag, +2 for task_type match, +1 for recency (last 30 days)
-4. If any playbook scores >= 3, it's a match
+### 1.5 Interactive Plan Approval
 
-**On match found:**
+Read `~/.claude/ftm-config.yml` field `execution.approval_mode`. This controls whether the user sees and approves the plan before execution begins.
+
+#### Mode: `auto` (default legacy behavior)
+Skip this section entirely. Execute as before — micro/small just go, medium outlines steps and executes, large routes to brainstorm/executor.
+
+#### Mode: `plan_first` (recommended for collaborative work)
+
+**For small tasks**: Show a brief pre-flight summary before executing. This is not a formal approval gate — just visibility so the user knows what's about to happen. Present it inline and proceed unless the user objects:
+
 ```
-Found a playbook from [date]: "[playbook name]"
+Quick summary before I start:
+- Read [file] to understand current behavior
+- Change [X] to [Y] in [file]
+- Verify: [test/lint/manual check]
 
-Steps:
-1. [step 1]
-2. [step 2]
-...
-
-Use this playbook? Say "go" to execute, "modify" to edit first, or "fresh" to generate a new plan.
-```
-
-**User responses:**
-- **"go"** — execute the playbook as-is (same as approving a plan)
-- **"modify"** — enter plan modification mode with the playbook's steps loaded
-- **"fresh"** / **"new plan"** — skip the playbook, generate a fresh plan from scratch
-- All plan modification commands work on playbook-loaded plans
-
-**On no match:**
-- Proceed directly to step 1 (Generate a plan) as normal
-- No message shown — the playbook check is silent when nothing matches
-
-**Multiple matches:**
-If 2+ playbooks match, show the top match and note: "Also found: [other playbook names]. Say 'show alternatives' to see them."
-
-### 1. Generate a plan
-
-Based on Orient's synthesis, generate a plan appropriate to the task's complexity:
-
-**Micro tasks** (rename a variable, fix a typo, answer a question):
-- 1-2 step plan, presented inline: "I'll rename `foo` to `bar` in `src/utils.ts`. Go?"
-- User says "go" / "yes" / "do it" → execute immediately
-
-**Small tasks** (single-file feature, config change, write a test):
-- 2-3 step plan with file list
-- Each step is one sentence describing the action
-
-**Medium tasks** (multi-file feature, bug investigation, refactor):
-- 4-8 step plan with file lists per step
-- Dependencies between steps noted
-- Verification steps included (tests, build check)
-
-**Large tasks** (new feature system, architecture change, multi-skill workflow):
-- Phased plan with two-tier approval
-- Phase 1 presented first; subsequent phases shown after Phase 1 completes
-- Each phase has its own verification criteria
-
-### 2. Present the plan
-
-Show the plan with numbered steps. For medium+ tasks, include:
-- Step number and description
-- Files to be modified/created
-- Dependencies on prior steps
-- Verification criteria
-
-Format:
-```
-Plan: [title]
-
-1. [step description]
-   Files: [file list]
-
-2. [step description]
-   Files: [file list]
-   Depends on: step 1
-
-3. Verify: [verification description]
-
-Ready? Say "go" to execute, or modify the plan.
+Going ahead unless you say otherwise.
 ```
 
-### 3. Wait for approval
+**For medium and large tasks**: Present a numbered task list and wait for the user to approve before executing anything. Do NOT start executing while presenting the plan — the plan IS the first deliverable.
 
-The user controls execution. Valid responses:
-- **"go"** / **"execute"** / **"ship it"** / **"yes"** → begin execution
-- **Plan modification commands** → see Plan Modification section below
-- **"save this plan"** → persist to `~/.claude/plans/[slug]-plan.md`
-- **"explain N"** → show more detail for step N without approving
-- **Questions** → answer without approving, re-present plan
+**Step 0: Discovery Interview (if applicable).**
 
-### 4. Track user modifications
+Before generating the plan, check whether a Discovery Interview is needed (see Orient section 10). If the task involves external systems, stakeholder coordination, or unfamiliar code, run the interview FIRST. The user's answers feed directly into the plan — without them, the plan will miss requirements.
 
-When the user modifies the plan across multiple turns, track which steps were:
-- **Generated**: created by ftm-mind (default)
-- **User-modified**: changed by the user's explicit instruction
-- **User-added**: inserted by the user
+The sequence is: Orient → Discovery Interview → Generate Plan → User Approval → Execute. Not: Orient → Generate Plan → Execute → "oh wait, we also needed to..."
 
-On re-presentation after modification, highlight what changed:
+**Step 1: Generate the plan.**
+
+Build a numbered list of concrete steps based on Orient synthesis AND discovery interview answers. Each step must have:
+- A number
+- A one-line description of what will be done
+- The files that will be touched
+- The verification method (test, lint, visual check, or "self-evident")
+
+Present it like this:
+
 ```
-Plan: [title] (modified)
+Here's my plan for this task:
 
-1. [step description]
-2. [step description] ← modified
-3. [NEW] [step description] ← added by you
-4. [step description]
+  1. [ ] Read auth middleware and map dependencies → src/middleware/auth.ts
+  2. [ ] Add OAuth token validation endpoint → src/routes/auth.ts, src/middleware/oauth.ts
+  3. [ ] Update existing auth tests for new flow → src/__tests__/auth.test.ts
+  4. [ ] Run full test suite → verify: pytest / npm test
+  5. [ ] Update INTENT.md for changed functions → docs/INTENT.md
+
+Approve all? Or tell me what to change.
+  - "approve" or "go" → execute all steps in order
+  - "skip 3" → execute all except step 3
+  - "for step 2, use passport.js instead" → modify step 2, then execute all
+  - "only 1,2" → execute only steps 1 and 2
+  - "add: step between 2 and 3 to update the config" → insert a step
+  - "deny" or "stop" → cancel entirely
 ```
 
-### Plan Modification Commands
+**Step 2: Parse the user's response.**
 
-When a plan is presented, the user can modify it using natural language. Recognize these 5 core commands:
+| User says | Action |
+|-----------|--------|
+| `approve`, `go`, `yes`, `lgtm`, `ship it` | Execute all steps in order |
+| `skip N` or `skip N,M` | Remove those steps, execute the rest |
+| `only N,M,P` | Execute only the listed steps in order |
+| `for step N, [instruction]` | Replace step N's approach with the user's instruction, then execute all |
+| `add: [description] after N` or `add: [description] before N` | Insert a new step at that position, renumber, then execute all |
+| `deny`, `stop`, `cancel`, `no` | Cancel. Do not execute anything. Ask what the user wants instead. |
+| A longer message with mixed feedback | Parse each instruction. Apply all modifications to the plan. Present the revised plan and ask for final approval. |
 
-#### `explain N`
-Show expanded detail for step N without approving the plan. Include:
-- What exactly will be changed and why
-- Which functions/components are affected
-- What could go wrong
-- How it will be verified
+**Step 3: Execute the approved plan.**
 
-Example: "explain 3" → show detailed breakdown of step 3, then re-present the full plan.
+Work through the approved steps sequentially. After each step:
+- Show a brief completion message: `Step 2/5 done: OAuth endpoint added.`
+- If a step fails, stop and report. Ask: "Step 3 failed: [error]. Fix and continue, skip this step, or stop?"
+- After all steps complete, show a summary of what was done.
 
-#### `skip N`
-Remove step N from the plan. Adjust numbering. Check for dependency violations:
-- If another step depends on N, warn: "Step 5 depends on step 3. Skip both, or keep 3?"
-- If no dependencies, remove cleanly and re-present
+**Step 4: Post-execution update.**
 
-Example: "skip 2" → remove step 2, renumber remaining steps, re-present.
+Update the blackboard with decisions made and experience recorded, same as normal Act phase.
 
-#### `merge N and M`
-Combine steps N and M into a single step. Rules:
-- If N and M are adjacent, combine their descriptions and file lists
-- If N and M are not adjacent, reorder to make them adjacent first, then combine
-- If merging creates a step that touches >10 files, warn: "Merged step would touch 12 files. That's large for one step. Proceed?"
-- Update dependencies: anything that depended on N or M now depends on the merged step
+#### Mode: `always_ask`
+Same as `plan_first` but applies to **small** tasks too. Only micro tasks (single obvious edit) skip the approval gate.
 
-Example: "merge 2 and 3" → combine into one step, re-present.
+#### Combining with explicit skill routing
 
-#### `add after N: [description]`
-Insert a new step after step N. The user provides the description in natural language.
-- Parse the description to infer file list if possible
-- Mark the new step as "User-added" in modification tracking
-- Renumber subsequent steps
-- If the description is vague, ask one clarifying question before inserting
+When the mind decides to route to a skill (e.g., ftm-debug, ftm-executor), the plan approval still applies if the mode is `plan_first` or `always_ask`. Present:
 
-Example: "add after 4: write unit tests for the new validation function" → insert step 5 with test-writing task, renumber old 5+ to 6+.
+```
+For this task, I'd route to ftm-debug with this approach:
 
-#### `save this plan`
-Persist the current plan (with all modifications) to a file.
-- Generate a slug from the plan title: lowercase, hyphens, no special chars
-- Save to `~/.claude/plans/[slug]-plan.md`
-- Use the standard plan format: title, steps with files and dependencies, acceptance criteria
-- Confirm: "Plan saved to ~/.claude/plans/[slug]-plan.md"
-- After saving, the plan is still pending approval — saving doesn't execute
+  1. [ ] Launch ftm-debug war room on the flaky auth test
+  2. [ ] Apply the fix from debug findings
+  3. [ ] Run test suite to verify
+  4. [ ] Record experience to blackboard
 
-### Parsing Rules
+Approve? Or adjust the approach.
+```
 
-- Commands are case-insensitive: "Skip 3", "SKIP 3", "skip 3" all work
-- Natural language variations are accepted: "remove step 3" = "skip 3", "combine 2 and 3" = "merge 2 and 3", "what does step 4 do?" = "explain 4"
-- Multiple commands in one message: "skip 2 and merge 4 and 5" → process sequentially
-- After ANY modification, re-present the updated plan with change indicators
+This gives the user control over the *strategy* even when delegating to skills.
 
-### 5. Choose execution mode
+### 2. Choose direct vs routed execution
 
-After approval, decide HOW to execute:
-- **Direct**: ftm-mind executes the steps itself (micro/small tasks)
-- **Routed**: delegate to a specialized skill (ftm-debug, ftm-brainstorm, etc.)
-- **Orchestrated**: delegate to ftm-executor for multi-agent parallel execution (large tasks)
+Use direct execution when:
 
-### 6. Choose supporting MCP reads
+- the work is micro or small
+- routing overhead adds no value
+- the answer can be delivered faster than a delegated workflow
 
-If the request depends on external context (Jira URL, meeting, policy question, UI bug), fetch minimum required state first.
+Use a ftm skill when:
 
-### 7. Decide whether to loop
+- its specialized workflow will materially improve the result
+- the user explicitly invoked it
+- the task is medium/large and the skill is the right vehicle
 
-If the next move will reveal new information, plan to re-enter Observe after acting.
+### 3. Choose any supporting MCP reads
+
+If the request depends on external context, fetch the minimum required state first.
+
+Examples:
+
+- Jira URL -> read the ticket first
+- meeting request -> read calendar first
+- internal policy question -> search Glean first
+- UI bug -> snapshot or inspect browser first
+
+### 4. Decide whether to loop
+
+If the next move will reveal new information, plan to re-enter Observe after the action. This is normal for debugging, investigation, and mixed-tool workflows.
 
 ## Act
 
+Act is clean, decisive execution.
+
 ### 1. Direct action
 
-For micro and small tasks: do the work, verify if needed, summarize what changed. Do not over-narrate.
+For micro tasks:
+
+- do the work
+- summarize what changed
+
+For small tasks (when `approval_mode` is `plan_first` or `always_ask`):
+
+- show the pre-flight summary first (see Decide section 1.5)
+- then do the work
+- verify
+- summarize what changed
+
+The pre-flight summary is not a gate — you proceed immediately after showing it unless the user objects. But showing it is mandatory because it gives the user a chance to catch mis-sizing or redirect before work begins. If the user says "wait" or "actually..." after seeing the pre-flight, stop and listen.
+
+Do not over-narrate during execution.
 
 ### 2. Skill routing
 
-Show one short routing line, then invoke the target skill with the full user input.
+Before invoking a skill, show one short routing line.
+
+Examples:
+
+- `Routing to ftm-debug: this is a flaky failure with real diagnostic uncertainty.`
+- `Routing to ftm-brainstorm: this is still design-stage and benefits from research-backed planning.`
+
+Then invoke the target skill with the full user input.
 
 ### 3. MCP execution
 
-Parallel reads when safe, sequential writes, approval gates for external-facing actions.
+Use:
 
-### 4. Blackboard updates
+- parallel reads when safe
+- sequential writes
+- approval gates only for external-facing actions
 
-After a meaningful action: update context.json, append to recent_decisions, update skills_invoked, record experience file if a task completed or notable lesson emerged.
+### 3.5. Draft-before-send protocol
+
+When composing Slack messages, emails, or any outbound communication, always save the draft locally before sending.
+
+**Drafts folder**: `.ftm-drafts/` in the project root (or `~/.claude/ftm-drafts/` if no project context).
+
+**Ensure the folder exists and is gitignored:**
+
+1. Create `.ftm-drafts/` if it doesn't exist
+2. Check `.gitignore` — if `.ftm-drafts/` is not listed, add it
+
+**Save every draft** before presenting it to the user or sending it:
+
+- Filename: `YYYY-MM-DD_HH-MM_<type>_<recipient-or-channel>.md` (e.g., `2026-03-19_14-30_slack_mo-ali.md`)
+- Content format:
+  ```markdown
+  ---
+  type: slack | email
+  to: #channel-name | @person | email@address
+  subject: (email only)
+  drafted: 2026-03-19T14:30:00
+  status: draft | sent | cancelled
+  ---
+
+  [message body]
+  ```
+
+**Workflow:**
+1. Compose the message
+2. Save to `.ftm-drafts/`
+3. Present to user for approval (this is already required by the approval gates)
+4. If approved and sent, update `status: sent` in the file
+5. If cancelled or modified, update accordingly
+
+This gives the user a local audit trail of everything ftm drafted on their behalf, without polluting git history.
+
+### 4. Blackboard updates (mandatory)
+
+After every completed task — not just "meaningful" ones — update the blackboard. This is how ftm learns. If you skip this step, the next session starts from zero on tasks like this one.
+
+**Always do all of these:**
+
+1. Update `context.json` — set `current_task` to reflect what was done, append to `recent_decisions`
+2. Update `session_metadata.skills_invoked` if a skill was used
+
+**After task completion, always record an experience file:**
+
+3. Write an experience file to `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json`
+4. Update `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
+
+The experience file should capture:
+- `task_type`: what kind of work this was (e.g., `integration-reroute`, `automation-update`, `bug-fix`)
+- `tags`: domain nouns for future retrieval (e.g., `jira`, `freshservice`, `llm-integration`, `aria`, `itwork2`)
+- `outcome`: `success` or `partial` or `failed`
+- `lessons`: what worked, what was missed, what to do differently next time
+- `files_touched`: list of files modified
+- `stakeholders`: people involved or notified
+- `decisions_made`: key choices and their rationale
+
+The reason this is mandatory: the Jira rerouting task involved discovering that ARIA uses Stories not CRs, has no active sprints, needs different custom fields, and requires stakeholder coordination with Mo. None of that is in the code — it's tribal knowledge that only exists if we record it.
+
+Follow the schema and full-file write rules from `blackboard-schema.md`.
 
 ### 5. Loop
 
-If complete → answer and stop. If new information → return to Observe. If blocked → ask the user. If simple approach failed → re-orient and escalate one level.
-
-## Post-Execution
-
-After plan execution completes successfully, check whether the task originated from an external ticket (Jira, Freshservice). If it did, draft a completion comment.
-
-### 1. Detect ticket origin
-
-Check Observe's `external_context` for the source. If no external_context exists (task was not ticket-driven), skip post-execution drafting entirely.
-
-### 2. Draft completion comment
-
-Generate a comment that includes:
-- **What was done**: concrete summary of changes (files modified, configs applied, features added)
-- **Steps completed**: list of plan steps that executed successfully
-- **Verification results**: test results, build status, any validation that was run
-- **What's next**: any follow-up actions needed (deployment, testing by requester, etc.)
-
-Tone: professional, concise, factual. No filler. Written as if you're updating a colleague.
-
-### 3. Present for approval
-
-**For Jira tickets:**
-```
-Draft comment for PROJ-123:
-
----
-[draft content here]
----
-
-Say "send" to post via jira_add_comment, or edit the draft.
-```
-
-**For Freshservice tickets:**
-```
-Draft reply for FS#12345:
-
----
-[draft content here]
----
-
-Say "send" to post via send_ticket_reply, or edit the draft.
-```
-
-### 4. User controls sending
-
-- **"send"** / **"post"** → execute the MCP call to post the comment
-- **User edits the draft** → incorporate changes, re-present
-- **"skip"** / **"don't send"** → skip posting, continue
-- **NEVER post without explicit approval**. This is a hard gate.
-
-### 5. Execute posting
-
-For **Jira**: call `jira_add_comment` with the ticket key and approved comment body.
-For **Freshservice**: call `send_ticket_reply` with the ticket ID and approved reply body.
-
-After successful posting, note it in the blackboard context as a recent_decision: "Posted completion comment to [source] [id]".
-
-### 6. Playbook Save Offer
-
-After successful plan execution (all steps completed, verification passed), offer to save the plan as a reusable playbook.
-
-**When to offer:**
-- Plan executed successfully (all steps passed)
-- The plan had 3+ steps (micro tasks aren't worth saving as playbooks)
-- The user hasn't declined playbook saves 3+ times this session
-
-**Prompt:**
-```
-✓ Plan executed successfully.
-
-Save as playbook for future reuse? This plan can be loaded automatically
-when you encounter a similar task.
-
-Name: [auto-generated from plan title]
-Tags: [inferred from task_type + domain tags]
-
-Say "save" to create playbook, or "skip".
-```
-
-**On "save":**
-
-1. Generate a slug from the plan title: lowercase, hyphens, no special chars, max 50 chars
-2. Create the playbooks directory if it doesn't exist: `~/.ftm/playbooks/`
-3. Save as YAML to `~/.ftm/playbooks/[slug].yml`:
-
-```yaml
-name: [plan title]
-description: [one-line summary]
-created_from: [original task description]
-created_at: [ISO timestamp]
-task_type: [inferred task type]
-tags: [list of relevant tags]
-source_ticket: [ticket ID if task was ticket-driven, null otherwise]
-
-steps:
-  - number: 1
-    description: [step description]
-    files: [file list]
-    verification: [how to verify this step]
-  - number: 2
-    description: [step description]
-    files: [file list]
-    depends_on: [1]
-    verification: [verification]
-
-verification:
-  - [overall verification criteria]
-
-notes:
-  - [any decisions or lessons from execution]
-```
-
-4. Confirm: "Playbook saved to ~/.ftm/playbooks/[slug].yml"
-5. Record in blackboard: add to recent_decisions "Saved playbook: [name]"
-
-**On "skip":**
-- Note the decline (for the 3-decline suppression)
-- Continue normally
-
-**v1.0 limitations:**
-- No parameterization — saves the literal plan as-is
-- No sharing format — personal playbooks only
-- Playbook is valid YAML and parseable but not templated
-
-### 7. Playbook Parameterization (v1.5)
-
-After a playbook has been loaded and executed successfully 3 or more times (tracked via a `use_count` field in the playbook YAML), offer to parameterize it for broader reuse.
-
-**When to trigger:**
-- A playbook was loaded via "Check for matching playbooks" (step 0 in Decide)
-- The playbook executed successfully
-- The playbook's `use_count` reaches 3 (or any multiple of 3 thereafter for re-parameterization)
-
-**Prompt:**
-```
-This playbook "[name]" has been used successfully [N] times.
-
-Parameterize it? This replaces specific values with {{placeholders}},
-making it reusable across different projects/tickets.
-
-Say "parameterize" to proceed, or "skip".
-```
-
-**On "parameterize":**
-
-Execute the APC two-step generalization:
-
-**Step 1: Rule-based filter** — Strip execution-specific content:
-- Remove reasoning comments and rationale paragraphs
-- Remove timestamps, session IDs, commit hashes
-- Remove absolute file paths (replace with relative or placeholder)
-- Keep: step descriptions, verification criteria, dependency structure
-
-**Step 2: LLM-driven entity extraction** — Identify values that are specific to one execution and replace with typed placeholders:
-
-| Value Type | Example | Placeholder |
-|---|---|---|
-| Project name | `my-app` | `{{project_name}}` |
-| Ticket ID | `PROJ-123` | `{{ticket_id}}` |
-| File paths | `src/auth/login.ts` | `{{target_file}}` |
-| User/requester | `john@company.com` | `{{requester_email}}` |
-| Domain/URL | `admin.company.com` | `{{admin_url}}` |
-| Config values | `us-east-1` | `{{aws_region}}` |
-| Repo name | `panda-brain` | `{{repo_name}}` |
-
-**Updated playbook format:**
-
-```yaml
-name: [same name]
-version: 2  # bumped from 1
-parameterized: true
-use_count: [N]
-parameters:
-  project_name:
-    type: string
-    description: "Name of the target project"
-    example: "my-app"
-  ticket_id:
-    type: string
-    description: "Source ticket identifier"
-    example: "PROJ-123"
-  # ... more parameters
-
-steps:
-  - number: 1
-    description: "Set up {{project_name}} authentication module"
-    files: ["{{target_file}}"]
-    verification: "Tests pass for {{project_name}} auth"
-```
-
-**Backup:** Save the original (v1) playbook as `[slug].v1.yml` before overwriting with the parameterized version.
-
-**On future use:**
-When a parameterized playbook is loaded in step 0 of Decide:
-1. Detect `parameterized: true` in the YAML
-2. Prompt for parameter values: "This playbook needs: project_name, ticket_id. Provide values or I'll infer from context."
-3. Infer what's possible from the current task context (ticket ID from Observe, project name from cwd)
-4. Ask only for values that can't be inferred
-5. Substitute all `{{placeholders}}` with actual values before presenting the plan
-
-**Metrics (from APC research):**
-- 50% cost reduction from plan reuse
-- 27% latency reduction from skipping plan generation
-- Parameterized playbooks become more valuable with each use
-
-### 8. Slack Message Drafting
-
-When a plan step involves communicating via Slack (notifying a team, updating a channel, escalating to someone), draft the message and present for approval.
-
-**Detection:**
-- Plan step mentions "notify", "message", "slack", "post to #channel", "tell [person]"
-- Task context indicates a Slack communication is needed (e.g., deployment notification, incident update)
-
-**Draft process:**
-1. Compose the message based on:
-   - What was accomplished (from execution results)
-   - Who needs to know (from plan context or ticket)
-   - Appropriate tone (from blackboard patterns — formal for incidents, casual for updates)
-2. Present the draft:
-   ```
-   Draft Slack message to #[channel] (or @[user]):
-
-   ---
-   [draft message content]
-   ---
-
-   Say "send" to post via slack_post_message, "edit" to modify, or "skip".
-   ```
-3. On "send": call `slack_post_message` with channel and message
-4. On edit: incorporate changes, re-present
-5. On "skip": continue without sending
-6. **NEVER send without explicit "send" / "post" approval**
-
-**Thread replies:** If responding to a Slack thread (detected from external_context), use `slack_reply_to_thread` instead.
-
-**Tone adaptation:** If blackboard patterns contain communication style preferences, adapt the draft tone. Default: concise, professional, emoji-light.
-
-### 9. Email Drafting
-
-Same pattern as Slack but for email via Gmail MCP.
-
-**Detection:**
-- Plan step mentions "email", "send mail", "notify via email"
-- Task involves external stakeholders who aren't on Slack
-
-**Draft process:**
-1. Compose email with:
-   - **Subject line**: concise, descriptive
-   - **Body**: what was done, what's needed, next steps
-   - **Recipients**: inferred from context or explicitly stated
-2. Present the draft:
-   ```
-   Draft email:
-
-   To: [recipients]
-   Subject: [subject]
-
-   ---
-   [body content]
-   ---
-
-   Say "send" to deliver via Gmail, "edit" to modify, or "skip".
-   ```
-3. On "send": call `send_email` with recipients, subject, body
-4. On edit: any part (to, subject, body) can be modified
-5. On "skip": continue without sending
-6. **NEVER send without explicit approval**
+After acting:
+
+- if complete, answer and stop
+- if new information appeared, return to Observe
+- if blocked by approval or missing info, ask the user
+- if the simple approach failed, re-orient and escalate one level
 
 ## Routing Scenarios
 
-Read `references/routing/SCENARIOS.md` for the full behavioral test table.
+Use these as behavioral tests.
+
+| Input | What Orient notices | Decision |
+|---|---|---|
+| `debug this flaky test` | bug, uncertainty, likely multiple hypotheses | route to `ftm-debug` |
+| `help me think through auth design` | ideation, architecture, not implementation yet | route to `ftm-brainstorm` |
+| `execute ~/.claude/plans/foo.md` | explicit plan path and execution ask | route to `ftm-executor` |
+| `rename this variable` | one obvious local edit, tiny blast radius | handle directly as `micro` |
+| `what would other AIs think about this approach` | explicit multi-model request | route to `ftm-council` |
+| `audit the wiring` | structural verification request | route to `ftm-audit` |
+| Jira ticket URL only | ticket-driven work, intent not yet clear | fetch via `mcp-atlassian-personal`, then re-orient |
+| `check my calendar and draft a slack message` | mixed-domain workflow, read + external draft/send boundary | read calendar, draft Slack, ask before send |
+| `make this better` | ambiguous, insufficient anchor | ask one focused clarifying question |
+| `/ftm help` | explicit help/menu request | show help menu |
+| `I just committed the fix, now check it` | continuation, recent commit validation | inspect diff, run tests or audit, then report |
+| `/ftm-debug auth race condition` | explicit skill choice | respect explicit route to `ftm-debug` |
+| `/ftm-brainstorm replacement for Okta hooks` | explicit design-phase route | respect explicit route to `ftm-brainstorm` |
+| `open the page and tell me what looks broken` | visual/browser task | route to `ftm-browse` or use browser support if already in-flow |
+| `add error handling to the API routes` | medium task, multi-file, `plan_first` mode | present numbered plan for approval, wait for user response, then execute approved steps |
+| `refactor auth to support OAuth` (with `plan_first`) | medium-large, multi-file with dependencies | present plan with 5-7 steps, user says "skip 4, for step 3 use passport.js" → adjust and execute |
+| `reroute the Jira automation from ITWORK2 to ARIA` | forced-medium: external systems (Jira), cross-system references, unfamiliar codebase, stakeholder coordination | present numbered plan listing all reference changes, stakeholder communication, and verification steps — do NOT start editing code |
+| `update the integration to point to the new API endpoint` | forced-medium: cross-system references, automation code, multiple files likely | present plan first — even if it looks like "just change a URL", the blast radius of integration changes is always higher than expected |
 
 ## Help Menu
 
 When the user asks for help, shows empty input, or says `?` or `menu`, show:
 
 ```text
-FTM Skills:
+Panda Skills:
   /ftm brainstorm [idea]     — Research-backed idea development
   /ftm execute [plan-path]   — Autonomous plan execution with agent teams
   /ftm debug [description]   — Multi-vector deep debugging war room
@@ -810,99 +908,15 @@ FTM Skills:
   /ftm upgrade               — Check for skill updates
   /ftm retro                 — Post-execution retrospective
   /ftm config                — Configure ftm settings
+  /ftm git                   — Secret scanning & credential safety gate
   /ftm mind [anything]       — Full cognitive loop
 
 Or just describe what you need and ftm-mind will figure out the smallest correct next move.
 ```
 
-## Error Recovery Protocol
-
-When any FTM skill fails mid-execution, follow this structured recovery sequence. The goal is to learn from every failure and never repeat the same mistake.
-
-### Step 1: Record failure immediately
-
-Before attempting any recovery, create an experience entry:
-```json
-{
-  "task_type": "[current task type]",
-  "description": "FAILURE: [what was being attempted]",
-  "outcome": "failure",
-  "error_message": "[the actual error]",
-  "failed_step": "[which step/phase failed]",
-  "approach_attempted": "[what was tried]",
-  "tags": ["failure", "[task_type]", "[relevant domain tags]"],
-  "confidence": 0.8,
-  "lessons": ["[initial assessment of what went wrong]"]
-}
-```
-
-This ensures the failure is captured even if recovery also fails.
-
-### Step 2: Search blackboard for similar past failures
-
-Query `experiences/index.json` for entries with:
-- `outcome: "failure"`
-- Matching `task_type` OR overlapping `tags`
-- Similar `error_message` pattern (substring match)
-
-If a match is found with a subsequent successful recovery:
-1. Read the recovery experience for the approach that worked
-2. Try that approach first
-3. If it works, reinforce the recovery pattern (update confidence)
-
-### Step 3: Escalate one complexity tier
-
-If no past solution exists or the past solution didn't work:
-
-| Current Approach | Escalation |
-|---|---|
-| Direct action (micro task) | Generate a 2-3 step plan and retry |
-| Small plan (2-3 steps) | Expand to medium plan with verification steps |
-| Medium plan | Route to ftm-debug for deep investigation |
-| ftm-debug | Invoke ftm-council for multi-model perspective |
-| ftm-council | Save state and present diagnosis to user |
-
-### Step 4: Save state on unrecoverable failure
-
-If escalation through all tiers fails:
-1. Invoke ftm-pause to save full session state
-2. Present a structured diagnosis to the user:
-   ```
-   ⚠ Unrecoverable failure in [skill]:
-
-   Error: [error message]
-   Step: [which step failed]
-   Attempts: [list of approaches tried and why each failed]
-
-   Suggested next steps:
-   - [suggestion based on error pattern]
-   - [alternative approach]
-
-   Session saved. Resume with /ftm-resume to continue.
-   ```
-3. Do NOT silently retry indefinitely — 3 attempts max per escalation tier
-
-### Step 5: Record successful recovery
-
-When a recovery succeeds (at any tier):
-1. Create a HIGH-VALUE experience entry:
-   ```json
-   {
-     "task_type": "[type]",
-     "description": "RECOVERY: [original failure] → [what fixed it]",
-     "outcome": "success",
-     "confidence": 0.9,
-     "tags": ["recovery", "high-value", "[domain tags]"],
-     "lessons": [
-       "Original error: [error]",
-       "Failed approaches: [list]",
-       "Working solution: [what worked and why]"
-     ]
-   }
-   ```
-2. These recovery experiences are prioritized in future blackboard searches
-
 ## Anti-Patterns
+
+Avoid these failures:
 
 - keyword routing without real orientation
 - routing a micro task just because a matching skill exists
@@ -912,6 +926,11 @@ When a recovery succeeds (at any tier):
 - escalating to planning when a direct pass would work
 - performing external-facing actions without approval
 - ignoring explicit skill invocation when it is coherent and safe
+- **downsizing past forced escalation boundaries** — if forced-medium signals fired, the task is medium. Period. "It's basically just find-and-replace" is the exact rationalization that leads to grinding through 15 edits without a plan.
+- **starting to edit code before presenting a plan** when `approval_mode` is `plan_first` and the task is medium+. The plan IS the first deliverable. Reading code to inform the plan is fine. Editing code before plan approval is not.
+- **treating unfamiliar codebases as simple** — if you haven't read the code yet this session, you don't know how complex the change is. Default to medium until you've oriented.
+- **skipping the discovery interview** for medium+ tasks that involve external systems or stakeholders. "I have enough context from the request" is almost never true — the user always knows things they haven't said yet.
+- **skipping blackboard writes** after task completion. If you don't record the experience, the next session starts from zero. Tribal knowledge about project-specific details (custom field IDs, board configurations, stakeholder preferences) is exactly what experiences are for.
 
 ## Operating Principles
 
