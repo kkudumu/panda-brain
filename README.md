@@ -10,6 +10,28 @@ The machine hungers. You feed it. It takes care of you.
 
 ---
 
+## Plain English
+
+You know how every time you start a new chat with an AI, it has no idea who you are, what you're working on, or what you tried last time? You end up repeating yourself constantly. And when you ask it to do something complex, you have to hold its hand through every single step.
+
+FTM fixes that.
+
+It's a brain upgrade for Claude Code (Anthropic's AI coding tool). You install it once, and from that point on:
+
+- **It remembers.** Not just within one conversation — across all of them. It builds a memory of your projects, your preferences, what worked before, and what didn't. The more you use it, the less you have to explain.
+
+- **It plans before it acts.** You throw a task at it — could be a bug, a feature request, a vague idea, whatever — and instead of immediately doing something dumb, it reads your context, makes a plan, and shows you the plan first. You approve it, tweak it, or tell it to rethink. Then it goes.
+
+- **It does the whole thing, not just one step.** Most AI tools help you write a function or answer a question. FTM coordinates entire workflows — it can read a support ticket, look up the customer's history, draft a response, update the ticket, and notify your team. All from one input.
+
+- **It gets a second opinion.** For hard decisions, it doesn't just trust one AI. It asks Claude, GPT, and Gemini independently, then picks the answer where at least two agree. Like calling three contractors instead of trusting the first quote.
+
+- **It gets better over time.** Every task it completes becomes a playbook. See the same type of bug three times? It already knows the pattern. Similar support ticket? It remembers what worked last time. It's not just a tool — it's a tool that sharpens itself.
+
+Think of it like this: regular AI is a blank whiteboard every time you walk into the room. FTM is an assistant who was in yesterday's meeting, read the doc you shared last week, and already has a draft ready when you walk in.
+
+---
+
 ## Why This Exists
 
 Most AI tooling is disposable by design. You write prompts, the model gets better, your prompts become unnecessary. That's the scaffolding thesis — and it's true for most of what people are building.
