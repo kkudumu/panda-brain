@@ -49,6 +49,36 @@ Read `~/.claude/ftm-state/blackboard/context.json`. Extract: `current_task`, `re
 
 Run `git status --short` and `git log --oneline -5`. Note uncommitted changes, recent commits, current branch, worktree cleanliness. Do not infer meaning yet.
 
+### 5. Pre-load external ticket context
+
+When the captured request contains recognizable external references, fetch their full context now — before Orient begins. This ensures Orient has complete information for synthesis.
+
+**Detection patterns:**
+- **Jira ticket**: URL containing `/browse/` or `/jira/` (e.g., `https://company.atlassian.net/browse/PROJ-123`), or standalone key matching `[A-Z]+-\d+` pattern (e.g., `PROJ-123`, `INGEST-42`)
+- **Freshservice ticket**: Numeric ID preceded by "ticket", "FS#", "#", or URL containing `/helpdesk/tickets/` (e.g., `FS#12345`, `ticket 12345`)
+- **Slack thread**: URL containing `slack.com/archives/` with a thread timestamp
+
+**Fetch protocol:**
+
+For **Jira tickets** — use MCP tools in sequence:
+1. `jira_get_issue` — read full description, status, assignee, priority, labels
+2. `jira_get_issue` comments — read all comments for context and discussion history
+3. Check for subtasks and sprint state if the issue is an epic or story
+
+For **Freshservice tickets** — use MCP tools in sequence:
+1. `get_ticket_by_id` — read ticket description, status, priority, requester
+2. `get_requested_items` — read any service request items attached
+3. `list_all_ticket_conversation` — read all replies and notes for full context
+
+For **Slack threads** — use MCP tools:
+1. `slack_get_thread_replies` — read the full thread including all replies
+
+**Rules:**
+- Only fetch when the user's input CONTAINS a recognizable reference. Never speculatively search for tickets.
+- If the MCP tool fails (server not configured, auth error), note the failure in Observe output and continue — do not block Orient.
+- Store fetched context as `external_context` in the Observe output, structured as: `{ source: "jira"|"freshservice"|"slack", id: "...", summary: "...", full_data: {...} }`
+- Multiple references in one message → fetch all of them in parallel.
+
 ## Orient
 
 Orient is the crown jewel. Spend most of the reasoning budget here. Build the best possible mental model before touching anything.
@@ -137,33 +167,149 @@ Ask only when: two materially different interpretations are plausible, an extern
 
 ### 11. Orient Synthesis
 
-Silently synthesize: outcome wanted, task type, session continuity, codebase constraints, relevant lessons, capability mix, smallest correct task size, whether approval or clarification is needed. Orient is complete only when the next move feels obvious.
+Silently synthesize: outcome wanted, task type, session continuity, codebase constraints, relevant lessons, capability mix, smallest correct task size, whether approval or clarification is needed. If `external_context` was populated in Observe (from a Jira ticket, Freshservice ticket, or Slack thread), incorporate it as primary input here — treat the fetched ticket description, status, comments, and conversation as first-class context alongside codebase and session state. Orient is complete only when the next move feels obvious.
 
 ## Decide
 
-Decide turns the orientation model into one concrete next move.
+Every task gets a plan before execution. The plan's depth scales with complexity, but the flow is always: present plan → user approves/modifies → execute.
 
-### 1. Choose the smallest correct execution mode
+### 1. Generate a plan
 
-- `micro` → direct action
-- `small` → direct action plus verification
-- `medium` → short written plan plus execution
-- `large` → `ftm-brainstorm` if no plan exists, or `ftm-executor` if a plan exists
+Based on Orient's synthesis, generate a plan appropriate to the task's complexity:
 
-### 1.5 Interactive Plan Approval (medium+ tasks)
+**Micro tasks** (rename a variable, fix a typo, answer a question):
+- 1-2 step plan, presented inline: "I'll rename `foo` to `bar` in `src/utils.ts`. Go?"
+- User says "go" / "yes" / "do it" → execute immediately
 
-Read `references/protocols/PLAN-APPROVAL.md` for the full approval protocol (modes: auto, plan_first, always_ask) including response parsing, step execution, and skill routing combination.
+**Small tasks** (single-file feature, config change, write a test):
+- 2-3 step plan with file list
+- Each step is one sentence describing the action
 
-### 2. Choose direct vs routed execution
+**Medium tasks** (multi-file feature, bug investigation, refactor):
+- 4-8 step plan with file lists per step
+- Dependencies between steps noted
+- Verification steps included (tests, build check)
 
-Direct when: micro/small, routing overhead adds no value, answer is faster than delegation.
-Routed when: specialized workflow improves result, user explicitly invoked it, task is medium/large.
+**Large tasks** (new feature system, architecture change, multi-skill workflow):
+- Phased plan with two-tier approval
+- Phase 1 presented first; subsequent phases shown after Phase 1 completes
+- Each phase has its own verification criteria
 
-### 3. Choose supporting MCP reads
+### 2. Present the plan
+
+Show the plan with numbered steps. For medium+ tasks, include:
+- Step number and description
+- Files to be modified/created
+- Dependencies on prior steps
+- Verification criteria
+
+Format:
+```
+Plan: [title]
+
+1. [step description]
+   Files: [file list]
+
+2. [step description]
+   Files: [file list]
+   Depends on: step 1
+
+3. Verify: [verification description]
+
+Ready? Say "go" to execute, or modify the plan.
+```
+
+### 3. Wait for approval
+
+The user controls execution. Valid responses:
+- **"go"** / **"execute"** / **"ship it"** / **"yes"** → begin execution
+- **Plan modification commands** → see Plan Modification section below
+- **"save this plan"** → persist to `~/.claude/plans/[slug]-plan.md`
+- **"explain N"** → show more detail for step N without approving
+- **Questions** → answer without approving, re-present plan
+
+### 4. Track user modifications
+
+When the user modifies the plan across multiple turns, track which steps were:
+- **Generated**: created by ftm-mind (default)
+- **User-modified**: changed by the user's explicit instruction
+- **User-added**: inserted by the user
+
+On re-presentation after modification, highlight what changed:
+```
+Plan: [title] (modified)
+
+1. [step description]
+2. [step description] ← modified
+3. [NEW] [step description] ← added by you
+4. [step description]
+```
+
+### Plan Modification Commands
+
+When a plan is presented, the user can modify it using natural language. Recognize these 5 core commands:
+
+#### `explain N`
+Show expanded detail for step N without approving the plan. Include:
+- What exactly will be changed and why
+- Which functions/components are affected
+- What could go wrong
+- How it will be verified
+
+Example: "explain 3" → show detailed breakdown of step 3, then re-present the full plan.
+
+#### `skip N`
+Remove step N from the plan. Adjust numbering. Check for dependency violations:
+- If another step depends on N, warn: "Step 5 depends on step 3. Skip both, or keep 3?"
+- If no dependencies, remove cleanly and re-present
+
+Example: "skip 2" → remove step 2, renumber remaining steps, re-present.
+
+#### `merge N and M`
+Combine steps N and M into a single step. Rules:
+- If N and M are adjacent, combine their descriptions and file lists
+- If N and M are not adjacent, reorder to make them adjacent first, then combine
+- If merging creates a step that touches >10 files, warn: "Merged step would touch 12 files. That's large for one step. Proceed?"
+- Update dependencies: anything that depended on N or M now depends on the merged step
+
+Example: "merge 2 and 3" → combine into one step, re-present.
+
+#### `add after N: [description]`
+Insert a new step after step N. The user provides the description in natural language.
+- Parse the description to infer file list if possible
+- Mark the new step as "User-added" in modification tracking
+- Renumber subsequent steps
+- If the description is vague, ask one clarifying question before inserting
+
+Example: "add after 4: write unit tests for the new validation function" → insert step 5 with test-writing task, renumber old 5+ to 6+.
+
+#### `save this plan`
+Persist the current plan (with all modifications) to a file.
+- Generate a slug from the plan title: lowercase, hyphens, no special chars
+- Save to `~/.claude/plans/[slug]-plan.md`
+- Use the standard plan format: title, steps with files and dependencies, acceptance criteria
+- Confirm: "Plan saved to ~/.claude/plans/[slug]-plan.md"
+- After saving, the plan is still pending approval — saving doesn't execute
+
+### Parsing Rules
+
+- Commands are case-insensitive: "Skip 3", "SKIP 3", "skip 3" all work
+- Natural language variations are accepted: "remove step 3" = "skip 3", "combine 2 and 3" = "merge 2 and 3", "what does step 4 do?" = "explain 4"
+- Multiple commands in one message: "skip 2 and merge 4 and 5" → process sequentially
+- After ANY modification, re-present the updated plan with change indicators
+
+### 5. Choose execution mode
+
+After approval, decide HOW to execute:
+- **Direct**: ftm-mind executes the steps itself (micro/small tasks)
+- **Routed**: delegate to a specialized skill (ftm-debug, ftm-brainstorm, etc.)
+- **Orchestrated**: delegate to ftm-executor for multi-agent parallel execution (large tasks)
+
+### 6. Choose supporting MCP reads
 
 If the request depends on external context (Jira URL, meeting, policy question, UI bug), fetch minimum required state first.
 
-### 4. Decide whether to loop
+### 7. Decide whether to loop
 
 If the next move will reveal new information, plan to re-enter Observe after acting.
 
@@ -188,6 +334,62 @@ After a meaningful action: update context.json, append to recent_decisions, upda
 ### 5. Loop
 
 If complete → answer and stop. If new information → return to Observe. If blocked → ask the user. If simple approach failed → re-orient and escalate one level.
+
+## Post-Execution
+
+After plan execution completes successfully, check whether the task originated from an external ticket (Jira, Freshservice). If it did, draft a completion comment.
+
+### 1. Detect ticket origin
+
+Check Observe's `external_context` for the source. If no external_context exists (task was not ticket-driven), skip post-execution drafting entirely.
+
+### 2. Draft completion comment
+
+Generate a comment that includes:
+- **What was done**: concrete summary of changes (files modified, configs applied, features added)
+- **Steps completed**: list of plan steps that executed successfully
+- **Verification results**: test results, build status, any validation that was run
+- **What's next**: any follow-up actions needed (deployment, testing by requester, etc.)
+
+Tone: professional, concise, factual. No filler. Written as if you're updating a colleague.
+
+### 3. Present for approval
+
+**For Jira tickets:**
+```
+Draft comment for PROJ-123:
+
+---
+[draft content here]
+---
+
+Say "send" to post via jira_add_comment, or edit the draft.
+```
+
+**For Freshservice tickets:**
+```
+Draft reply for FS#12345:
+
+---
+[draft content here]
+---
+
+Say "send" to post via send_ticket_reply, or edit the draft.
+```
+
+### 4. User controls sending
+
+- **"send"** / **"post"** → execute the MCP call to post the comment
+- **User edits the draft** → incorporate changes, re-present
+- **"skip"** / **"don't send"** → skip posting, continue
+- **NEVER post without explicit approval**. This is a hard gate.
+
+### 5. Execute posting
+
+For **Jira**: call `jira_add_comment` with the ticket key and approved comment body.
+For **Freshservice**: call `send_ticket_reply` with the ticket ID and approved reply body.
+
+After successful posting, note it in the blackboard context as a recent_decision: "Posted completion comment to [source] [id]".
 
 ## Routing Scenarios
 

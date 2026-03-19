@@ -36,6 +36,9 @@ execution:
   max_parallel_agents: 5          # max agents dispatched simultaneously
   auto_audit: true                # run ftm-audit after each executor task
   progress_tracking: true         # write PROGRESS.md during execution
+  approval_mode: plan_first       # plan_first | always_ask
+                                  #   plan_first: every task gets a plan, micro tasks get inline plans
+                                  #   always_ask: always present full plan, even for micro tasks
 
 # Skill enable/disable — set enabled: false to prevent ftm-mind from routing to a skill
 skills:
