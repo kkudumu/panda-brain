@@ -1,0 +1,92 @@
+[
+  {
+    "input": "PROJ-123 is broken, users can't login",
+    "expected_route": "ftm-debug",
+    "tags": ["bug", "jira"],
+    "rationale": "Jira ticket reference + reported breakage = debug scenario"
+  },
+  {
+    "input": "I want to build a notification system",
+    "expected_route": "ftm-brainstorm",
+    "tags": ["feature", "idea"],
+    "rationale": "Ideation phrase 'I want to build' triggers brainstorming before implementation"
+  },
+  {
+    "input": "execute ~/.claude/plans/my-plan.md",
+    "expected_route": "ftm-executor",
+    "tags": ["plan", "execute"],
+    "rationale": "Explicit plan path + 'execute' keyword = plan executor"
+  },
+  {
+    "input": "what would other AIs think about this approach?",
+    "expected_route": "ftm-council",
+    "tags": ["council", "multi-model"],
+    "rationale": "Explicit multi-model / other AIs request = council skill"
+  },
+  {
+    "input": "audit the wiring in src/",
+    "expected_route": "ftm-audit",
+    "tags": ["audit", "wiring"],
+    "rationale": "'audit the wiring' is a direct trigger phrase for ftm-audit"
+  },
+  {
+    "input": "check the admin console at admin.company.com",
+    "expected_route": "ftm-browse",
+    "tags": ["browse", "admin"],
+    "rationale": "URL + visual check request = browser automation skill"
+  },
+  {
+    "input": "scan for secrets before we push",
+    "expected_route": "ftm-git",
+    "tags": ["git", "secrets"],
+    "rationale": "Pre-push secret scan is a git safety operation"
+  },
+  {
+    "input": "help me think through this API design",
+    "expected_route": "ftm-brainstorm",
+    "tags": ["brainstorm", "design"],
+    "rationale": "'help me think through' is a brainstorm trigger phrase"
+  },
+  {
+    "input": "run my morning triage routine",
+    "expected_route": "ftm-routine",
+    "tags": ["routine"],
+    "rationale": "Explicit 'routine' keyword with temporal context (morning)"
+  },
+  {
+    "input": "rename userId to user_id across the codebase",
+    "expected_route": "direct",
+    "tags": ["micro", "refactor"],
+    "rationale": "Simple rename = micro task, handle directly without routing to a sub-skill"
+  },
+  {
+    "input": "deploy the latest changes to production",
+    "expected_route": "ftm-mind",
+    "tags": ["deploy", "ops"],
+    "rationale": "Deployment needs orientation + confirmation loop before acting — stays in ftm-mind"
+  },
+  {
+    "input": "FS#12345 needs attention",
+    "expected_route": "ftm-mind",
+    "tags": ["freshservice", "ticket"],
+    "rationale": "Freshservice ticket without clear intent — ftm-mind fetches context then re-orients"
+  },
+  {
+    "input": "debug this deeply, nothing else has worked",
+    "expected_route": "ftm-debug",
+    "tags": ["debug", "deep"],
+    "rationale": "Explicit 'debug' + escalation signal ('nothing else worked') = deep debug"
+  },
+  {
+    "input": "pause this session, I need to go",
+    "expected_route": "ftm-pause",
+    "tags": ["pause", "save"],
+    "rationale": "Explicit pause / session save request"
+  },
+  {
+    "input": "show me the retro for last sprint",
+    "expected_route": "ftm-retro",
+    "tags": ["retro", "analytics"],
+    "rationale": "Retrospective / review request maps to ftm-retro"
+  }
+]

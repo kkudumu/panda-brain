@@ -148,3 +148,78 @@ jobs:
 
       - name: Validate blackboard files against schemas
         run: node tests/validate-blackboard.mjs
+
+  typecheck-browse:
+    name: TypeScript Check (ftm-browse)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install browse daemon dependencies
+        working-directory: ftm-browse/daemon
+        run: bun install
+      - name: TypeScript check
+        working-directory: ftm-browse/daemon
+        run: bun run tsc --noEmit
+
+  validate-frontmatter:
+    name: Validate Skill Frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check frontmatter
+        run: bash tests/structural/test-skill-frontmatter.sh
+
+  validate-event-crossrefs:
+    name: Validate Event Registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-validate events
+        run: bash tests/structural/test-event-crossrefs.sh
+
+  validate-schemas:
+    name: Validate JSON Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate schemas and data
+        run: bash tests/structural/test-json-schemas.sh
+
+  check-hardcoded-paths:
+    name: No Hardcoded Paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for hardcoded paths
+        run: bash tests/structural/test-no-hardcoded-paths.sh
+
+  validate-manifest-drift:
+    name: Manifest Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Regenerate manifest
+        run: node bin/generate-manifest.mjs
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code ftm-manifest.json; then
+            echo "ERROR: ftm-manifest.json is out of date. Run 'npm run generate-manifest' and commit."
+            exit 1
+          fi
+
+  test-runtime:
+    name: Runtime Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run ftm-runtime tests
+        run: node tests/runtime/test-ftm-runtime.mjs

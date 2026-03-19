@@ -1,0 +1,4 @@
+---
+name: ftm-dashboard
+description: Session and weekly analytics dashboard for the FTM skill ecosystem. Reads events.log and blackboard state to show skills invoked, plans presented, approval rates, experiences recorded, and patterns promoted. Use when user says "dashboard", "analytics", "stats", "ftm-dashboard", "show session stats", or "how's the system doing".
+---
