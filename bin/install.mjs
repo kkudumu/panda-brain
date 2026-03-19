@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * npx ftm-skills — installs ftm skills into ~/.claude/skills/
+ * npx feed-the-machine — installs ftm skills into ~/.claude/skills/
  *
  * Works by finding the npm package root (where the skill files live)
  * and symlinking them into the Claude Code skills directory.

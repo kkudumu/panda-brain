@@ -11,7 +11,7 @@
 - Headless browser daemon (ftm-browse)
 - Secret scanning git safety gate (ftm-git)
 - Self-upgrade mechanism (ftm-upgrade)
-- npm distribution (`npx ftm-skills@latest`)
+- npm distribution (`npx feed-the-machine@latest`)
 - Cross-platform Node.js installer
 - CI pipeline with skill validation, JSON lint, and shellcheck
 - Quickstart guide and contributing guide

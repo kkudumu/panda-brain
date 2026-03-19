@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-version.sh — Check for ftm-skills updates via GitHub Releases
+# check-version.sh — Check for feed-the-machine updates via GitHub Releases
 # Outputs: UP_TO_DATE | UPGRADE_AVAILABLE <version> <changelog_url> | CHECK_FAILED <reason>
 
 set -uo pipefail

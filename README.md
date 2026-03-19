@@ -129,7 +129,7 @@ graph TD
 Install:
 
 ```bash
-npx ftm-skills@latest
+npx feed-the-machine@latest
 ```
 
 Symlinks all 16+ skills into `~/.claude/skills/` where Claude Code discovers them automatically. That's it.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# upgrade.sh — Download and install latest ftm-skills release
+# upgrade.sh — Download and install latest feed-the-machine release
 # Usage: upgrade.sh [--version <tag>]
 
 set -uo pipefail

@@ -1,5 +1,5 @@
 {
-  "name": "ftm-skills",
+  "name": "feed-the-machine",
   "version": "1.0.0",
   "description": "A unified intelligence layer for Claude Code — 16 skills with OODA-based reasoning, persistent memory, and multi-model deliberation",
   "license": "MIT",
@@ -7,9 +7,9 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kkudumu/ftm-brain.git"
+    "url": "https://github.com/kkudumu/feed-the-machine.git"
   },
-  "homepage": "https://github.com/kkudumu/ftm-brain",
+  "homepage": "https://github.com/kkudumu/feed-the-machine",
   "keywords": [
     "claude-code",
     "ai-agents",
@@ -20,7 +20,7 @@
     "agentic"
   ],
   "bin": {
-    "ftm-skills": "bin/install.mjs"
+    "feed-the-machine": "bin/install.mjs"
   },
   "files": [
     "bin/",
@@ -51,8 +51,7 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "prepare": "husky",
