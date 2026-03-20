@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-19T21:50:36.917Z",
+  "generated_at": "2026-03-20T20:02:52.706Z",
   "skills": [
     {
       "name": "ftm",
@@ -10,9 +10,60 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "legacy_router_fallback setting"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state for blackboard update on routing"
+        }
+      ],
+      "risk": {
+        "level": "read_only",
+        "scope": "reads blackboard context.json and updates session_metadata.skills_invoked before routing; does not modify any project files",
+        "rollback": "no mutations to reverse; blackboard update is a metadata append"
+      },
+      "approval_gates": [
+        {
+          "trigger": "ftm-mind failure AND legacy_router_fallback enabled",
+          "action": "fall back to keyword routing automatically (no user gate needed)"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "ftm-mind fails or times out",
+          "action": "check legacy_router_fallback in ftm-config.yml; if true, use keyword matching; if false, report failure"
+        },
+        {
+          "condition": "blackboard context.json missing",
+          "action": "skip blackboard update, proceed with routing"
+        },
+        {
+          "condition": "skill tool unavailable for target skill",
+          "action": "report routing failure to user with the target skill name"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "(none)": []
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 3722,
+      "warnings": [],
+      "size_bytes": 5206,
       "enabled": true
     },
     {
@@ -38,9 +89,252 @@
         "~/.claude/ftm-state/blackboard/context.json",
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json"
       ],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "knip",
+          "required": false,
+          "description": "static dead-code and unused-export analysis (Layer 1)"
+        },
+        {
+          "type": "tool",
+          "name": "node",
+          "required": true,
+          "description": "runtime for knip via npx"
+        },
+        {
+          "type": "config",
+          "name": "knip.config.ts",
+          "required": false,
+          "description": "custom knip configuration at project root"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/PROJECT-PATTERNS.md",
+          "required": true,
+          "description": "framework detection table and dimension activation matrix"
+        },
+        {
+          "type": "reference",
+          "name": "references/strategies/AUTO-FIX-STRATEGIES.md",
+          "required": true,
+          "description": "fix actions by finding type"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/WIRING-CONTRACTS.md",
+          "required": false,
+          "description": "wiring contract schema for plan-driven audits"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/RUNTIME-WIRING.md",
+          "required": false,
+          "description": "runtime verification protocol"
+        },
+        {
+          "type": "reference",
+          "name": "references/templates/REPORT-FORMAT.md",
+          "required": true,
+          "description": "structured report template"
+        },
+        {
+          "type": "tool",
+          "name": "$HOME/.claude/skills/ftm-browse/bin/ftm-browse",
+          "required": false,
+          "description": "runtime wiring verification via browser (Phase 3)"
+        }
+      ],
+      "risk": {
+        "level": "medium_write",
+        "scope": "modifies source files to fix wiring issues (auto-fix layer); also adds/removes imports and route registrations; reads codebase broadly",
+        "rollback": "git checkout on auto-fixed files; all changes are tracked in the changelog report before being applied"
+      },
+      "approval_gates": [
+        {
+          "trigger": "auto-fix proposed for a finding",
+          "action": "report proposed change before applying (show \"Proposed: ...\" format)"
+        },
+        {
+          "trigger": "finding flagged MANUAL_INTERVENTION_NEEDED",
+          "action": "surface to user with suggested action, do not auto-fix"
+        },
+        {
+          "trigger": "re-verification still fails after 3 iterations",
+          "action": "stop and report remaining issues to user"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "plan_first",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "knip not installed and npx unavailable",
+          "action": "skip Layer 1, run Layer 2 adversarial audit only"
+        },
+        {
+          "condition": "no package.json found",
+          "action": "skip knip entirely, run adversarial audit only"
+        },
+        {
+          "condition": "ftm-browse not installed",
+          "action": "skip Phase 3 runtime wiring check, log reason and continue"
+        },
+        {
+          "condition": "dev server not running",
+          "action": "skip Phase 3 runtime wiring check, log reason and continue"
+        },
+        {
+          "condition": "wiring contracts absent",
+          "action": "run pure Layer 1 + Layer 2 analysis without contract checking"
+        },
+        {
+          "condition": "project has no identifiable entry point",
+          "action": "skip knip, run adversarial audit only"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "knip",
+          "required": false,
+          "description": "dead code detection via npx knip"
+        },
+        {
+          "type": "cli",
+          "name": "node",
+          "required": true,
+          "description": "JavaScript runtime for npx"
+        },
+        {
+          "type": "cli",
+          "name": "$HOME/.claude/skills/ftm-browse/bin/ftm-browse",
+          "required": false,
+          "description": "headless browser for runtime wiring"
+        },
+        {
+          "type": "mcp",
+          "name": "git",
+          "required": false,
+          "description": "diff scope for Layer 2 adversarial audit"
+        }
+      ],
+      "event_payloads": {
+        "audit_complete": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-audit\""
+          },
+          {
+            "field": "findings_count",
+            "type": "number",
+            "description": "total issues found across all layers"
+          },
+          {
+            "field": "auto_fixed_count",
+            "type": "number",
+            "description": "issues auto-remediated by Layer 3"
+          },
+          {
+            "field": "manual_count",
+            "type": "number",
+            "description": "issues requiring manual intervention"
+          },
+          {
+            "field": "scope",
+            "type": "string[]",
+            "description": "file paths audited"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total audit duration"
+          },
+          {
+            "field": "layers_run",
+            "type": "string[]",
+            "description": "which layers executed (e.g., [\"layer1\", \"layer2\", \"layer3\"])"
+          }
+        ],
+        "issue_found": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-audit\""
+          },
+          {
+            "field": "layer",
+            "type": "string",
+            "description": "\"layer1\" | \"layer2\" | \"layer3\""
+          },
+          {
+            "field": "dimension",
+            "type": "string",
+            "description": "D1 | D2 | D3 | D4 | D5 (for Layer 2 findings)"
+          },
+          {
+            "field": "finding_type",
+            "type": "string",
+            "description": "exports | types | duplicates | UNWIRED_COMPONENT | etc."
+          },
+          {
+            "field": "file_path",
+            "type": "string",
+            "description": "affected file"
+          },
+          {
+            "field": "symbol",
+            "type": "string",
+            "description": "affected symbol name"
+          },
+          {
+            "field": "severity",
+            "type": "string",
+            "description": "CRITICAL | HIGH | MEDIUM | LOW"
+          },
+          {
+            "field": "auto_fixable",
+            "type": "boolean",
+            "description": "whether Layer 3 can fix this automatically"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-audit\""
+          },
+          {
+            "field": "result",
+            "type": "string",
+            "description": "\"pass\" | \"pass_with_fixes\" | \"fail\""
+          },
+          {
+            "field": "findings_count",
+            "type": "number",
+            "description": "total findings"
+          },
+          {
+            "field": "auto_fixed_count",
+            "type": "number",
+            "description": "auto-remediated count"
+          },
+          {
+            "field": "manual_count",
+            "type": "number",
+            "description": "manual intervention needed"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 7659,
+      "warnings": [],
+      "size_bytes": 11433,
       "enabled": true
     },
     {
@@ -65,12 +359,161 @@
         "~/.claude/ftm-state/blackboard/context.json",
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json"
       ],
+      "requirements": [
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "model profile for planning agents"
+        },
+        {
+          "type": "reference",
+          "name": "references/agent-prompts.md",
+          "required": true,
+          "description": "research agent prompt templates"
+        },
+        {
+          "type": "reference",
+          "name": "references/plan-template.md",
+          "required": true,
+          "description": "plan document generation template"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state and active constraints"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "past brainstorm lessons"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/patterns.json",
+          "required": false,
+          "description": "execution and user behavior patterns"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes plan documents to ~/.claude/plans/; writes blackboard context and experience files; does not modify project source code",
+        "rollback": "delete generated plan file; blackboard writes can be reverted by editing JSON files"
+      },
+      "approval_gates": [
+        {
+          "trigger": "Phase 3 plan generation ready",
+          "action": "present \"Here's what I think we've landed on\" summary and wait for explicit user approval before generating plan"
+        },
+        {
+          "trigger": "plan document generated",
+          "action": "present plan incrementally (vision → tasks → agents/waves) and get approval at each step"
+        },
+        {
+          "trigger": "research returns thin results on all agents",
+          "action": "note research gaps, present fewer suggestions, do not fabricate citations"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "plan_first",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "ftm-researcher not available",
+          "action": "dispatch 3 direct parallel research agents (web/github/competitive) using built-in prompts from references/agent-prompts.md"
+        },
+        {
+          "condition": "no git repo detected in Phase 0",
+          "action": "skip repo scan, ask about tech stack during intake"
+        },
+        {
+          "condition": "blackboard missing or empty",
+          "action": "proceed without experience-informed shortcuts, rely on direct analysis"
+        },
+        {
+          "condition": "ftm-config.yml missing",
+          "action": "use session default model for all agents"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "mcp",
+          "name": "WebSearch",
+          "required": false,
+          "description": "web research agents use for blog posts and case studies"
+        },
+        {
+          "type": "mcp",
+          "name": "WebFetch",
+          "required": false,
+          "description": "GitHub exploration and competitive analysis"
+        },
+        {
+          "type": "mcp",
+          "name": "sequential-thinking",
+          "required": false,
+          "description": "complex trade-off analysis during synthesis"
+        }
+      ],
+      "event_payloads": {
+        "plan_generated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-brainstorm\""
+          },
+          {
+            "field": "plan_path",
+            "type": "string",
+            "description": "absolute path to generated plan file"
+          },
+          {
+            "field": "plan_title",
+            "type": "string",
+            "description": "human-readable plan title"
+          },
+          {
+            "field": "task_count",
+            "type": "number",
+            "description": "total tasks in the plan"
+          },
+          {
+            "field": "wave_count",
+            "type": "number",
+            "description": "number of parallel execution waves"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-brainstorm\""
+          },
+          {
+            "field": "task_title",
+            "type": "string",
+            "description": "title of the brainstorm topic"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total session duration"
+          }
+        ]
+      },
       "references": [
         "agent-prompts.md",
         "plan-template.md"
       ],
       "has_evals": true,
-      "size_bytes": 18865,
+      "warnings": [],
+      "size_bytes": 21640,
       "enabled": true
     },
     {
@@ -84,9 +527,292 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "$HOME/.claude/skills/ftm-browse/bin/ftm-browse",
+          "required": true,
+          "description": "headless browser CLI binary"
+        },
+        {
+          "type": "tool",
+          "name": "npx playwright install chromium",
+          "required": true,
+          "description": "Chromium browser engine (first-time setup)"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "navigates browser, takes screenshots saved to ~/.ftm-browse/screenshots/; does not modify project source files; form fills and clicks can have side effects on the target application",
+        "rollback": "no project file mutations; browser interactions on local dev servers are typically reversible by reloading"
+      },
+      "approval_gates": [
+        {
+          "trigger": "auth redirect detected during supervised execution",
+          "action": "STOP immediately, present options (retry/skip/abort/manual), wait for user choice"
+        },
+        {
+          "trigger": "unexpected browser state during plan step",
+          "action": "STOP, take screenshot, present situation to user, wait for explicit choice"
+        },
+        {
+          "trigger": "supervised mode enabled AND state mismatch detected",
+          "action": "halt and report before proceeding"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "daemon binary not found at expected path",
+          "action": "report installation instructions and stop"
+        },
+        {
+          "condition": "Chromium not installed",
+          "action": "instruct user to run \"npx playwright install chromium\" and stop"
+        },
+        {
+          "condition": "daemon fails to start within 10 seconds",
+          "action": "check ~/.ftm-browse/ logs, report binary or Bun issue"
+        },
+        {
+          "condition": "dev server not running when navigating to localhost",
+          "action": "report timeout error with the URL attempted"
+        },
+        {
+          "condition": "stale ref after navigation",
+          "action": "re-run snapshot -i before retrying click/fill"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "$HOME/.claude/skills/ftm-browse/bin/ftm-browse",
+          "required": true,
+          "description": "headless Chromium control CLI"
+        }
+      ],
+      "event_payloads": {
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-browse\""
+          },
+          {
+            "field": "workflow",
+            "type": "string",
+            "description": "description of the visual verification or interaction performed"
+          },
+          {
+            "field": "screenshots",
+            "type": "string[]",
+            "description": "absolute paths to screenshots taken"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total workflow duration"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 15356,
+      "warnings": [],
+      "size_bytes": 17411,
+      "enabled": true
+    },
+    {
+      "name": "ftm-capture",
+      "description": "Extract reusable routines, playbooks, and reference docs from the current session's work. Reads session context (blackboard, daily log, tool history), asks clarifying questions about generalizability, then writes to all three ftm knowledge layers. Use when user says \"capture this\", \"save this as a routine\", \"make a playbook from this\", \"ftm capture\", \"codify this\", \"turn this into a routine\", \"extract the pattern\", \"save what we did\", \"learn from this\", \"remember how to do this\", \"don't make me explain this again\".",
+      "trigger_file": "ftm-capture.yml",
+      "skill_directory": "ftm-capture/",
+      "events_emits": [
+        "capture_complete",
+        "experience_recorded",
+        "known_issue_recorded"
+      ],
+      "events_listens": [
+        "task_completed",
+        "pattern_discovered"
+      ],
+      "blackboard_reads": [],
+      "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": true,
+          "description": "current task and recent decisions for pattern extraction"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/eng-buddy/daily/{today}.md",
+          "required": false,
+          "description": "daily log for completed items and tool calls"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": true,
+          "description": "today's session experiences"
+        },
+        {
+          "type": "reference",
+          "name": "~/.ftm/routines/",
+          "required": false,
+          "description": "check for existing routines before creating new one"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/eng-buddy/playbooks/",
+          "required": false,
+          "description": "check for existing playbooks before creating"
+        },
+        {
+          "type": "reference",
+          "name": "~/Documents/Code/panda/docs/playbooks/",
+          "required": false,
+          "description": "check for existing reference docs before creating"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes YAML routine to ~/.ftm/routines/, JSON playbook to ~/.claude/eng-buddy/playbooks/, and Markdown reference doc to ~/Documents/Code/panda/docs/playbooks/; writes experience to blackboard; does not modify project source code",
+        "rollback": "delete the three written artifact files; remove experience entry from blackboard experiences/"
+      },
+      "approval_gates": [
+        {
+          "trigger": "existing artifact found for this workflow name",
+          "action": "show existing vs new content, ask user to confirm update or create new version"
+        },
+        {
+          "trigger": "Step 3 clarifying questions answered",
+          "action": "proceed to write all three artifacts automatically (no additional gate)"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "blackboard context.json missing",
+          "action": "ask user directly about the workflow to capture instead of reading from blackboard"
+        },
+        {
+          "condition": "daily log missing or empty",
+          "action": "skip daily log extraction, rely on conversation context and blackboard experiences"
+        },
+        {
+          "condition": "~/.ftm/routines/ directory doesn't exist",
+          "action": "create directory before writing routine"
+        },
+        {
+          "condition": "docs/playbooks/ directory doesn't exist",
+          "action": "create directory before writing reference doc"
+        },
+        {
+          "condition": "existing artifact found but cannot be parsed",
+          "action": "treat as missing, create fresh artifact"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "capture_complete": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-capture\""
+          },
+          {
+            "field": "workflow_name",
+            "type": "string",
+            "description": "kebab-case name of captured workflow"
+          },
+          {
+            "field": "routine_path",
+            "type": "string",
+            "description": "absolute path to written routine YAML"
+          },
+          {
+            "field": "playbook_path",
+            "type": "string",
+            "description": "absolute path to written playbook JSON"
+          },
+          {
+            "field": "reference_path",
+            "type": "string",
+            "description": "absolute path to written reference doc"
+          },
+          {
+            "field": "phases_count",
+            "type": "number",
+            "description": "number of workflow phases captured"
+          },
+          {
+            "field": "steps_count",
+            "type": "number",
+            "description": "total steps across all phases"
+          },
+          {
+            "field": "known_issues_count",
+            "type": "number",
+            "description": "API gotchas encoded"
+          }
+        ],
+        "experience_recorded": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-capture\""
+          },
+          {
+            "field": "experience_path",
+            "type": "string",
+            "description": "path to written experience file"
+          },
+          {
+            "field": "workflow_name",
+            "type": "string",
+            "description": "name of captured workflow"
+          }
+        ],
+        "known_issue_recorded": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-capture\""
+          },
+          {
+            "field": "workflow_name",
+            "type": "string",
+            "description": "workflow this issue belongs to"
+          },
+          {
+            "field": "issue",
+            "type": "string",
+            "description": "issue name"
+          },
+          {
+            "field": "fix",
+            "type": "string",
+            "description": "remediation approach encoded"
+          }
+        ]
+      },
+      "references": [],
+      "has_evals": false,
+      "warnings": [],
+      "size_bytes": 15166,
       "enabled": true
     },
     {
@@ -112,9 +838,187 @@
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json",
         "~/.claude/ftm-state/blackboard/experiences/index.json"
       ],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "codex",
+          "required": true,
+          "description": "OpenAI Codex CLI for adversarial validation"
+        },
+        {
+          "type": "reference",
+          "name": "{project_root}/INTENT.md",
+          "required": false,
+          "description": "root intent documentation for conflict detection"
+        },
+        {
+          "type": "reference",
+          "name": "{project_root}/STYLE.md",
+          "required": false,
+          "description": "code style standards for quality enforcement"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "prior validation patterns"
+        }
+      ],
+      "risk": {
+        "level": "medium_write",
+        "scope": "Codex modifies source files and commits fixes directly in the project working directory (--yolo mode); writes entries to DEBUG.md; writes structured output to /tmp/codex-result-*.md",
+        "rollback": "git revert codex fix commits; delete /tmp/codex-result-*.md cleanup is automatic"
+      },
+      "approval_gates": [
+        {
+          "trigger": "codex gate returns PASS_WITH_FIXES and INTENT.md conflict detected",
+          "action": "auto-invoke ftm-council for arbitration before accepting or reverting the fix"
+        },
+        {
+          "trigger": "codex gate returns FAIL after 2 fix attempts",
+          "action": "report remaining issues to ftm-executor caller, wait for direction"
+        },
+        {
+          "trigger": "codex CLI not found",
+          "action": "return FAIL immediately with install instructions, do not proceed"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "codex CLI not installed",
+          "action": "return FAIL with \"Codex CLI not found. Install with: npm install -g @openai/codex\""
+        },
+        {
+          "condition": "codex times out after 600s",
+          "action": "read partial output if available, return PARTIAL results with note; if no output, return FAIL"
+        },
+        {
+          "condition": "output file empty or missing",
+          "action": "return FAIL with \"Codex output not found — may have crashed\""
+        },
+        {
+          "condition": "INTENT.md missing at project root",
+          "action": "note in prompt to Codex and continue without INTENT validation"
+        },
+        {
+          "condition": "STYLE.md missing",
+          "action": "note in prompt to Codex and continue without style enforcement"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "codex",
+          "required": true,
+          "description": "OpenAI Codex CLI (npm install -g @openai/codex)"
+        },
+        {
+          "type": "env",
+          "name": "OPENAI_API_KEY",
+          "required": true,
+          "description": "authentication for Codex CLI execution"
+        }
+      ],
+      "event_payloads": {
+        "review_complete": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-codex-gate\""
+          },
+          {
+            "field": "mode",
+            "type": "string",
+            "description": "\"wave\" | \"single-task\""
+          },
+          {
+            "field": "status",
+            "type": "string",
+            "description": "\"PASS\" | \"PASS_WITH_FIXES\" | \"FAIL\""
+          },
+          {
+            "field": "tests_formed",
+            "type": "number",
+            "description": "adversarial test scenarios generated"
+          },
+          {
+            "field": "tests_passed",
+            "type": "number",
+            "description": "test scenarios that passed"
+          },
+          {
+            "field": "fixes_applied",
+            "type": "number",
+            "description": "fixes committed by Codex"
+          },
+          {
+            "field": "quality_issues",
+            "type": "number",
+            "description": "style/quality violations found"
+          },
+          {
+            "field": "intent_conflicts",
+            "type": "number",
+            "description": "INTENT.md conflicts detected"
+          }
+        ],
+        "issue_found": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-codex-gate\""
+          },
+          {
+            "field": "file_path",
+            "type": "string",
+            "description": "file where issue was found"
+          },
+          {
+            "field": "description",
+            "type": "string",
+            "description": "issue description"
+          },
+          {
+            "field": "type",
+            "type": "string",
+            "description": "\"test_failure\" | \"quality_violation\" | \"intent_conflict\""
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-codex-gate\""
+          },
+          {
+            "field": "status",
+            "type": "string",
+            "description": "\"PASS\" | \"PASS_WITH_FIXES\" | \"FAIL\""
+          },
+          {
+            "field": "output_file",
+            "type": "string",
+            "description": "path to Codex result file"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 10730,
+      "warnings": [],
+      "size_bytes": 13872,
       "enabled": true
     },
     {
@@ -128,9 +1032,69 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "main config file (created with defaults if missing)"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "reads and writes ~/.claude/ftm-config.yml only; backs up malformed config to ftm-config.yml.bak before overwriting; no project files touched",
+        "rollback": "restore from ~/.claude/ftm-config.yml.bak or delete the file to reset to defaults on next invocation"
+      },
+      "approval_gates": [
+        {
+          "trigger": "reset command issued",
+          "action": "show current config and ask \"Proceed?\" before restoring defaults"
+        },
+        {
+          "trigger": "invalid model name or profile name provided",
+          "action": "reject with clear error showing valid options, do not write"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "ftm-config.yml missing",
+          "action": "create file with default balanced profile and all defaults"
+        },
+        {
+          "condition": "ftm-config.yml malformed YAML",
+          "action": "back up as ftm-config.yml.bak, create fresh default config"
+        },
+        {
+          "condition": "invalid model or profile value provided",
+          "action": "reject and show valid options without writing"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-config\""
+          },
+          {
+            "field": "action",
+            "type": "string",
+            "description": "\"display\" | \"set_profile\" | \"set_value\" | \"reset\" | \"show_profiles\" | \"show_skills\""
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 10666,
+      "warnings": [],
+      "size_bytes": 12151,
       "enabled": true
     },
     {
@@ -153,9 +1117,192 @@
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json",
         "~/.claude/ftm-state/blackboard/experiences/index.json"
       ],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "codex",
+          "required": true,
+          "description": "Codex CLI for independent peer investigation"
+        },
+        {
+          "type": "tool",
+          "name": "gemini",
+          "required": true,
+          "description": "Gemini CLI for independent peer investigation"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/PREREQUISITES.md",
+          "required": true,
+          "description": "availability check, fallback logic, timeout config"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/STEP-0-FRAMING.md",
+          "required": true,
+          "description": "problem framing format"
+        },
+        {
+          "type": "reference",
+          "name": "references/prompts/CLAUDE-INVESTIGATION.md",
+          "required": true,
+          "description": "Claude investigation prompt template"
+        },
+        {
+          "type": "reference",
+          "name": "references/prompts/CODEX-INVESTIGATION.md",
+          "required": true,
+          "description": "Codex investigation prompt template"
+        },
+        {
+          "type": "reference",
+          "name": "references/prompts/GEMINI-INVESTIGATION.md",
+          "required": true,
+          "description": "Gemini investigation prompt template"
+        },
+        {
+          "type": "reference",
+          "name": "references/prompts/REBUTTAL-TEMPLATE.md",
+          "required": true,
+          "description": "rebuttal round prompt template"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state"
+        }
+      ],
+      "risk": {
+        "level": "read_only",
+        "scope": "reads codebase for independent investigation; does not modify source files; writes blackboard experience after verdict",
+        "rollback": "no source mutations; blackboard write can be reverted by editing JSON files"
+      },
+      "approval_gates": [
+        {
+          "trigger": "council prompt framed in Step 0",
+          "action": "show framed prompt to user and wait for confirmation before dispatching to council"
+        },
+        {
+          "trigger": "2-of-3 majority reached",
+          "action": "present verdict summary to user and ask if they want to proceed or dig into dissent"
+        },
+        {
+          "trigger": "auto-invocation by ftm-executor (INTENT.md conflict)",
+          "action": "skip user framing confirmation, run immediately and return structured COUNCIL VERDICT to caller"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "codex CLI not found",
+          "action": "report missing dependency with install instructions and stop (do not run degraded council)"
+        },
+        {
+          "condition": "gemini CLI not found",
+          "action": "report missing dependency with install instructions and stop"
+        },
+        {
+          "condition": "no majority after 5 rounds",
+          "action": "synthesize final positions, highlight core tension, present 2-3 concrete options for user decision"
+        },
+        {
+          "condition": "model times out during a round",
+          "action": "note timeout for that model, continue round with remaining models' responses"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "codex",
+          "required": true,
+          "description": "OpenAI Codex CLI peer reviewer"
+        },
+        {
+          "type": "cli",
+          "name": "gemini",
+          "required": true,
+          "description": "Google Gemini CLI peer reviewer"
+        },
+        {
+          "type": "env",
+          "name": "OPENAI_API_KEY",
+          "required": true,
+          "description": "for Codex CLI authentication"
+        },
+        {
+          "type": "env",
+          "name": "GEMINI_API_KEY",
+          "required": true,
+          "description": "for Gemini CLI authentication"
+        }
+      ],
+      "event_payloads": {
+        "review_complete": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-council\""
+          },
+          {
+            "field": "verdict",
+            "type": "string",
+            "description": "\"update_intent\" | \"revert_fix\" | \"option_a\" | \"option_b\" | custom decision"
+          },
+          {
+            "field": "round",
+            "type": "number",
+            "description": "round in which majority was reached (1-5, or 5+ for synthesis)"
+          },
+          {
+            "field": "agreed_by",
+            "type": "string[]",
+            "description": "which models agreed on the verdict"
+          },
+          {
+            "field": "reasoning",
+            "type": "string",
+            "description": "why the majority won"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-council\""
+          },
+          {
+            "field": "decision_domain",
+            "type": "string",
+            "description": "topic the council deliberated on"
+          },
+          {
+            "field": "verdict",
+            "type": "string",
+            "description": "final decision"
+          },
+          {
+            "field": "round",
+            "type": "number",
+            "description": "rounds taken to reach verdict"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total deliberation time"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 7788,
+      "warnings": [],
+      "size_bytes": 10950,
       "enabled": true
     },
     {
@@ -169,9 +1316,77 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/events.log",
+          "required": false,
+          "description": "JSONL event log for skill invocation tracking"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": true,
+          "description": "current session metadata"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "experience inventory and counts"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/patterns.json",
+          "required": false,
+          "description": "pattern health for weekly stats"
+        },
+        {
+          "type": "reference",
+          "name": "~/.ftm/playbooks/",
+          "required": false,
+          "description": "playbook use counts and stats"
+        }
+      ],
+      "risk": {
+        "level": "read_only",
+        "scope": "reads event log and blackboard state only; does not modify any files",
+        "rollback": "no mutations to reverse"
+      },
+      "approval_gates": [],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "events.log missing or empty",
+          "action": "show \"No session events recorded yet\" for relevant sections"
+        },
+        {
+          "condition": "blackboard context.json missing",
+          "action": "show \"No session data available\" and suggest using FTM skills first"
+        },
+        {
+          "condition": "experiences/index.json missing",
+          "action": "skip experience stats sections"
+        },
+        {
+          "condition": "playbooks directory missing",
+          "action": "show 0 for all playbook stats"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "(none)": []
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 3781,
+      "warnings": [],
+      "size_bytes": 5165,
       "enabled": true
     },
     {
@@ -200,9 +1415,301 @@
         "~/.claude/ftm-state/blackboard/context.json",
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json"
       ],
+      "requirements": [
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "model profiles for investigation agents"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/BLACKBOARD.md",
+          "required": true,
+          "description": "blackboard read/write protocol"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/EDGE-CASES.md",
+          "required": true,
+          "description": "anti-patterns and fallback handling"
+        },
+        {
+          "type": "reference",
+          "name": "references/phases/PHASE-0-INTAKE.md",
+          "required": true,
+          "description": "intake steps and Explore agent prompt"
+        },
+        {
+          "type": "reference",
+          "name": "references/phases/PHASE-1-TRIAGE.md",
+          "required": true,
+          "description": "agent selection guide and worktree strategy"
+        },
+        {
+          "type": "reference",
+          "name": "references/phases/PHASE-2-WAR-ROOM-AGENTS.md",
+          "required": true,
+          "description": "all four agent prompts"
+        },
+        {
+          "type": "reference",
+          "name": "references/phases/PHASE-3-TO-6-EXECUTION.md",
+          "required": true,
+          "description": "synthesis, solver, reviewer prompts"
+        },
+        {
+          "type": "tool",
+          "name": "git",
+          "required": true,
+          "description": "worktree creation, diff inspection, commit history"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "past bug fixes and known issues"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/patterns.json",
+          "required": false,
+          "description": "recurring failure patterns"
+        }
+      ],
+      "risk": {
+        "level": "medium_write",
+        "scope": "creates git worktrees for investigation and fix branches; modifies source files in Solver agent worktree; merges fix after Reviewer approval",
+        "rollback": "git worktree remove + git branch -D for debug/* worktrees; all fix changes isolated until user confirms merge"
+      },
+      "approval_gates": [
+        {
+          "trigger": "investigation plan formulated in Phase 0",
+          "action": "present plan to user and proceed unless user objects"
+        },
+        {
+          "trigger": "Solver produces fix",
+          "action": "Reviewer agent must independently verify before presenting to user (hard gate — cannot skip)"
+        },
+        {
+          "trigger": "Reviewer APPROVED",
+          "action": "present root cause + changes + evidence to user, wait for user confirmation before merging"
+        },
+        {
+          "trigger": "Solver NEEDS REWORK after 3 attempts",
+          "action": "escalate to user with full context, wait for direction"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "plan_first",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "Instrumenter agent fails or produces no useful output",
+          "action": "skip instrumentation worktree, proceed with remaining agents"
+        },
+        {
+          "condition": "Reproducer cannot create a minimal failing test",
+          "action": "note as \"reproduction failed\", proceed with hypothesis-only approach"
+        },
+        {
+          "condition": "Researcher finds no relevant issues or docs",
+          "action": "proceed with instrumentation and hypothesis findings only"
+        },
+        {
+          "condition": "fix still failing after 3 Solver iterations",
+          "action": "escalate to user with all hypotheses tested and evidence gathered"
+        },
+        {
+          "condition": "project has no test suite",
+          "action": "Reviewer uses build check + diff review + live runtime verification instead of test runner"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "git",
+          "required": true,
+          "description": "worktree isolation for investigation agents"
+        },
+        {
+          "type": "mcp",
+          "name": "sequential-thinking",
+          "required": false,
+          "description": "complex multi-hypothesis analysis"
+        },
+        {
+          "type": "mcp",
+          "name": "playwright",
+          "required": false,
+          "description": "visual bug verification in Reviewer phase"
+        },
+        {
+          "type": "mcp",
+          "name": "WebSearch",
+          "required": false,
+          "description": "Researcher agent for GitHub issues and Stack Overflow"
+        },
+        {
+          "type": "mcp",
+          "name": "WebFetch",
+          "required": false,
+          "description": "Researcher agent for docs and changelogs"
+        }
+      ],
+      "event_payloads": {
+        "bug_fixed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "root_cause",
+            "type": "string",
+            "description": "one-sentence root cause description"
+          },
+          {
+            "field": "fix_approach",
+            "type": "string",
+            "description": "description of the fix applied"
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "path to fix worktree"
+          },
+          {
+            "field": "iterations",
+            "type": "number",
+            "description": "number of solver-reviewer cycles needed"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total war room duration"
+          }
+        ],
+        "issue_found": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "phase",
+            "type": "string",
+            "description": "\"phase1\" | \"phase2\""
+          },
+          {
+            "field": "agent",
+            "type": "string",
+            "description": "\"instrumenter\" | \"researcher\" | \"reproducer\" | \"hypothesizer\""
+          },
+          {
+            "field": "finding",
+            "type": "string",
+            "description": "description of the specific issue found"
+          },
+          {
+            "field": "confidence",
+            "type": "string",
+            "description": "high | medium | low"
+          }
+        ],
+        "test_passed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "scope",
+            "type": "string",
+            "description": "\"reproduction\" | \"full_suite\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "worktree path where tests ran"
+          }
+        ],
+        "test_failed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "scope",
+            "type": "string",
+            "description": "\"reproduction\" | \"full_suite\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "worktree path"
+          },
+          {
+            "field": "error_summary",
+            "type": "string",
+            "description": "brief failure description"
+          }
+        ],
+        "error_encountered": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "phase",
+            "type": "string",
+            "description": "war room phase where error occurred"
+          },
+          {
+            "field": "error",
+            "type": "string",
+            "description": "error description"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-debug\""
+          },
+          {
+            "field": "outcome",
+            "type": "string",
+            "description": "\"fixed\" | \"escalated\" | \"unresolved\""
+          },
+          {
+            "field": "root_cause",
+            "type": "string",
+            "description": "root cause if found"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total session duration"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 8131,
+      "warnings": [],
+      "size_bytes": 12629,
       "enabled": true
     },
     {
@@ -219,9 +1726,133 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": ".ftm-map/map.db",
+          "required": false,
+          "description": "SQLite knowledge graph for accurate diagram generation (graph-powered mode)"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": false,
+          "description": "Python runtime for graph-powered views.py"
+        },
+        {
+          "type": "reference",
+          "name": "package.json",
+          "required": false,
+          "description": "project structure detection for bootstrap"
+        },
+        {
+          "type": "reference",
+          "name": "tsconfig.json",
+          "required": false,
+          "description": "TypeScript project structure detection"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes .mmd diagram files to project directories; only creates or modifies ARCHITECTURE.mmd and per-module DIAGRAM.mmd files; does not touch source code",
+        "rollback": "git checkout on modified .mmd files; delete newly created .mmd files"
+      },
+      "approval_gates": [
+        {
+          "trigger": "bootstrap mode on large codebase (50+ modules)",
+          "action": "report what was found and what will be created before writing, proceed unless user objects"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": ".ftm-map/map.db not found",
+          "action": "fall back to standard import-grep analysis for diagram generation"
+        },
+        {
+          "condition": "Python venv not set up",
+          "action": "fall back to standard analysis, log \"Graph-powered mode unavailable — run ftm-map to enable\""
+        },
+        {
+          "condition": "no src/ or identifiable source root",
+          "action": "ask user for source root before bootstrapping"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": false,
+          "description": "graph-powered diagram generation"
+        },
+        {
+          "type": "mcp",
+          "name": "git",
+          "required": false,
+          "description": "detect changed files for incremental updates"
+        }
+      ],
+      "event_payloads": {
+        "documentation_updated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-diagram\""
+          },
+          {
+            "field": "files_written",
+            "type": "string[]",
+            "description": "absolute paths to .mmd files created or modified"
+          },
+          {
+            "field": "modules_added",
+            "type": "number",
+            "description": "new module nodes added to ARCHITECTURE.mmd"
+          },
+          {
+            "field": "functions_added",
+            "type": "number",
+            "description": "new function nodes added across module DIAGRAMs"
+          },
+          {
+            "field": "edges_added",
+            "type": "number",
+            "description": "new dependency edges added"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-diagram\""
+          },
+          {
+            "field": "mode",
+            "type": "string",
+            "description": "\"bootstrap\" | \"incremental\""
+          },
+          {
+            "field": "files_count",
+            "type": "number",
+            "description": "total .mmd files written"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total diagram sync duration"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 8348,
+      "warnings": [],
+      "size_bytes": 10424,
       "enabled": true
     },
     {
@@ -245,11 +1876,318 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "git",
+          "required": true,
+          "description": "worktree creation, branch management, commit operations"
+        },
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "model profiles, max_parallel_agents, auto_audit, progress_tracking"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/plans/",
+          "required": false,
+          "description": "plan documents for execution"
+        },
+        {
+          "type": "tool",
+          "name": "node",
+          "required": false,
+          "description": "project setup commands in worktrees"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-executor/references/STYLE-TEMPLATE.md",
+          "required": false,
+          "description": "STYLE.md bootstrap template"
+        }
+      ],
+      "risk": {
+        "level": "high_write",
+        "scope": "creates git worktrees and branches, modifies source files across multiple tasks, runs tests and builds, optionally pushes branches or creates PRs",
+        "rollback": "git worktree remove + git branch -D for each worktree; all changes isolated to plan-exec/* branches until explicitly merged"
+      },
+      "approval_gates": [
+        {
+          "trigger": "no plan document provided",
+          "action": "generate plan and wait for explicit user approval before any code is written"
+        },
+        {
+          "trigger": "plan_checker returns FAIL",
+          "action": "present blockers and ask user to fix or override before proceeding"
+        },
+        {
+          "trigger": "plan_checker returns WARN",
+          "action": "show warnings to user, proceed unless they object"
+        },
+        {
+          "trigger": "wave complete and all agents done",
+          "action": "auto-invoke ftm-codex-gate (no user gate needed for this step)"
+        },
+        {
+          "trigger": "final phase 6 verification passes",
+          "action": "present 4 branch finishing options and wait for explicit user choice"
+        },
+        {
+          "trigger": "codex gate FAIL after 2 fix attempts",
+          "action": "report to user and wait for input before continuing"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "plan_first",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "ftm-browse not installed at $HOME/.claude/skills/ftm-browse/bin/ftm-browse",
+          "action": "skip visual smoke test checks, log \"Visual smoke test skipped — ftm-browse not installed\""
+        },
+        {
+          "condition": "ftm-retro skill not available",
+          "action": "skip retrospective phase, note in output and proceed to branch finishing"
+        },
+        {
+          "condition": "codex CLI not found",
+          "action": "skip codex gate, log \"Codex gate skipped — codex not installed\", proceed to next wave"
+        },
+        {
+          "condition": "no package.json in project",
+          "action": "skip npm install in worktree setup; skip knip-based audit layers"
+        },
+        {
+          "condition": "project has no test suite",
+          "action": "skip test verification gates, rely on diff review and build checks"
+        },
+        {
+          "condition": "agent fails or gets stuck",
+          "action": "read agent output, fix directly or respawn with more context"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "git",
+          "required": true,
+          "description": "worktree management and version control"
+        },
+        {
+          "type": "cli",
+          "name": "node",
+          "required": false,
+          "description": "project dependency installation"
+        },
+        {
+          "type": "mcp",
+          "name": "sequential-thinking",
+          "required": false,
+          "description": "complex dependency analysis and plan validation"
+        }
+      ],
+      "event_payloads": {
+        "task_received": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "task_description",
+            "type": "string",
+            "description": "description of the task being queued"
+          },
+          {
+            "field": "plan_path",
+            "type": "string",
+            "description": "absolute path to plan document"
+          }
+        ],
+        "plan_generated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "plan_path",
+            "type": "string",
+            "description": "absolute path to saved plan file"
+          },
+          {
+            "field": "task_count",
+            "type": "number",
+            "description": "total tasks in the plan"
+          },
+          {
+            "field": "wave_count",
+            "type": "number",
+            "description": "number of parallel execution waves"
+          }
+        ],
+        "plan_approved": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "plan_path",
+            "type": "string",
+            "description": "absolute path to approved plan"
+          },
+          {
+            "field": "approved_steps",
+            "type": "number[]",
+            "description": "step numbers approved for execution"
+          }
+        ],
+        "code_changed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "path to the worktree where files changed"
+          },
+          {
+            "field": "files",
+            "type": "string[]",
+            "description": "list of modified file paths"
+          },
+          {
+            "field": "agent",
+            "type": "string",
+            "description": "agent type that made the changes"
+          }
+        ],
+        "code_committed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "path to worktree"
+          },
+          {
+            "field": "commit_hash",
+            "type": "string",
+            "description": "short commit hash"
+          },
+          {
+            "field": "message",
+            "type": "string",
+            "description": "commit message"
+          },
+          {
+            "field": "task_number",
+            "type": "number",
+            "description": "plan task number this commit belongs to"
+          }
+        ],
+        "test_passed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "scope",
+            "type": "string",
+            "description": "\"task\" | \"full_suite\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "worktree path"
+          }
+        ],
+        "test_failed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "scope",
+            "type": "string",
+            "description": "\"task\" | \"full_suite\""
+          },
+          {
+            "field": "worktree",
+            "type": "string",
+            "description": "worktree path"
+          },
+          {
+            "field": "error_summary",
+            "type": "string",
+            "description": "brief description of failure"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "task_number",
+            "type": "number",
+            "description": "completed task number"
+          },
+          {
+            "field": "audit_result",
+            "type": "string",
+            "description": "\"pass\" | \"pass_with_fixes\" | \"fail\" | \"skipped\""
+          },
+          {
+            "field": "auto_fixed_count",
+            "type": "number",
+            "description": "issues auto-remediated by ftm-audit"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "task execution time"
+          }
+        ],
+        "error_encountered": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-executor\""
+          },
+          {
+            "field": "phase",
+            "type": "string",
+            "description": "execution phase where error occurred"
+          },
+          {
+            "field": "error",
+            "type": "string",
+            "description": "error description"
+          }
+        ]
+      },
       "references": [
         "STYLE-TEMPLATE.md"
       ],
       "has_evals": false,
-      "size_bytes": 31684,
+      "warnings": [],
+      "size_bytes": 36395,
       "enabled": true
     },
     {
@@ -275,9 +2213,194 @@
       "blackboard_writes": [
         "~/.claude/ftm-state/blackboard/context.json"
       ],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "git",
+          "required": true,
+          "description": "staged file inspection, commit history scanning"
+        },
+        {
+          "type": "reference",
+          "name": "references/patterns/SECRET-PATTERNS.md",
+          "required": true,
+          "description": "Tier 1/2 patterns, severity table, ignore list"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/REMEDIATION.md",
+          "required": true,
+          "description": "remediation protocol, env var patterns, report formats"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-git/scripts/pre-commit-secrets.sh",
+          "required": true,
+          "description": "pre-commit hook script for installation"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-git/hooks/post-commit-experience.sh",
+          "required": false,
+          "description": "post-commit experience recorder hook"
+        }
+      ],
+      "risk": {
+        "level": "medium_write",
+        "scope": "modifies source files to replace hardcoded secrets with env var references; creates/updates .env and .env.example files; installs git hooks in .git/hooks/; re-stages files after remediation",
+        "rollback": "git checkout on refactored source files; manually remove added .env and .gitignore entries; remove hook from .git/hooks/pre-commit"
+      },
+      "approval_gates": [
+        {
+          "trigger": "CRITICAL or HIGH severity secret found",
+          "action": "BLOCK commit/push immediately, announce \"BLOCKED — N secret(s) found\", then attempt auto-remediation"
+        },
+        {
+          "trigger": "auto-remediation proposed for a finding",
+          "action": "show proposed change (file, variable name, env var name) before applying"
+        },
+        {
+          "trigger": "re-scan after remediation still finds secrets",
+          "action": "report remaining findings to user, do not proceed with commit"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": ".env file does not exist",
+          "action": "create .env and .env.example and add .env to .gitignore before extracting secrets"
+        },
+        {
+          "condition": ".gitignore does not exist",
+          "action": "create .gitignore with .env entry before remediation"
+        },
+        {
+          "condition": "language detection fails for env var pattern",
+          "action": "extract secret to .env but flag source file refactoring as MANUAL_INTERVENTION_NEEDED"
+        },
+        {
+          "condition": "pre-commit hook already exists",
+          "action": "append ftm-git scan to existing hook rather than overwriting"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "git",
+          "required": true,
+          "description": "staged file listing, diff inspection, commit history traversal"
+        }
+      ],
+      "event_payloads": {
+        "secrets_found": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-git\""
+          },
+          {
+            "field": "findings_count",
+            "type": "number",
+            "description": "total secrets detected"
+          },
+          {
+            "field": "critical_count",
+            "type": "number",
+            "description": "CRITICAL severity findings"
+          },
+          {
+            "field": "high_count",
+            "type": "number",
+            "description": "HIGH severity findings"
+          },
+          {
+            "field": "files_affected",
+            "type": "string[]",
+            "description": "files containing secrets"
+          },
+          {
+            "field": "blocked",
+            "type": "boolean",
+            "description": "whether commit/push was halted"
+          }
+        ],
+        "secrets_clear": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-git\""
+          },
+          {
+            "field": "files_scanned",
+            "type": "number",
+            "description": "total files checked"
+          },
+          {
+            "field": "scope",
+            "type": "string",
+            "description": "\"staged\" | \"working_tree\" | \"history\" | \"pre-push\""
+          }
+        ],
+        "secrets_remediated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-git\""
+          },
+          {
+            "field": "findings_remediated",
+            "type": "number",
+            "description": "secrets successfully extracted"
+          },
+          {
+            "field": "env_vars_added",
+            "type": "string[]",
+            "description": "environment variable names created"
+          },
+          {
+            "field": "files_refactored",
+            "type": "string[]",
+            "description": "source files updated to use env vars"
+          },
+          {
+            "field": "manual_needed",
+            "type": "number",
+            "description": "findings requiring manual intervention"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-git\""
+          },
+          {
+            "field": "outcome",
+            "type": "string",
+            "description": "\"clear\" | \"remediated\" | \"blocked\""
+          },
+          {
+            "field": "files_scanned",
+            "type": "number",
+            "description": "total files scanned"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total scan and remediation time"
+          }
+        ]
+      },
       "references": [],
       "has_evals": true,
-      "size_bytes": 10654,
+      "warnings": [],
+      "size_bytes": 13806,
       "enabled": true
     },
     {
@@ -294,9 +2417,127 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": ".ftm-map/map.db",
+          "required": false,
+          "description": "SQLite knowledge graph for accurate intent generation (graph-powered mode)"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": false,
+          "description": "Python runtime for graph-powered views.py"
+        },
+        {
+          "type": "reference",
+          "name": "package.json",
+          "required": false,
+          "description": "project vision and structure detection for bootstrap"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes INTENT.md files in project directories; only creates or modifies INTENT.md documentation files; does not touch source code files",
+        "rollback": "git checkout on modified INTENT.md files; delete newly created INTENT.md files"
+      },
+      "approval_gates": [
+        {
+          "trigger": "bootstrap mode — about to create multiple INTENT.md files",
+          "action": "report count of files to be created and modules to be documented, proceed unless user objects"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": ".ftm-map/map.db not found",
+          "action": "fall back to standard Glob/Grep analysis for function discovery"
+        },
+        {
+          "condition": "Python venv not set up",
+          "action": "fall back to standard analysis, log \"Graph-powered mode unavailable — run ftm-map to enable\""
+        },
+        {
+          "condition": "no README or package.json for Vision section",
+          "action": "infer project vision from directory structure and module names"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": false,
+          "description": "graph-powered intent generation"
+        },
+        {
+          "type": "mcp",
+          "name": "git",
+          "required": false,
+          "description": "detect changed files for incremental sync"
+        }
+      ],
+      "event_payloads": {
+        "documentation_updated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-intent\""
+          },
+          {
+            "field": "files_written",
+            "type": "string[]",
+            "description": "absolute paths to INTENT.md files created or modified"
+          },
+          {
+            "field": "functions_added",
+            "type": "number",
+            "description": "new function entries documented"
+          },
+          {
+            "field": "functions_updated",
+            "type": "number",
+            "description": "existing entries updated"
+          },
+          {
+            "field": "functions_removed",
+            "type": "number",
+            "description": "stale entries removed"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-intent\""
+          },
+          {
+            "field": "mode",
+            "type": "string",
+            "description": "\"bootstrap\" | \"incremental\""
+          },
+          {
+            "field": "files_count",
+            "type": "number",
+            "description": "total INTENT.md files written"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total documentation sync duration"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 9704,
+      "warnings": [],
+      "size_bytes": 11817,
       "enabled": true
     },
     {
@@ -314,9 +2555,160 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": true,
+          "description": "Python with tree-sitter and SQLite bindings"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/setup.sh",
+          "required": true,
+          "description": "virtualenv and dependency installer"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/index.py",
+          "required": true,
+          "description": "bootstrap and incremental indexer"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/query.py",
+          "required": true,
+          "description": "blast radius, dependency, and FTS5 search queries"
+        },
+        {
+          "type": "tool",
+          "name": "ftm-map/scripts/views.py",
+          "required": true,
+          "description": "INTENT.md and .mmd diagram generation from graph"
+        },
+        {
+          "type": "tool",
+          "name": "git",
+          "required": false,
+          "description": "changed file detection for incremental mode"
+        },
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "model profile and skills.ftm-map.enabled flag"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes and updates .ftm-map/map.db SQLite database; does not modify any project source files; also writes blackboard experience entry",
+        "rollback": "delete .ftm-map/map.db to reset to unindexed state; re-run bootstrap to rebuild"
+      },
+      "approval_gates": [
+        {
+          "trigger": "bootstrap requested on very large codebase (1000+ files)",
+          "action": "report estimated file count before running, proceed unless user objects"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": ".venv does not exist",
+          "action": "run setup.sh first to create it before proceeding"
+        },
+        {
+          "condition": "tree-sitter binary missing",
+          "action": "run setup.sh to install dependencies"
+        },
+        {
+          "condition": ".ftm-map/map.db missing when query requested",
+          "action": "explain graph not indexed, offer to run bootstrap"
+        },
+        {
+          "condition": "git not available for incremental changed-file detection",
+          "action": "fall back to indexing all modified files detected from disk timestamps"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "ftm-map/scripts/.venv/bin/python3",
+          "required": true,
+          "description": "tree-sitter parsing and SQLite operations"
+        },
+        {
+          "type": "cli",
+          "name": "git",
+          "required": false,
+          "description": "changed file detection for incremental indexing"
+        }
+      ],
+      "event_payloads": {
+        "map_updated": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-map\""
+          },
+          {
+            "field": "project_path",
+            "type": "string",
+            "description": "absolute path to indexed project"
+          },
+          {
+            "field": "symbols_count",
+            "type": "number",
+            "description": "total symbols in the graph"
+          },
+          {
+            "field": "edges_count",
+            "type": "number",
+            "description": "total dependency edges"
+          },
+          {
+            "field": "files_parsed",
+            "type": "number",
+            "description": "files processed in this operation"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "indexing duration"
+          },
+          {
+            "field": "mode",
+            "type": "string",
+            "description": "\"bootstrap\" | \"incremental\""
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-map\""
+          },
+          {
+            "field": "operation",
+            "type": "string",
+            "description": "\"bootstrap\" | \"incremental\" | \"query\""
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total operation duration"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 8649,
+      "warnings": [],
+      "size_bytes": 11126,
       "enabled": true
     },
     {
@@ -328,6 +2720,192 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "git",
+          "required": true,
+          "description": "codebase state inspection (git status, git log)"
+        },
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "approval_mode, execution preferences"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-mind/references/mcp-inventory.md",
+          "required": true,
+          "description": "MCP capability routing table"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/context.json",
+          "required": false,
+          "description": "session state and preferences"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "experience retrieval index"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/patterns.json",
+          "required": false,
+          "description": "promoted patterns for orientation"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes blackboard context and experience files; local code edits only on micro/small direct tasks; routes to other skills for larger work",
+        "rollback": "blackboard writes can be reverted by editing JSON files; no destructive mutations performed directly"
+      },
+      "approval_gates": [
+        {
+          "trigger": "task_size >= medium AND involves external systems",
+          "action": "present numbered plan and wait for explicit user approval"
+        },
+        {
+          "trigger": "any external mutation (Okta, Freshservice, Jira, Slack, email, calendar, S3, deploys, git push)",
+          "action": "present phase-level approval request before executing each mutation"
+        },
+        {
+          "trigger": "task_size == small AND approval_mode == always_ask",
+          "action": "show pre-flight summary before proceeding"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto (pre-flight summary if plan_first)",
+        "medium": "plan_first",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "blackboard context.json missing or malformed",
+          "action": "treat as empty state, proceed at full capability using live observation"
+        },
+        {
+          "condition": "experiences/index.json empty or no matching entries",
+          "action": "skip experience retrieval, lean on current repo state and direct inspection"
+        },
+        {
+          "condition": "patterns.json missing",
+          "action": "skip pattern application, rely on direct analysis"
+        },
+        {
+          "condition": "ftm-config.yml missing",
+          "action": "default to plan_first approval_mode and balanced model profile"
+        },
+        {
+          "condition": "mcp-inventory.md missing",
+          "action": "rely on built-in MCP routing heuristics from skill body"
+        },
+        {
+          "condition": "requested ftm skill unavailable",
+          "action": "notify user and attempt direct handling or alternate routing"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "mcp",
+          "name": "git",
+          "required": false,
+          "description": "codebase state, diffs, history, commits"
+        },
+        {
+          "type": "mcp",
+          "name": "mcp-atlassian-personal",
+          "required": false,
+          "description": "Jira/Confluence reads for ticket-driven work"
+        },
+        {
+          "type": "mcp",
+          "name": "slack",
+          "required": false,
+          "description": "Slack context reads, draft messages"
+        },
+        {
+          "type": "mcp",
+          "name": "gmail",
+          "required": false,
+          "description": "email reads, drafts"
+        },
+        {
+          "type": "mcp",
+          "name": "google-calendar",
+          "required": false,
+          "description": "calendar inspection for scheduling requests"
+        },
+        {
+          "type": "mcp",
+          "name": "freshservice-mcp",
+          "required": false,
+          "description": "IT ticketing reads"
+        },
+        {
+          "type": "mcp",
+          "name": "sequential-thinking",
+          "required": false,
+          "description": "multi-step reflective reasoning"
+        },
+        {
+          "type": "mcp",
+          "name": "playwright",
+          "required": false,
+          "description": "browser automation for visual tasks"
+        },
+        {
+          "type": "mcp",
+          "name": "glean_default",
+          "required": false,
+          "description": "internal company knowledge search"
+        },
+        {
+          "type": "mcp",
+          "name": "context7",
+          "required": false,
+          "description": "external library documentation"
+        }
+      ],
+      "event_payloads": {
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-mind\""
+          },
+          {
+            "field": "task_type",
+            "type": "string",
+            "description": "detected task type (feature, bug, refactor, investigation, etc.)"
+          },
+          {
+            "field": "task_size",
+            "type": "string",
+            "description": "micro | small | medium | large"
+          },
+          {
+            "field": "route",
+            "type": "string",
+            "description": "direct | skill name routed to"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "time from observe to act completion"
+          },
+          {
+            "field": "blackboard_updated",
+            "type": "boolean",
+            "description": "whether context.json and experience were written"
+          }
+        ]
+      },
       "references": [
         "blackboard-schema.md",
         "complexity-guide.md",
@@ -337,7 +2915,8 @@
         "routing-scenarios.md"
       ],
       "has_evals": true,
-      "size_bytes": 42006,
+      "warnings": [],
+      "size_bytes": 46760,
       "enabled": true
     },
     {
@@ -352,9 +2931,126 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/STATE.md",
+          "required": false,
+          "description": "existing state file to overwrite"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-pause/references/protocols/SKILL-RESTORE-PROTOCOLS.md",
+          "required": true,
+          "description": "per-skill capture field specifications"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-pause/references/protocols/VALIDATION.md",
+          "required": true,
+          "description": "pre-write and post-write validation checklist"
+        },
+        {
+          "type": "tool",
+          "name": "git",
+          "required": false,
+          "description": "git branch and commit hash capture for state file"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes ~/.claude/ftm-state/STATE.md only; does not modify project source files or blackboard experiences; overwrites existing STATE.md without backup",
+        "rollback": "no project mutations; prior STATE.md is overwritten (not backed up) by design"
+      },
+      "approval_gates": [
+        {
+          "trigger": "multiple skills active and unclear which to pause",
+          "action": "ask user which skill state to save before writing"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "~/.claude/ftm-state/ directory doesn't exist",
+          "action": "create directory before writing STATE.md"
+        },
+        {
+          "condition": "no ftm skill detected as active",
+          "action": "report \"No active ftm session detected\" and list which skills this applies to"
+        },
+        {
+          "condition": "git not available",
+          "action": "omit git_branch and git_commit fields from state file frontmatter"
+        },
+        {
+          "condition": "artifact files referenced in state don't exist on disk",
+          "action": "note as \"path recorded but file not found\" in Artifacts section"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "git",
+          "required": false,
+          "description": "branch name and commit hash for state file metadata"
+        }
+      ],
+      "event_payloads": {
+        "session_paused": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-pause\""
+          },
+          {
+            "field": "saved_skill",
+            "type": "string",
+            "description": "the ftm skill whose state was saved"
+          },
+          {
+            "field": "phase",
+            "type": "string",
+            "description": "phase at which the session was paused"
+          },
+          {
+            "field": "state_file",
+            "type": "string",
+            "description": "absolute path to written STATE.md"
+          },
+          {
+            "field": "artifacts_count",
+            "type": "number",
+            "description": "number of artifact paths recorded"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-pause\""
+          },
+          {
+            "field": "saved_skill",
+            "type": "string",
+            "description": "the ftm skill whose state was saved"
+          },
+          {
+            "field": "state_file",
+            "type": "string",
+            "description": "absolute path to STATE.md"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 6058,
+      "warnings": [],
+      "size_bytes": 8104,
       "enabled": true
     },
     {
@@ -371,6 +3067,187 @@
       ],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "planning and review model profiles, per_skill_overrides.ftm-researcher agent cap"
+        },
+        {
+          "type": "reference",
+          "name": "ftm-researcher/references/agent-prompts.md",
+          "required": true,
+          "description": "7 finder agent prompts and orchestrator decomposition protocol"
+        },
+        {
+          "type": "reference",
+          "name": "ftm-researcher/references/synthesis-pipeline.md",
+          "required": true,
+          "description": "5-phase synthesis pipeline"
+        },
+        {
+          "type": "reference",
+          "name": "ftm-researcher/references/adaptive-search.md",
+          "required": false,
+          "description": "wave 2 adaptive refinement (deep mode only)"
+        },
+        {
+          "type": "reference",
+          "name": "ftm-researcher/references/output-format.md",
+          "required": true,
+          "description": "JSON schema and markdown template"
+        },
+        {
+          "type": "reference",
+          "name": "ftm-researcher/references/council-integration.md",
+          "required": false,
+          "description": "ftm-council interface (deep mode only)"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-blackboard/context.json",
+          "required": false,
+          "description": "session state"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-blackboard/patterns.json",
+          "required": false,
+          "description": "recurring research patterns"
+        }
+      ],
+      "risk": {
+        "level": "read_only",
+        "scope": "reads web sources and local codebase via agents; writes blackboard experience entry; writes structured JSON artifact; does not modify project source files",
+        "rollback": "no project mutations; blackboard write can be reverted by editing JSON files"
+      },
+      "approval_gates": [
+        {
+          "trigger": "research complete and user says \"done\" / \"thanks\"",
+          "action": "finalize, write blackboard, emit events"
+        },
+        {
+          "trigger": "deep mode and ftm-council invoked",
+          "action": "council runs automatically on top claims (no user gate needed for this step)"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "ftm-council not available (deep mode)",
+          "action": "use 2 fallback challenger agents (Devil's Advocate + Edge Case Hunter) instead"
+        },
+        {
+          "condition": "agent cap exceeded",
+          "action": "queue excess agents and dispatch after current wave completes"
+        },
+        {
+          "condition": "research agent returns no findings",
+          "action": "broaden query and retry; if still empty, report \"No prior art found — this may be novel\""
+        },
+        {
+          "condition": "blackboard missing",
+          "action": "proceed without experience-informed shortcuts"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "mcp",
+          "name": "WebSearch",
+          "required": false,
+          "description": "finder agents for web, GitHub, and competitive research"
+        },
+        {
+          "type": "mcp",
+          "name": "WebFetch",
+          "required": false,
+          "description": "fetching specific URLs found during research"
+        },
+        {
+          "type": "mcp",
+          "name": "sequential-thinking",
+          "required": false,
+          "description": "complex synthesis and reconciliation"
+        }
+      ],
+      "event_payloads": {
+        "research_complete": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-researcher\""
+          },
+          {
+            "field": "query",
+            "type": "string",
+            "description": "original research question"
+          },
+          {
+            "field": "mode",
+            "type": "string",
+            "description": "\"quick\" | \"standard\" | \"deep\""
+          },
+          {
+            "field": "findings_count",
+            "type": "number",
+            "description": "total normalized findings"
+          },
+          {
+            "field": "consensus_count",
+            "type": "number",
+            "description": "findings with 3+ agent agreement"
+          },
+          {
+            "field": "contested_count",
+            "type": "number",
+            "description": "findings with council disagreement"
+          },
+          {
+            "field": "unique_count",
+            "type": "number",
+            "description": "single-agent findings"
+          },
+          {
+            "field": "sources_count",
+            "type": "number",
+            "description": "total sources cited"
+          },
+          {
+            "field": "council_used",
+            "type": "boolean",
+            "description": "whether ftm-council was invoked"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total research duration"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-researcher\""
+          },
+          {
+            "field": "task_title",
+            "type": "string",
+            "description": "research topic title"
+          },
+          {
+            "field": "duration_ms",
+            "type": "number",
+            "description": "total session duration including iterations"
+          }
+        ]
+      },
       "references": [
         "adaptive-search.md",
         "agent-prompts.md",
@@ -379,7 +3256,8 @@
         "synthesis-pipeline.md"
       ],
       "has_evals": true,
-      "size_bytes": 10899,
+      "warnings": [],
+      "size_bytes": 13941,
       "enabled": true
     },
     {
@@ -394,9 +3272,140 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/STATE.md",
+          "required": true,
+          "description": "saved session state file from ftm-pause"
+        },
+        {
+          "type": "reference",
+          "name": "../ftm-pause/references/protocols/SKILL-RESTORE-PROTOCOLS.md",
+          "required": true,
+          "description": "per-skill state field restoration instructions"
+        },
+        {
+          "type": "reference",
+          "name": "../ftm-pause/references/protocols/VALIDATION.md",
+          "required": true,
+          "description": "validation protocol for state file integrity"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/archive/",
+          "required": false,
+          "description": "archived prior state files"
+        },
+        {
+          "type": "tool",
+          "name": "git",
+          "required": false,
+          "description": "checking git state drift since session was paused"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "archives STATE.md by moving it to ~/.claude/ftm-state/archive/; invokes the target ftm skill with restored context; does not modify project source files",
+        "rollback": "copy archived STATE.md back from archive if restoration was incorrect"
+      },
+      "approval_gates": [
+        {
+          "trigger": "validation finds warnings (git drift, stale state, missing artifacts)",
+          "action": "present consolidated validation summary and require user acknowledgment before proceeding"
+        },
+        {
+          "trigger": "validation finds block-level failure",
+          "action": "stop and report failure; do not invoke target skill"
+        },
+        {
+          "trigger": "user provides new context along with \"yes\"",
+          "action": "capture as post-pause update and inject into skill invocation"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "STATE.md not found",
+          "action": "report \"No saved ftm session found\" with instructions for saving sessions"
+        },
+        {
+          "condition": "STATE.md frontmatter missing required fields",
+          "action": "report validation failure with specific missing fields"
+        },
+        {
+          "condition": "multiple STATE.md files (STATE.md + STATE-*.md)",
+          "action": "ask user which to resume, list each with skill type and timestamp"
+        },
+        {
+          "condition": "state is >7 days old",
+          "action": "flag as potentially stale with warning, require user acknowledgment"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "git",
+          "required": false,
+          "description": "branch and commit state validation"
+        }
+      ],
+      "event_payloads": {
+        "session_resumed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-resume\""
+          },
+          {
+            "field": "resumed_skill",
+            "type": "string",
+            "description": "the ftm skill that was re-invoked"
+          },
+          {
+            "field": "phase",
+            "type": "string",
+            "description": "phase the session is resuming at"
+          },
+          {
+            "field": "state_age_hours",
+            "type": "number",
+            "description": "how long ago the session was paused"
+          },
+          {
+            "field": "post_pause_update",
+            "type": "boolean",
+            "description": "whether user provided new context"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-resume\""
+          },
+          {
+            "field": "resumed_skill",
+            "type": "string",
+            "description": "the ftm skill re-invoked"
+          },
+          {
+            "field": "state_file_archived",
+            "type": "string",
+            "description": "path where STATE.md was archived"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 6878,
+      "warnings": [],
+      "size_bytes": 9319,
       "enabled": true
     },
     {
@@ -419,9 +3428,168 @@
         "~/.claude/ftm-state/blackboard/context.json",
         "~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json"
       ],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "PROGRESS.md",
+          "required": false,
+          "description": "executor progress log for auto-triggered mode"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-retros/",
+          "required": false,
+          "description": "prior retro files for pattern analysis"
+        },
+        {
+          "type": "reference",
+          "name": "references/protocols/SCORING-RUBRICS.md",
+          "required": true,
+          "description": "scoring scale breakpoints and evidence requirements"
+        },
+        {
+          "type": "reference",
+          "name": "references/templates/REPORT-FORMAT.md",
+          "required": true,
+          "description": "retro report output template"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/experiences/index.json",
+          "required": false,
+          "description": "experience inventory for micro-reflection mode"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/ftm-state/blackboard/patterns.json",
+          "required": false,
+          "description": "pattern registry for promotion and decay"
+        }
+      ],
+      "risk": {
+        "level": "low_write",
+        "scope": "writes retro report to ~/.claude/ftm-retros/; writes experience files to blackboard; promotes patterns to patterns.json; does not modify project source files",
+        "rollback": "delete retro report file; remove experience entry from blackboard"
+      },
+      "approval_gates": [
+        {
+          "trigger": "pattern promotion triggered (3+ matching experiences)",
+          "action": "auto-promote to patterns.json without user gate (learning system behavior)"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "PROGRESS.md not found and manual mode",
+          "action": "check ~/.claude/ftm-retros/ for most recent .md file; ask user which execution to review if multiple found"
+        },
+        {
+          "condition": "execution context not provided by ftm-executor",
+          "action": "reconstruct from PROGRESS.md or ask user for context"
+        },
+        {
+          "condition": "scoring rubric file missing",
+          "action": "apply built-in scoring heuristics from skill body"
+        },
+        {
+          "condition": "experiences/index.json has fewer than 10 entries",
+          "action": "cold-start mode — record every task, set all confidence to low"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "experience_recorded": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-retro\""
+          },
+          {
+            "field": "experience_path",
+            "type": "string",
+            "description": "path to written experience file"
+          },
+          {
+            "field": "task_type",
+            "type": "string",
+            "description": "type of task recorded"
+          },
+          {
+            "field": "outcome",
+            "type": "string",
+            "description": "success | partial | failure"
+          },
+          {
+            "field": "confidence",
+            "type": "string",
+            "description": "low | medium | high"
+          }
+        ],
+        "pattern_discovered": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-retro\""
+          },
+          {
+            "field": "pattern_name",
+            "type": "string",
+            "description": "name of the promoted pattern"
+          },
+          {
+            "field": "category",
+            "type": "string",
+            "description": "codebase_insights | execution_patterns | user_behavior | recurring_issues"
+          },
+          {
+            "field": "occurrence_count",
+            "type": "number",
+            "description": "number of experiences that triggered promotion"
+          },
+          {
+            "field": "confidence",
+            "type": "string",
+            "description": "low | medium | high"
+          }
+        ],
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-retro\""
+          },
+          {
+            "field": "report_path",
+            "type": "string",
+            "description": "absolute path to saved retro report"
+          },
+          {
+            "field": "overall_score",
+            "type": "number",
+            "description": "total score out of 50"
+          },
+          {
+            "field": "top_issue",
+            "type": "string",
+            "description": "most impactful bottleneck identified"
+          },
+          {
+            "field": "patterns_promoted",
+            "type": "number",
+            "description": "new patterns added to patterns.json"
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 8192,
+      "warnings": [],
+      "size_bytes": 10871,
       "enabled": true
     },
     {
@@ -433,9 +3601,72 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "reference",
+          "name": "~/.ftm/routines/",
+          "required": true,
+          "description": "YAML routine definitions directory"
+        },
+        {
+          "type": "config",
+          "name": "~/.claude/ftm-config.yml",
+          "required": false,
+          "description": "model preferences for skill-type steps"
+        }
+      ],
+      "risk": {
+        "level": "medium_write",
+        "scope": "executes MCP tool calls, skill invocations, and bash commands as defined by the routine; external-facing mutations depend entirely on routine definition; approval gates in the routine control which steps require user confirmation",
+        "rollback": "depends on individual routine steps; steps with approval: approve gate let user review before execution; MCP writes (Jira, Slack, email) may not be reversible"
+      },
+      "approval_gates": [
+        {
+          "trigger": "routine step with approval: approve",
+          "action": "show plan for that step and wait for \"go\" before executing"
+        },
+        {
+          "trigger": "routine step with approval: review",
+          "action": "execute step, show results, wait for \"continue\" or \"stop\""
+        },
+        {
+          "trigger": "routine step with approval: none",
+          "action": "execute automatically and show results"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "plan_first (show full routine plan first)",
+        "large": "plan_first",
+        "xl": "always_ask"
+      },
+      "fallbacks": [
+        {
+          "condition": "routine YAML file not found",
+          "action": "show \"Routine not found\" with list of available routines from ~/.ftm/routines/"
+        },
+        {
+          "condition": "MCP tool referenced in routine not available",
+          "action": "report unavailable tool, ask user whether to skip that step or abort"
+        },
+        {
+          "condition": "skill referenced in routine not available",
+          "action": "report unavailable skill, ask user whether to skip or abort"
+        },
+        {
+          "condition": "bash command in step fails with non-zero exit",
+          "action": "report failure output, ask user whether to continue or abort"
+        }
+      ],
+      "capabilities": [],
+      "event_payloads": {
+        "(none)": []
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 3989,
+      "warnings": [],
+      "size_bytes": 5982,
       "enabled": true
     },
     {
@@ -449,10 +3680,115 @@
       "events_listens": [],
       "blackboard_reads": [],
       "blackboard_writes": [],
+      "requirements": [
+        {
+          "type": "tool",
+          "name": "gh",
+          "required": true,
+          "description": "GitHub CLI for querying releases from kkudumu/ftm-brain"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-upgrade/scripts/check-version.sh",
+          "required": true,
+          "description": "version check and cache script"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-upgrade/scripts/upgrade.sh",
+          "required": true,
+          "description": "download and install latest release script"
+        },
+        {
+          "type": "reference",
+          "name": "~/.claude/skills/ftm-version.txt",
+          "required": false,
+          "description": "locally installed version number"
+        }
+      ],
+      "risk": {
+        "level": "high_write",
+        "scope": "downloads and overwrites skill files in ~/.claude/skills/ on upgrade; changes affect all ftm skill behavior going forward; irreversible without restoring previous version from backup or git",
+        "rollback": "restore from ~/.claude/skills/ backup if one was made before upgrade; or reinstall specific version by downloading an older release tarball"
+      },
+      "approval_gates": [
+        {
+          "trigger": "UPGRADE_AVAILABLE detected",
+          "action": "show current and latest version with changelog URL, wait for explicit \"yes\" confirmation before running upgrade.sh"
+        },
+        {
+          "trigger": "version check during preamble (passive notice pattern)",
+          "action": "show one-line notice only, do NOT ask for confirmation or interrupt workflow"
+        }
+      ],
+      "complexity_routing": {
+        "micro": "auto",
+        "small": "auto",
+        "medium": "auto",
+        "large": "auto",
+        "xl": "auto"
+      },
+      "fallbacks": [
+        {
+          "condition": "gh not installed",
+          "action": "report \"GitHub CLI not installed\" with brew install gh instructions"
+        },
+        {
+          "condition": "no internet connection",
+          "action": "report \"Cannot reach GitHub. Check internet connection.\""
+        },
+        {
+          "condition": "kkudumu/ftm-brain repo not found",
+          "action": "report repo not found, suggest verifying access"
+        },
+        {
+          "condition": "no releases found",
+          "action": "report \"No releases found yet. Check back later.\""
+        },
+        {
+          "condition": "upgrade.sh exits non-zero",
+          "action": "report failure output, suggest running script manually"
+        }
+      ],
+      "capabilities": [
+        {
+          "type": "cli",
+          "name": "gh",
+          "required": true,
+          "description": "GitHub CLI for release queries and download"
+        },
+        {
+          "type": "cli",
+          "name": "bash",
+          "required": true,
+          "description": "for running check-version.sh and upgrade.sh"
+        }
+      ],
+      "event_payloads": {
+        "task_completed": [
+          {
+            "field": "skill",
+            "type": "string",
+            "description": "\"ftm-upgrade\""
+          },
+          {
+            "field": "action",
+            "type": "string",
+            "description": "\"check\" | \"upgrade\" | \"already_up_to_date\""
+          },
+          {
+            "field": "status",
+            "type": "string",
+            "description": "\"success\" | \"failed\" | \"up_to_date\" | \"check_failed\""
+          }
+        ]
+      },
       "references": [],
       "has_evals": false,
-      "size_bytes": 5206,
+      "warnings": [],
+      "size_bytes": 7482,
       "enabled": true
     }
-  ]
+  ],
+  "warnings": []
 }

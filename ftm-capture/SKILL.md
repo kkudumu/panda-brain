@@ -311,3 +311,60 @@ When capturing, always note the environment context:
 - **Always document**: Which APIs are used, what credentials are needed, what repo provides the client libraries.
 
 This prevents future sessions from trying to use APIs they don't have access to.
+
+## Requirements
+
+- reference: `~/.claude/ftm-state/blackboard/context.json` | required | current task and recent decisions for pattern extraction
+- reference: `~/.claude/eng-buddy/daily/{today}.md` | optional | daily log for completed items and tool calls
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | required | today's session experiences
+- reference: `~/.ftm/routines/` | optional | check for existing routines before creating new one
+- reference: `~/.claude/eng-buddy/playbooks/` | optional | check for existing playbooks before creating
+- reference: `~/Documents/Code/panda/docs/playbooks/` | optional | check for existing reference docs before creating
+
+## Risk
+
+- level: low_write
+- scope: writes YAML routine to ~/.ftm/routines/, JSON playbook to ~/.claude/eng-buddy/playbooks/, and Markdown reference doc to ~/Documents/Code/panda/docs/playbooks/; writes experience to blackboard; does not modify project source code
+- rollback: delete the three written artifact files; remove experience entry from blackboard experiences/
+
+## Approval Gates
+
+- trigger: existing artifact found for this workflow name | action: show existing vs new content, ask user to confirm update or create new version
+- trigger: Step 3 clarifying questions answered | action: proceed to write all three artifacts automatically (no additional gate)
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: blackboard context.json missing | action: ask user directly about the workflow to capture instead of reading from blackboard
+- condition: daily log missing or empty | action: skip daily log extraction, rely on conversation context and blackboard experiences
+- condition: ~/.ftm/routines/ directory doesn't exist | action: create directory before writing routine
+- condition: docs/playbooks/ directory doesn't exist | action: create directory before writing reference doc
+- condition: existing artifact found but cannot be parsed | action: treat as missing, create fresh artifact
+
+## Capabilities
+
+- mcp: none required directly (reads files and writes artifacts)
+- env: none required
+
+## Event Payloads
+
+### capture_complete
+- skill: string — "ftm-capture"
+- workflow_name: string — kebab-case name of captured workflow
+- routine_path: string — absolute path to written routine YAML
+- playbook_path: string — absolute path to written playbook JSON
+- reference_path: string — absolute path to written reference doc
+- phases_count: number — number of workflow phases captured
+- steps_count: number — total steps across all phases
+- known_issues_count: number — API gotchas encoded
+
+### experience_recorded
+- skill: string — "ftm-capture"
+- experience_path: string — path to written experience file
+- workflow_name: string — name of captured workflow
+
+### known_issue_recorded
+- skill: string — "ftm-capture"
+- workflow_name: string — workflow this issue belongs to
+- issue: string — issue name
+- fix: string — remediation approach encoded

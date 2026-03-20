@@ -193,3 +193,63 @@ After completing, update the blackboard:
    - Which patterns matched (to improve future scans)
 3. Update `experiences/index.json` with the new entry
 4. Emit `secrets_clear` or `secrets_remediated` or `secrets_blocked`
+
+## Requirements
+
+- tool: `git` | required | staged file inspection, commit history scanning
+- reference: `references/patterns/SECRET-PATTERNS.md` | required | Tier 1/2 patterns, severity table, ignore list
+- reference: `references/protocols/REMEDIATION.md` | required | remediation protocol, env var patterns, report formats
+- reference: `~/.claude/skills/ftm-git/scripts/pre-commit-secrets.sh` | required | pre-commit hook script for installation
+- reference: `~/.claude/skills/ftm-git/hooks/post-commit-experience.sh` | optional | post-commit experience recorder hook
+
+## Risk
+
+- level: medium_write
+- scope: modifies source files to replace hardcoded secrets with env var references; creates/updates .env and .env.example files; installs git hooks in .git/hooks/; re-stages files after remediation
+- rollback: git checkout on refactored source files; manually remove added .env and .gitignore entries; remove hook from .git/hooks/pre-commit
+
+## Approval Gates
+
+- trigger: CRITICAL or HIGH severity secret found | action: BLOCK commit/push immediately, announce "BLOCKED — N secret(s) found", then attempt auto-remediation
+- trigger: auto-remediation proposed for a finding | action: show proposed change (file, variable name, env var name) before applying
+- trigger: re-scan after remediation still finds secrets | action: report remaining findings to user, do not proceed with commit
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: .env file does not exist | action: create .env and .env.example and add .env to .gitignore before extracting secrets
+- condition: .gitignore does not exist | action: create .gitignore with .env entry before remediation
+- condition: language detection fails for env var pattern | action: extract secret to .env but flag source file refactoring as MANUAL_INTERVENTION_NEEDED
+- condition: pre-commit hook already exists | action: append ftm-git scan to existing hook rather than overwriting
+
+## Capabilities
+
+- cli: `git` | required | staged file listing, diff inspection, commit history traversal
+
+## Event Payloads
+
+### secrets_found
+- skill: string — "ftm-git"
+- findings_count: number — total secrets detected
+- critical_count: number — CRITICAL severity findings
+- high_count: number — HIGH severity findings
+- files_affected: string[] — files containing secrets
+- blocked: boolean — whether commit/push was halted
+
+### secrets_clear
+- skill: string — "ftm-git"
+- files_scanned: number — total files checked
+- scope: string — "staged" | "working_tree" | "history" | "pre-push"
+
+### secrets_remediated
+- skill: string — "ftm-git"
+- findings_remediated: number — secrets successfully extracted
+- env_vars_added: string[] — environment variable names created
+- files_refactored: string[] — source files updated to use env vars
+- manual_needed: number — findings requiring manual intervention
+
+### task_completed
+- skill: string — "ftm-git"
+- outcome: string — "clear" | "remediated" | "blocked"
+- files_scanned: number — total files scanned
+- duration_ms: number — total scan and remediation time

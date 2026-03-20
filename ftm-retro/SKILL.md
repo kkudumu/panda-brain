@@ -187,3 +187,57 @@ After completing, update:
 2. Write experience file to `~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json`
 3. Update `experiences/index.json` with the new entry
 4. Emit `task_completed`
+
+## Requirements
+
+- reference: `PROGRESS.md` | optional | executor progress log for auto-triggered mode
+- reference: `~/.claude/ftm-retros/` | optional | prior retro files for pattern analysis
+- reference: `references/protocols/SCORING-RUBRICS.md` | required | scoring scale breakpoints and evidence requirements
+- reference: `references/templates/REPORT-FORMAT.md` | required | retro report output template
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | experience inventory for micro-reflection mode
+- reference: `~/.claude/ftm-state/blackboard/patterns.json` | optional | pattern registry for promotion and decay
+
+## Risk
+
+- level: low_write
+- scope: writes retro report to ~/.claude/ftm-retros/; writes experience files to blackboard; promotes patterns to patterns.json; does not modify project source files
+- rollback: delete retro report file; remove experience entry from blackboard
+
+## Approval Gates
+
+- trigger: pattern promotion triggered (3+ matching experiences) | action: auto-promote to patterns.json without user gate (learning system behavior)
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: PROGRESS.md not found and manual mode | action: check ~/.claude/ftm-retros/ for most recent .md file; ask user which execution to review if multiple found
+- condition: execution context not provided by ftm-executor | action: reconstruct from PROGRESS.md or ask user for context
+- condition: scoring rubric file missing | action: apply built-in scoring heuristics from skill body
+- condition: experiences/index.json has fewer than 10 entries | action: cold-start mode — record every task, set all confidence to low
+
+## Capabilities
+
+- env: none required
+
+## Event Payloads
+
+### experience_recorded
+- skill: string — "ftm-retro"
+- experience_path: string — path to written experience file
+- task_type: string — type of task recorded
+- outcome: string — success | partial | failure
+- confidence: string — low | medium | high
+
+### pattern_discovered
+- skill: string — "ftm-retro"
+- pattern_name: string — name of the promoted pattern
+- category: string — codebase_insights | execution_patterns | user_behavior | recurring_issues
+- occurrence_count: number — number of experiences that triggered promotion
+- confidence: string — low | medium | high
+
+### task_completed
+- skill: string — "ftm-retro"
+- report_path: string — absolute path to saved retro report
+- overall_score: number — total score out of 50
+- top_issue: string — most impactful bottleneck identified
+- patterns_promoted: number — new patterns added to patterns.json

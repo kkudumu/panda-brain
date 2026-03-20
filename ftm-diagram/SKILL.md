@@ -231,3 +231,47 @@ Read and display `ARCHITECTURE.mmd` + list available module diagrams.
 ### Auto-Invocation by ftm-executor
 
 This skill's format is used by ftm-executor's documentation pipeline. After every commit during plan execution, agents update INTENT.md (or DIAGRAM.mmd) entries following this skill's templates. The updates are automatic and don't require explicit skill invocation — agents reference the format directly.
+
+## Requirements
+
+- reference: `.ftm-map/map.db` | optional | SQLite knowledge graph for accurate diagram generation (graph-powered mode)
+- tool: `ftm-map/scripts/.venv/bin/python3` | optional | Python runtime for graph-powered views.py
+- reference: `package.json` | optional | project structure detection for bootstrap
+- reference: `tsconfig.json` | optional | TypeScript project structure detection
+
+## Risk
+
+- level: low_write
+- scope: writes .mmd diagram files to project directories; only creates or modifies ARCHITECTURE.mmd and per-module DIAGRAM.mmd files; does not touch source code
+- rollback: git checkout on modified .mmd files; delete newly created .mmd files
+
+## Approval Gates
+
+- trigger: bootstrap mode on large codebase (50+ modules) | action: report what was found and what will be created before writing, proceed unless user objects
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: .ftm-map/map.db not found | action: fall back to standard import-grep analysis for diagram generation
+- condition: Python venv not set up | action: fall back to standard analysis, log "Graph-powered mode unavailable — run ftm-map to enable"
+- condition: no src/ or identifiable source root | action: ask user for source root before bootstrapping
+
+## Capabilities
+
+- cli: `ftm-map/scripts/.venv/bin/python3` | optional | graph-powered diagram generation
+- mcp: `git` | optional | detect changed files for incremental updates
+
+## Event Payloads
+
+### documentation_updated
+- skill: string — "ftm-diagram"
+- files_written: string[] — absolute paths to .mmd files created or modified
+- modules_added: number — new module nodes added to ARCHITECTURE.mmd
+- functions_added: number — new function nodes added across module DIAGRAMs
+- edges_added: number — new dependency edges added
+
+### task_completed
+- skill: string — "ftm-diagram"
+- mode: string — "bootstrap" | "incremental"
+- files_count: number — total .mmd files written
+- duration_ms: number — total diagram sync duration

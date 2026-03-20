@@ -118,6 +118,40 @@ Average plan modifications: 1.2 per plan
 - Keep output concise — one screen max
 - If data sources are empty (fresh install), show: "No data yet. Use FTM for a few sessions and check back."
 
+## Requirements
+
+- reference: `~/.claude/ftm-state/events.log` | optional | JSONL event log for skill invocation tracking
+- reference: `~/.claude/ftm-state/blackboard/context.json` | required | current session metadata
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | experience inventory and counts
+- reference: `~/.claude/ftm-state/blackboard/patterns.json` | optional | pattern health for weekly stats
+- reference: `~/.ftm/playbooks/` | optional | playbook use counts and stats
+
+## Risk
+
+- level: read_only
+- scope: reads event log and blackboard state only; does not modify any files
+- rollback: no mutations to reverse
+
+## Approval Gates
+
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: events.log missing or empty | action: show "No session events recorded yet" for relevant sections
+- condition: blackboard context.json missing | action: show "No session data available" and suggest using FTM skills first
+- condition: experiences/index.json missing | action: skip experience stats sections
+- condition: playbooks directory missing | action: show 0 for all playbook stats
+
+## Capabilities
+
+- env: none required
+
+## Event Payloads
+
+### (none)
+ftm-dashboard is read-only and does not emit events directly. It listens to task_completed for session tracking only.
+
 ## Events
 
 ### Listens To

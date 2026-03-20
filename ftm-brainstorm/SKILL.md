@@ -377,3 +377,54 @@ After completing, update:
 3. Update `experiences/index.json` with the new entry
 4. Emit `plan_generated` with `{ plan_path, plan_title, task_count, wave_count }` (if Phase 3 completed)
 5. Emit `task_completed` with `{ task_title, plan_path, duration_ms }`
+
+## Requirements
+
+- config: `~/.claude/ftm-config.yml` | optional | model profile for planning agents
+- reference: `references/agent-prompts.md` | required | research agent prompt templates
+- reference: `references/plan-template.md` | required | plan document generation template
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state and active constraints
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | past brainstorm lessons
+- reference: `~/.claude/ftm-state/blackboard/patterns.json` | optional | execution and user behavior patterns
+
+## Risk
+
+- level: low_write
+- scope: writes plan documents to ~/.claude/plans/; writes blackboard context and experience files; does not modify project source code
+- rollback: delete generated plan file; blackboard writes can be reverted by editing JSON files
+
+## Approval Gates
+
+- trigger: Phase 3 plan generation ready | action: present "Here's what I think we've landed on" summary and wait for explicit user approval before generating plan
+- trigger: plan document generated | action: present plan incrementally (vision → tasks → agents/waves) and get approval at each step
+- trigger: research returns thin results on all agents | action: note research gaps, present fewer suggestions, do not fabricate citations
+- complexity_routing: micro → auto | small → auto | medium → plan_first | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: ftm-researcher not available | action: dispatch 3 direct parallel research agents (web/github/competitive) using built-in prompts from references/agent-prompts.md
+- condition: no git repo detected in Phase 0 | action: skip repo scan, ask about tech stack during intake
+- condition: blackboard missing or empty | action: proceed without experience-informed shortcuts, rely on direct analysis
+- condition: ftm-config.yml missing | action: use session default model for all agents
+
+## Capabilities
+
+- mcp: `WebSearch` | optional | web research agents use for blog posts and case studies
+- mcp: `WebFetch` | optional | GitHub exploration and competitive analysis
+- mcp: `sequential-thinking` | optional | complex trade-off analysis during synthesis
+- env: none required
+
+## Event Payloads
+
+### plan_generated
+- skill: string — "ftm-brainstorm"
+- plan_path: string — absolute path to generated plan file
+- plan_title: string — human-readable plan title
+- task_count: number — total tasks in the plan
+- wave_count: number — number of parallel execution waves
+
+### task_completed
+- skill: string — "ftm-brainstorm"
+- task_title: string — title of the brainstorm topic
+- plan_path: string | null — path to generated plan if Phase 3 completed
+- duration_ms: number — total session duration

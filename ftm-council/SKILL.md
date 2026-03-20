@@ -130,3 +130,59 @@ After completing, update the blackboard:
 2. Write an experience file to `~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json` capturing decision domain, verdict, round reached, dissent summary, and whether the verdict held up
 3. Update `~/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
 4. Emit `task_completed` event
+
+## Requirements
+
+- tool: `codex` | required | Codex CLI for independent peer investigation
+- tool: `gemini` | required | Gemini CLI for independent peer investigation
+- reference: `references/protocols/PREREQUISITES.md` | required | availability check, fallback logic, timeout config
+- reference: `references/protocols/STEP-0-FRAMING.md` | required | problem framing format
+- reference: `references/prompts/CLAUDE-INVESTIGATION.md` | required | Claude investigation prompt template
+- reference: `references/prompts/CODEX-INVESTIGATION.md` | required | Codex investigation prompt template
+- reference: `references/prompts/GEMINI-INVESTIGATION.md` | required | Gemini investigation prompt template
+- reference: `references/prompts/REBUTTAL-TEMPLATE.md` | required | rebuttal round prompt template
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state
+
+## Risk
+
+- level: read_only
+- scope: reads codebase for independent investigation; does not modify source files; writes blackboard experience after verdict
+- rollback: no source mutations; blackboard write can be reverted by editing JSON files
+
+## Approval Gates
+
+- trigger: council prompt framed in Step 0 | action: show framed prompt to user and wait for confirmation before dispatching to council
+- trigger: 2-of-3 majority reached | action: present verdict summary to user and ask if they want to proceed or dig into dissent
+- trigger: auto-invocation by ftm-executor (INTENT.md conflict) | action: skip user framing confirmation, run immediately and return structured COUNCIL VERDICT to caller
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: codex CLI not found | action: report missing dependency with install instructions and stop (do not run degraded council)
+- condition: gemini CLI not found | action: report missing dependency with install instructions and stop
+- condition: no majority after 5 rounds | action: synthesize final positions, highlight core tension, present 2-3 concrete options for user decision
+- condition: model times out during a round | action: note timeout for that model, continue round with remaining models' responses
+
+## Capabilities
+
+- cli: `codex` | required | OpenAI Codex CLI peer reviewer
+- cli: `gemini` | required | Google Gemini CLI peer reviewer
+- env: `OPENAI_API_KEY` | required | for Codex CLI authentication
+- env: `GEMINI_API_KEY` | required | for Gemini CLI authentication
+
+## Event Payloads
+
+### review_complete
+- skill: string — "ftm-council"
+- verdict: string — "update_intent" | "revert_fix" | "option_a" | "option_b" | custom decision
+- round: number — round in which majority was reached (1-5, or 5+ for synthesis)
+- agreed_by: string[] — which models agreed on the verdict
+- dissent: string | null — summary of dissenting position
+- reasoning: string — why the majority won
+
+### task_completed
+- skill: string — "ftm-council"
+- decision_domain: string — topic the council deliberated on
+- verdict: string — final decision
+- round: number — rounds taken to reach verdict
+- duration_ms: number — total deliberation time

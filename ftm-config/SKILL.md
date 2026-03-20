@@ -308,3 +308,38 @@ If the YAML cannot be parsed, the skill will back up the broken file as `~/.clau
 
 ### Changes not taking effect
 Other ftm skills read the config at startup. If a ftm skill is already running, it will use the config that was active when it started. Changes apply to the next invocation.
+
+## Requirements
+
+- config: `~/.claude/ftm-config.yml` | optional | main config file (created with defaults if missing)
+
+## Risk
+
+- level: low_write
+- scope: reads and writes ~/.claude/ftm-config.yml only; backs up malformed config to ftm-config.yml.bak before overwriting; no project files touched
+- rollback: restore from ~/.claude/ftm-config.yml.bak or delete the file to reset to defaults on next invocation
+
+## Approval Gates
+
+- trigger: reset command issued | action: show current config and ask "Proceed?" before restoring defaults
+- trigger: invalid model name or profile name provided | action: reject with clear error showing valid options, do not write
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: ftm-config.yml missing | action: create file with default balanced profile and all defaults
+- condition: ftm-config.yml malformed YAML | action: back up as ftm-config.yml.bak, create fresh default config
+- condition: invalid model or profile value provided | action: reject and show valid options without writing
+
+## Capabilities
+
+- env: none required
+
+## Event Payloads
+
+### task_completed
+- skill: string — "ftm-config"
+- action: string — "display" | "set_profile" | "set_value" | "reset" | "show_profiles" | "show_skills"
+- changed_key: string | null — dotted path of changed setting
+- old_value: string | null — value before change
+- new_value: string | null — value after change

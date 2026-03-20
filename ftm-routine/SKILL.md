@@ -132,3 +132,39 @@ Create accounts → set permissions → send welcome email → schedule onboardi
 
 ### incident-response
 Check Sentry → check logs → notify channel → create Jira ticket → start investigation
+
+## Requirements
+
+- reference: `~/.ftm/routines/` | required | YAML routine definitions directory
+- config: `~/.claude/ftm-config.yml` | optional | model preferences for skill-type steps
+
+## Risk
+
+- level: medium_write
+- scope: executes MCP tool calls, skill invocations, and bash commands as defined by the routine; external-facing mutations depend entirely on routine definition; approval gates in the routine control which steps require user confirmation
+- rollback: depends on individual routine steps; steps with approval: approve gate let user review before execution; MCP writes (Jira, Slack, email) may not be reversible
+
+## Approval Gates
+
+- trigger: routine step with approval: approve | action: show plan for that step and wait for "go" before executing
+- trigger: routine step with approval: review | action: execute step, show results, wait for "continue" or "stop"
+- trigger: routine step with approval: none | action: execute automatically and show results
+- complexity_routing: micro → auto | small → auto | medium → plan_first (show full routine plan first) | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: routine YAML file not found | action: show "Routine not found" with list of available routines from ~/.ftm/routines/
+- condition: MCP tool referenced in routine not available | action: report unavailable tool, ask user whether to skip that step or abort
+- condition: skill referenced in routine not available | action: report unavailable skill, ask user whether to skip or abort
+- condition: bash command in step fails with non-zero exit | action: report failure output, ask user whether to continue or abort
+
+## Capabilities
+
+- mcp: various | optional | determined by individual routine definitions
+- cli: various | optional | bash steps in routine definitions
+- env: none required directly
+
+## Event Payloads
+
+### (none)
+ftm-routine does not emit its own events. Events are emitted by the MCPs and skills invoked during routine execution.

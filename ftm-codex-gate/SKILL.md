@@ -300,3 +300,62 @@ When returning an error before Codex runs:
 ### Remaining Issues
 - [error detail]
 ```
+
+## Requirements
+
+- tool: `codex` | required | OpenAI Codex CLI for adversarial validation
+- reference: `{project_root}/INTENT.md` | optional | root intent documentation for conflict detection
+- reference: `{project_root}/STYLE.md` | optional | code style standards for quality enforcement
+- reference: module-level `INTENT.md` files | optional | per-module intent for targeted conflict detection
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | prior validation patterns
+
+## Risk
+
+- level: medium_write
+- scope: Codex modifies source files and commits fixes directly in the project working directory (--yolo mode); writes entries to DEBUG.md; writes structured output to /tmp/codex-result-*.md
+- rollback: git revert codex fix commits; delete /tmp/codex-result-*.md cleanup is automatic
+
+## Approval Gates
+
+- trigger: codex gate returns PASS_WITH_FIXES and INTENT.md conflict detected | action: auto-invoke ftm-council for arbitration before accepting or reverting the fix
+- trigger: codex gate returns FAIL after 2 fix attempts | action: report remaining issues to ftm-executor caller, wait for direction
+- trigger: codex CLI not found | action: return FAIL immediately with install instructions, do not proceed
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: codex CLI not installed | action: return FAIL with "Codex CLI not found. Install with: npm install -g @openai/codex"
+- condition: codex times out after 600s | action: read partial output if available, return PARTIAL results with note; if no output, return FAIL
+- condition: output file empty or missing | action: return FAIL with "Codex output not found — may have crashed"
+- condition: INTENT.md missing at project root | action: note in prompt to Codex and continue without INTENT validation
+- condition: STYLE.md missing | action: note in prompt to Codex and continue without style enforcement
+
+## Capabilities
+
+- cli: `codex` | required | OpenAI Codex CLI (npm install -g @openai/codex)
+- env: `OPENAI_API_KEY` | required | authentication for Codex CLI execution
+
+## Event Payloads
+
+### review_complete
+- skill: string — "ftm-codex-gate"
+- mode: string — "wave" | "single-task"
+- status: string — "PASS" | "PASS_WITH_FIXES" | "FAIL"
+- tests_formed: number — adversarial test scenarios generated
+- tests_passed: number — test scenarios that passed
+- fixes_applied: number — fixes committed by Codex
+- quality_issues: number — style/quality violations found
+- intent_conflicts: number — INTENT.md conflicts detected
+
+### issue_found
+- skill: string — "ftm-codex-gate"
+- file_path: string — file where issue was found
+- line: number | null — line number if available
+- description: string — issue description
+- type: string — "test_failure" | "quality_violation" | "intent_conflict"
+
+### task_completed
+- skill: string — "ftm-codex-gate"
+- status: string — "PASS" | "PASS_WITH_FIXES" | "FAIL"
+- output_file: string — path to Codex result file

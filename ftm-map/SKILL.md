@@ -207,3 +207,53 @@ After `map_updated` or session end:
 - Stay in your worktree.
 - ALWAYS use the venv python (`ftm-map/scripts/.venv/bin/python3`), never the system python.
 - For query mode, ALWAYS run `setup.sh` first if `.venv` does not exist.
+
+## Requirements
+
+- tool: `ftm-map/scripts/.venv/bin/python3` | required | Python with tree-sitter and SQLite bindings
+- tool: `ftm-map/scripts/setup.sh` | required | virtualenv and dependency installer
+- tool: `ftm-map/scripts/index.py` | required | bootstrap and incremental indexer
+- tool: `ftm-map/scripts/query.py` | required | blast radius, dependency, and FTS5 search queries
+- tool: `ftm-map/scripts/views.py` | required | INTENT.md and .mmd diagram generation from graph
+- tool: `git` | optional | changed file detection for incremental mode
+- config: `~/.claude/ftm-config.yml` | optional | model profile and skills.ftm-map.enabled flag
+
+## Risk
+
+- level: low_write
+- scope: writes and updates .ftm-map/map.db SQLite database; does not modify any project source files; also writes blackboard experience entry
+- rollback: delete .ftm-map/map.db to reset to unindexed state; re-run bootstrap to rebuild
+
+## Approval Gates
+
+- trigger: bootstrap requested on very large codebase (1000+ files) | action: report estimated file count before running, proceed unless user objects
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: .venv does not exist | action: run setup.sh first to create it before proceeding
+- condition: tree-sitter binary missing | action: run setup.sh to install dependencies
+- condition: .ftm-map/map.db missing when query requested | action: explain graph not indexed, offer to run bootstrap
+- condition: git not available for incremental changed-file detection | action: fall back to indexing all modified files detected from disk timestamps
+
+## Capabilities
+
+- cli: `ftm-map/scripts/.venv/bin/python3` | required | tree-sitter parsing and SQLite operations
+- cli: `git` | optional | changed file detection for incremental indexing
+
+## Event Payloads
+
+### map_updated
+- skill: string — "ftm-map"
+- project_path: string — absolute path to indexed project
+- symbols_count: number — total symbols in the graph
+- edges_count: number — total dependency edges
+- files_parsed: number — files processed in this operation
+- duration_ms: number — indexing duration
+- mode: string — "bootstrap" | "incremental"
+
+### task_completed
+- skill: string — "ftm-map"
+- operation: string — "bootstrap" | "incremental" | "query"
+- query_type: string | null — "blast-radius" | "deps" | "search" | "info" (for query mode)
+- duration_ms: number — total operation duration

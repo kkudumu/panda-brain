@@ -144,3 +144,72 @@ After completing:
 ## Report Format
 
 See `references/templates/REPORT-FORMAT.md` for the full report template (summary, changelog table, layer-by-layer finding format with examples).
+
+## Requirements
+
+- tool: `knip` | optional | static dead-code and unused-export analysis (Layer 1)
+- tool: `node` | required | runtime for knip via npx
+- config: `knip.config.ts` | optional | custom knip configuration at project root
+- reference: `references/protocols/PROJECT-PATTERNS.md` | required | framework detection table and dimension activation matrix
+- reference: `references/strategies/AUTO-FIX-STRATEGIES.md` | required | fix actions by finding type
+- reference: `references/protocols/WIRING-CONTRACTS.md` | optional | wiring contract schema for plan-driven audits
+- reference: `references/protocols/RUNTIME-WIRING.md` | optional | runtime verification protocol
+- reference: `references/templates/REPORT-FORMAT.md` | required | structured report template
+- tool: `$HOME/.claude/skills/ftm-browse/bin/ftm-browse` | optional | runtime wiring verification via browser (Phase 3)
+
+## Risk
+
+- level: medium_write
+- scope: modifies source files to fix wiring issues (auto-fix layer); also adds/removes imports and route registrations; reads codebase broadly
+- rollback: git checkout on auto-fixed files; all changes are tracked in the changelog report before being applied
+
+## Approval Gates
+
+- trigger: auto-fix proposed for a finding | action: report proposed change before applying (show "Proposed: ..." format)
+- trigger: finding flagged MANUAL_INTERVENTION_NEEDED | action: surface to user with suggested action, do not auto-fix
+- trigger: re-verification still fails after 3 iterations | action: stop and report remaining issues to user
+- complexity_routing: micro → auto | small → auto | medium → plan_first | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: knip not installed and npx unavailable | action: skip Layer 1, run Layer 2 adversarial audit only
+- condition: no package.json found | action: skip knip entirely, run adversarial audit only
+- condition: ftm-browse not installed | action: skip Phase 3 runtime wiring check, log reason and continue
+- condition: dev server not running | action: skip Phase 3 runtime wiring check, log reason and continue
+- condition: wiring contracts absent | action: run pure Layer 1 + Layer 2 analysis without contract checking
+- condition: project has no identifiable entry point | action: skip knip, run adversarial audit only
+
+## Capabilities
+
+- cli: `knip` | optional | dead code detection via npx knip
+- cli: `node` | required | JavaScript runtime for npx
+- cli: `$HOME/.claude/skills/ftm-browse/bin/ftm-browse` | optional | headless browser for runtime wiring
+- mcp: `git` | optional | diff scope for Layer 2 adversarial audit
+
+## Event Payloads
+
+### audit_complete
+- skill: string — "ftm-audit"
+- findings_count: number — total issues found across all layers
+- auto_fixed_count: number — issues auto-remediated by Layer 3
+- manual_count: number — issues requiring manual intervention
+- scope: string[] — file paths audited
+- duration_ms: number — total audit duration
+- layers_run: string[] — which layers executed (e.g., ["layer1", "layer2", "layer3"])
+
+### issue_found
+- skill: string — "ftm-audit"
+- layer: string — "layer1" | "layer2" | "layer3"
+- dimension: string — D1 | D2 | D3 | D4 | D5 (for Layer 2 findings)
+- finding_type: string — exports | types | duplicates | UNWIRED_COMPONENT | etc.
+- file_path: string — affected file
+- symbol: string — affected symbol name
+- severity: string — CRITICAL | HIGH | MEDIUM | LOW
+- auto_fixable: boolean — whether Layer 3 can fix this automatically
+
+### task_completed
+- skill: string — "ftm-audit"
+- result: string — "pass" | "pass_with_fixes" | "fail"
+- findings_count: number — total findings
+- auto_fixed_count: number — auto-remediated count
+- manual_count: number — manual intervention needed

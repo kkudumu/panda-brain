@@ -218,3 +218,58 @@ The following state is persisted for pause/resume support:
 - `ftm-researcher/references/council-integration.md` — ftm-council interface + fallback challenger prompts
 - `ftm-researcher/scripts/score_credibility.py` — Source credibility scoring
 - `ftm-researcher/scripts/validate_research.py` — Research output validation
+
+## Requirements
+
+- config: `~/.claude/ftm-config.yml` | optional | planning and review model profiles, per_skill_overrides.ftm-researcher agent cap
+- reference: `ftm-researcher/references/agent-prompts.md` | required | 7 finder agent prompts and orchestrator decomposition protocol
+- reference: `ftm-researcher/references/synthesis-pipeline.md` | required | 5-phase synthesis pipeline
+- reference: `ftm-researcher/references/adaptive-search.md` | optional | wave 2 adaptive refinement (deep mode only)
+- reference: `ftm-researcher/references/output-format.md` | required | JSON schema and markdown template
+- reference: `ftm-researcher/references/council-integration.md` | optional | ftm-council interface (deep mode only)
+- reference: `~/.claude/ftm-blackboard/context.json` | optional | session state
+- reference: `~/.claude/ftm-blackboard/patterns.json` | optional | recurring research patterns
+
+## Risk
+
+- level: read_only
+- scope: reads web sources and local codebase via agents; writes blackboard experience entry; writes structured JSON artifact; does not modify project source files
+- rollback: no project mutations; blackboard write can be reverted by editing JSON files
+
+## Approval Gates
+
+- trigger: research complete and user says "done" / "thanks" | action: finalize, write blackboard, emit events
+- trigger: deep mode and ftm-council invoked | action: council runs automatically on top claims (no user gate needed for this step)
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: ftm-council not available (deep mode) | action: use 2 fallback challenger agents (Devil's Advocate + Edge Case Hunter) instead
+- condition: agent cap exceeded | action: queue excess agents and dispatch after current wave completes
+- condition: research agent returns no findings | action: broaden query and retry; if still empty, report "No prior art found — this may be novel"
+- condition: blackboard missing | action: proceed without experience-informed shortcuts
+
+## Capabilities
+
+- mcp: `WebSearch` | optional | finder agents for web, GitHub, and competitive research
+- mcp: `WebFetch` | optional | fetching specific URLs found during research
+- mcp: `sequential-thinking` | optional | complex synthesis and reconciliation
+
+## Event Payloads
+
+### research_complete
+- skill: string — "ftm-researcher"
+- query: string — original research question
+- mode: string — "quick" | "standard" | "deep"
+- findings_count: number — total normalized findings
+- consensus_count: number — findings with 3+ agent agreement
+- contested_count: number — findings with council disagreement
+- unique_count: number — single-agent findings
+- sources_count: number — total sources cited
+- council_used: boolean — whether ftm-council was invoked
+- duration_ms: number — total research duration
+
+### task_completed
+- skill: string — "ftm-researcher"
+- task_title: string — research topic title
+- duration_ms: number — total session duration including iterations

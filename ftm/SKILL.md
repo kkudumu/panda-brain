@@ -88,3 +88,35 @@ Or just describe what you need and ftm-mind will handle it.
 - Do not attempt to do the work yourself — route only.
 - Be fast — decisive routing, not conversation.
 - Case insensitive matching for all prefix detection.
+
+## Requirements
+
+- config: `~/.claude/ftm-config.yml` | optional | legacy_router_fallback setting
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state for blackboard update on routing
+- tool: none beyond skill invocation mechanism
+
+## Risk
+
+- level: read_only
+- scope: reads blackboard context.json and updates session_metadata.skills_invoked before routing; does not modify any project files
+- rollback: no mutations to reverse; blackboard update is a metadata append
+
+## Approval Gates
+
+- trigger: ftm-mind failure AND legacy_router_fallback enabled | action: fall back to keyword routing automatically (no user gate needed)
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: ftm-mind fails or times out | action: check legacy_router_fallback in ftm-config.yml; if true, use keyword matching; if false, report failure
+- condition: blackboard context.json missing | action: skip blackboard update, proceed with routing
+- condition: skill tool unavailable for target skill | action: report routing failure to user with the target skill name
+
+## Capabilities
+
+- env: none required
+
+## Event Payloads
+
+### (none)
+ftm is a pure router and does not emit events directly. Events are emitted by the target skill after routing.

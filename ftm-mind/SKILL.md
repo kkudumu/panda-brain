@@ -979,3 +979,58 @@ Avoid these failures:
 6. Read before write.
 7. Session trajectory matters.
 8. The best route is often no route at all.
+
+## Requirements
+
+- tool: `git` | required | codebase state inspection (git status, git log)
+- config: `~/.claude/ftm-config.yml` | optional | approval_mode, execution preferences
+- reference: `~/.claude/skills/ftm-mind/references/mcp-inventory.md` | required | MCP capability routing table
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state and preferences
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | experience retrieval index
+- reference: `~/.claude/ftm-state/blackboard/patterns.json` | optional | promoted patterns for orientation
+
+## Risk
+
+- level: low_write
+- scope: writes blackboard context and experience files; local code edits only on micro/small direct tasks; routes to other skills for larger work
+- rollback: blackboard writes can be reverted by editing JSON files; no destructive mutations performed directly
+
+## Approval Gates
+
+- trigger: task_size >= medium AND involves external systems | action: present numbered plan and wait for explicit user approval
+- trigger: any external mutation (Okta, Freshservice, Jira, Slack, email, calendar, S3, deploys, git push) | action: present phase-level approval request before executing each mutation
+- trigger: task_size == small AND approval_mode == always_ask | action: show pre-flight summary before proceeding
+- complexity_routing: micro → auto | small → auto (pre-flight summary if plan_first) | medium → plan_first | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: blackboard context.json missing or malformed | action: treat as empty state, proceed at full capability using live observation
+- condition: experiences/index.json empty or no matching entries | action: skip experience retrieval, lean on current repo state and direct inspection
+- condition: patterns.json missing | action: skip pattern application, rely on direct analysis
+- condition: ftm-config.yml missing | action: default to plan_first approval_mode and balanced model profile
+- condition: mcp-inventory.md missing | action: rely on built-in MCP routing heuristics from skill body
+- condition: requested ftm skill unavailable | action: notify user and attempt direct handling or alternate routing
+
+## Capabilities
+
+- mcp: `git` | optional | codebase state, diffs, history, commits
+- mcp: `mcp-atlassian-personal` | optional | Jira/Confluence reads for ticket-driven work
+- mcp: `slack` | optional | Slack context reads, draft messages
+- mcp: `gmail` | optional | email reads, drafts
+- mcp: `google-calendar` | optional | calendar inspection for scheduling requests
+- mcp: `freshservice-mcp` | optional | IT ticketing reads
+- mcp: `sequential-thinking` | optional | multi-step reflective reasoning
+- mcp: `playwright` | optional | browser automation for visual tasks
+- mcp: `glean_default` | optional | internal company knowledge search
+- mcp: `context7` | optional | external library documentation
+- env: none required
+
+## Event Payloads
+
+### task_completed
+- skill: string — "ftm-mind"
+- task_type: string — detected task type (feature, bug, refactor, investigation, etc.)
+- task_size: string — micro | small | medium | large
+- route: string — direct | skill name routed to
+- duration_ms: number — time from observe to act completion
+- blackboard_updated: boolean — whether context.json and experience were written

@@ -655,3 +655,100 @@ After completing, update the blackboard:
 2. Write an experience file to `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json` capturing task_type, agent team used, wave count, audit outcomes, and lessons learned
 3. Update `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
 4. Emit `task_completed` event
+
+## Requirements
+
+- tool: `git` | required | worktree creation, branch management, commit operations
+- config: `~/.claude/ftm-config.yml` | optional | model profiles, max_parallel_agents, auto_audit, progress_tracking
+- reference: `~/.claude/plans/` | optional | plan documents for execution
+- tool: `node` | optional | project setup commands in worktrees
+- reference: `~/.claude/skills/ftm-executor/references/STYLE-TEMPLATE.md` | optional | STYLE.md bootstrap template
+
+## Risk
+
+- level: high_write
+- scope: creates git worktrees and branches, modifies source files across multiple tasks, runs tests and builds, optionally pushes branches or creates PRs
+- rollback: git worktree remove + git branch -D for each worktree; all changes isolated to plan-exec/* branches until explicitly merged
+
+## Approval Gates
+
+- trigger: no plan document provided | action: generate plan and wait for explicit user approval before any code is written
+- trigger: plan_checker returns FAIL | action: present blockers and ask user to fix or override before proceeding
+- trigger: plan_checker returns WARN | action: show warnings to user, proceed unless they object
+- trigger: wave complete and all agents done | action: auto-invoke ftm-codex-gate (no user gate needed for this step)
+- trigger: final phase 6 verification passes | action: present 4 branch finishing options and wait for explicit user choice
+- trigger: codex gate FAIL after 2 fix attempts | action: report to user and wait for input before continuing
+- complexity_routing: micro → auto | small → auto | medium → plan_first | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: ftm-browse not installed at $HOME/.claude/skills/ftm-browse/bin/ftm-browse | action: skip visual smoke test checks, log "Visual smoke test skipped — ftm-browse not installed"
+- condition: ftm-retro skill not available | action: skip retrospective phase, note in output and proceed to branch finishing
+- condition: codex CLI not found | action: skip codex gate, log "Codex gate skipped — codex not installed", proceed to next wave
+- condition: no package.json in project | action: skip npm install in worktree setup; skip knip-based audit layers
+- condition: project has no test suite | action: skip test verification gates, rely on diff review and build checks
+- condition: agent fails or gets stuck | action: read agent output, fix directly or respawn with more context
+
+## Capabilities
+
+- cli: `git` | required | worktree management and version control
+- cli: `node` | optional | project dependency installation
+- mcp: `sequential-thinking` | optional | complex dependency analysis and plan validation
+- env: none required directly (agents inherit from session)
+
+## Event Payloads
+
+### task_received
+- skill: string — "ftm-executor"
+- task_description: string — description of the task being queued
+- plan_path: string — absolute path to plan document
+
+### plan_generated
+- skill: string — "ftm-executor"
+- plan_path: string — absolute path to saved plan file
+- task_count: number — total tasks in the plan
+- wave_count: number — number of parallel execution waves
+
+### plan_approved
+- skill: string — "ftm-executor"
+- plan_path: string — absolute path to approved plan
+- approved_steps: number[] — step numbers approved for execution
+
+### code_changed
+- skill: string — "ftm-executor"
+- worktree: string — path to the worktree where files changed
+- files: string[] — list of modified file paths
+- agent: string — agent type that made the changes
+
+### code_committed
+- skill: string — "ftm-executor"
+- worktree: string — path to worktree
+- commit_hash: string — short commit hash
+- message: string — commit message
+- task_number: number — plan task number this commit belongs to
+
+### test_passed
+- skill: string — "ftm-executor"
+- scope: string — "task" | "full_suite"
+- task_number: number | null — task number if scoped to task
+- worktree: string — worktree path
+
+### test_failed
+- skill: string — "ftm-executor"
+- scope: string — "task" | "full_suite"
+- task_number: number | null — task number if scoped
+- worktree: string — worktree path
+- error_summary: string — brief description of failure
+
+### task_completed
+- skill: string — "ftm-executor"
+- task_number: number — completed task number
+- audit_result: string — "pass" | "pass_with_fixes" | "fail" | "skipped"
+- auto_fixed_count: number — issues auto-remediated by ftm-audit
+- duration_ms: number — task execution time
+
+### error_encountered
+- skill: string — "ftm-executor"
+- phase: string — execution phase where error occurred
+- task_number: number | null — associated task if applicable
+- error: string — error description

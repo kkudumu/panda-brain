@@ -144,3 +144,87 @@ After completing, update the blackboard. Read `references/protocols/BLACKBOARD.m
 Before dispatching agents, read `~/.claude/ftm-config.yml`:
 - Use the `planning` model from the active profile for all investigation agents
 - If config missing, use session default
+
+## Requirements
+
+- config: `~/.claude/ftm-config.yml` | optional | model profiles for investigation agents
+- reference: `references/protocols/BLACKBOARD.md` | required | blackboard read/write protocol
+- reference: `references/protocols/EDGE-CASES.md` | required | anti-patterns and fallback handling
+- reference: `references/phases/PHASE-0-INTAKE.md` | required | intake steps and Explore agent prompt
+- reference: `references/phases/PHASE-1-TRIAGE.md` | required | agent selection guide and worktree strategy
+- reference: `references/phases/PHASE-2-WAR-ROOM-AGENTS.md` | required | all four agent prompts
+- reference: `references/phases/PHASE-3-TO-6-EXECUTION.md` | required | synthesis, solver, reviewer prompts
+- tool: `git` | required | worktree creation, diff inspection, commit history
+- reference: `~/.claude/ftm-state/blackboard/context.json` | optional | session state
+- reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | optional | past bug fixes and known issues
+- reference: `~/.claude/ftm-state/blackboard/patterns.json` | optional | recurring failure patterns
+
+## Risk
+
+- level: medium_write
+- scope: creates git worktrees for investigation and fix branches; modifies source files in Solver agent worktree; merges fix after Reviewer approval
+- rollback: git worktree remove + git branch -D for debug/* worktrees; all fix changes isolated until user confirms merge
+
+## Approval Gates
+
+- trigger: investigation plan formulated in Phase 0 | action: present plan to user and proceed unless user objects
+- trigger: Solver produces fix | action: Reviewer agent must independently verify before presenting to user (hard gate — cannot skip)
+- trigger: Reviewer APPROVED | action: present root cause + changes + evidence to user, wait for user confirmation before merging
+- trigger: Solver NEEDS REWORK after 3 attempts | action: escalate to user with full context, wait for direction
+- complexity_routing: micro → auto | small → auto | medium → plan_first | large → plan_first | xl → always_ask
+
+## Fallbacks
+
+- condition: Instrumenter agent fails or produces no useful output | action: skip instrumentation worktree, proceed with remaining agents
+- condition: Reproducer cannot create a minimal failing test | action: note as "reproduction failed", proceed with hypothesis-only approach
+- condition: Researcher finds no relevant issues or docs | action: proceed with instrumentation and hypothesis findings only
+- condition: fix still failing after 3 Solver iterations | action: escalate to user with all hypotheses tested and evidence gathered
+- condition: project has no test suite | action: Reviewer uses build check + diff review + live runtime verification instead of test runner
+
+## Capabilities
+
+- cli: `git` | required | worktree isolation for investigation agents
+- mcp: `sequential-thinking` | optional | complex multi-hypothesis analysis
+- mcp: `playwright` | optional | visual bug verification in Reviewer phase
+- mcp: `WebSearch` | optional | Researcher agent for GitHub issues and Stack Overflow
+- mcp: `WebFetch` | optional | Researcher agent for docs and changelogs
+
+## Event Payloads
+
+### bug_fixed
+- skill: string — "ftm-debug"
+- root_cause: string — one-sentence root cause description
+- fix_approach: string — description of the fix applied
+- worktree: string — path to fix worktree
+- iterations: number — number of solver-reviewer cycles needed
+- duration_ms: number — total war room duration
+
+### issue_found
+- skill: string — "ftm-debug"
+- phase: string — "phase1" | "phase2"
+- agent: string — "instrumenter" | "researcher" | "reproducer" | "hypothesizer"
+- finding: string — description of the specific issue found
+- confidence: string — high | medium | low
+
+### test_passed
+- skill: string — "ftm-debug"
+- scope: string — "reproduction" | "full_suite"
+- worktree: string — worktree path where tests ran
+
+### test_failed
+- skill: string — "ftm-debug"
+- scope: string — "reproduction" | "full_suite"
+- worktree: string — worktree path
+- error_summary: string — brief failure description
+
+### error_encountered
+- skill: string — "ftm-debug"
+- phase: string — war room phase where error occurred
+- agent: string | null — agent that encountered the error
+- error: string — error description
+
+### task_completed
+- skill: string — "ftm-debug"
+- outcome: string — "fixed" | "escalated" | "unresolved"
+- root_cause: string — root cause if found
+- duration_ms: number — total session duration

@@ -131,3 +131,46 @@ Tailor the counts to the skill: brainstorm shows decisions + turns, executor sho
 **Skill invoked, no user interaction yet:** Save what exists (Phase 0 scan, initial question). "Next Step" notes that the user hasn't answered yet.
 
 **Large state:** Do not truncate. Some sessions produce massive state files. Completeness is required for reliable restoration.
+
+## Requirements
+
+- reference: `~/.claude/ftm-state/STATE.md` | optional | existing state file to overwrite
+- reference: `~/.claude/ftm-pause/references/protocols/SKILL-RESTORE-PROTOCOLS.md` | required | per-skill capture field specifications
+- reference: `~/.claude/ftm-pause/references/protocols/VALIDATION.md` | required | pre-write and post-write validation checklist
+- tool: `git` | optional | git branch and commit hash capture for state file
+
+## Risk
+
+- level: low_write
+- scope: writes ~/.claude/ftm-state/STATE.md only; does not modify project source files or blackboard experiences; overwrites existing STATE.md without backup
+- rollback: no project mutations; prior STATE.md is overwritten (not backed up) by design
+
+## Approval Gates
+
+- trigger: multiple skills active and unclear which to pause | action: ask user which skill state to save before writing
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: ~/.claude/ftm-state/ directory doesn't exist | action: create directory before writing STATE.md
+- condition: no ftm skill detected as active | action: report "No active ftm session detected" and list which skills this applies to
+- condition: git not available | action: omit git_branch and git_commit fields from state file frontmatter
+- condition: artifact files referenced in state don't exist on disk | action: note as "path recorded but file not found" in Artifacts section
+
+## Capabilities
+
+- cli: `git` | optional | branch name and commit hash for state file metadata
+
+## Event Payloads
+
+### session_paused
+- skill: string — "ftm-pause"
+- saved_skill: string — the ftm skill whose state was saved
+- phase: string — phase at which the session was paused
+- state_file: string — absolute path to written STATE.md
+- artifacts_count: number — number of artifact paths recorded
+
+### task_completed
+- skill: string — "ftm-pause"
+- saved_skill: string — the ftm skill whose state was saved
+- state_file: string — absolute path to STATE.md

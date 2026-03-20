@@ -164,3 +164,50 @@ To save a session for later:
 2. When you need to stop, use /ftm-pause
 3. In a new conversation, use /ftm-resume to continue
 ```
+
+## Requirements
+
+- reference: `~/.claude/ftm-state/STATE.md` | required | saved session state file from ftm-pause
+- reference: `../ftm-pause/references/protocols/SKILL-RESTORE-PROTOCOLS.md` | required | per-skill state field restoration instructions
+- reference: `../ftm-pause/references/protocols/VALIDATION.md` | required | validation protocol for state file integrity
+- reference: `~/.claude/ftm-state/archive/` | optional | archived prior state files
+- tool: `git` | optional | checking git state drift since session was paused
+
+## Risk
+
+- level: low_write
+- scope: archives STATE.md by moving it to ~/.claude/ftm-state/archive/; invokes the target ftm skill with restored context; does not modify project source files
+- rollback: copy archived STATE.md back from archive if restoration was incorrect
+
+## Approval Gates
+
+- trigger: validation finds warnings (git drift, stale state, missing artifacts) | action: present consolidated validation summary and require user acknowledgment before proceeding
+- trigger: validation finds block-level failure | action: stop and report failure; do not invoke target skill
+- trigger: user provides new context along with "yes" | action: capture as post-pause update and inject into skill invocation
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: STATE.md not found | action: report "No saved ftm session found" with instructions for saving sessions
+- condition: STATE.md frontmatter missing required fields | action: report validation failure with specific missing fields
+- condition: multiple STATE.md files (STATE.md + STATE-*.md) | action: ask user which to resume, list each with skill type and timestamp
+- condition: state is >7 days old | action: flag as potentially stale with warning, require user acknowledgment
+
+## Capabilities
+
+- cli: `git` | optional | branch and commit state validation
+- env: none required
+
+## Event Payloads
+
+### session_resumed
+- skill: string — "ftm-resume"
+- resumed_skill: string — the ftm skill that was re-invoked
+- phase: string — phase the session is resuming at
+- state_age_hours: number — how long ago the session was paused
+- post_pause_update: boolean — whether user provided new context
+
+### task_completed
+- skill: string — "ftm-resume"
+- resumed_skill: string — the ftm skill re-invoked
+- state_file_archived: string — path where STATE.md was archived

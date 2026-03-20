@@ -196,3 +196,47 @@ When updating after changes:
 ### Auto-Invocation by ftm-executor
 
 This skill's format is used by ftm-executor's documentation pipeline. After every commit during plan execution, agents update INTENT.md (or DIAGRAM.mmd) entries following this skill's templates. The updates are automatic and don't require explicit skill invocation — agents reference the format directly.
+
+## Requirements
+
+- reference: `.ftm-map/map.db` | optional | SQLite knowledge graph for accurate intent generation (graph-powered mode)
+- tool: `ftm-map/scripts/.venv/bin/python3` | optional | Python runtime for graph-powered views.py
+- reference: `package.json` | optional | project vision and structure detection for bootstrap
+- reference: existing `**/INTENT.md` files | optional | current state for incremental updates
+
+## Risk
+
+- level: low_write
+- scope: writes INTENT.md files in project directories; only creates or modifies INTENT.md documentation files; does not touch source code files
+- rollback: git checkout on modified INTENT.md files; delete newly created INTENT.md files
+
+## Approval Gates
+
+- trigger: bootstrap mode — about to create multiple INTENT.md files | action: report count of files to be created and modules to be documented, proceed unless user objects
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: .ftm-map/map.db not found | action: fall back to standard Glob/Grep analysis for function discovery
+- condition: Python venv not set up | action: fall back to standard analysis, log "Graph-powered mode unavailable — run ftm-map to enable"
+- condition: no README or package.json for Vision section | action: infer project vision from directory structure and module names
+
+## Capabilities
+
+- cli: `ftm-map/scripts/.venv/bin/python3` | optional | graph-powered intent generation
+- mcp: `git` | optional | detect changed files for incremental sync
+
+## Event Payloads
+
+### documentation_updated
+- skill: string — "ftm-intent"
+- files_written: string[] — absolute paths to INTENT.md files created or modified
+- functions_added: number — new function entries documented
+- functions_updated: number — existing entries updated
+- functions_removed: number — stale entries removed
+
+### task_completed
+- skill: string — "ftm-intent"
+- mode: string — "bootstrap" | "incremental"
+- files_count: number — total INTENT.md files written
+- duration_ms: number — total documentation sync duration

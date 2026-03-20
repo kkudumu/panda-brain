@@ -413,3 +413,42 @@ When ftm-browse is used directly (not within a plan), supervised mode is OFF by 
 - The daemon uses a 1280x800 headless Chromium viewport with a standard Mac Chrome user-agent, so most sites render predictably.
 - To stop the daemon explicitly: `$PB stop`. It will auto-restart on next use.
 - `$PB eval` is the escape hatch for anything the ARIA tree doesn't expose — hidden inputs, JS globals, localStorage, computed values.
+
+## Requirements
+
+- tool: `$HOME/.claude/skills/ftm-browse/bin/ftm-browse` | required | headless browser CLI binary
+- tool: `npx playwright install chromium` | required | Chromium browser engine (first-time setup)
+- reference: none required
+
+## Risk
+
+- level: low_write
+- scope: navigates browser, takes screenshots saved to ~/.ftm-browse/screenshots/; does not modify project source files; form fills and clicks can have side effects on the target application
+- rollback: no project file mutations; browser interactions on local dev servers are typically reversible by reloading
+
+## Approval Gates
+
+- trigger: auth redirect detected during supervised execution | action: STOP immediately, present options (retry/skip/abort/manual), wait for user choice
+- trigger: unexpected browser state during plan step | action: STOP, take screenshot, present situation to user, wait for explicit choice
+- trigger: supervised mode enabled AND state mismatch detected | action: halt and report before proceeding
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: daemon binary not found at expected path | action: report installation instructions and stop
+- condition: Chromium not installed | action: instruct user to run "npx playwright install chromium" and stop
+- condition: daemon fails to start within 10 seconds | action: check ~/.ftm-browse/ logs, report binary or Bun issue
+- condition: dev server not running when navigating to localhost | action: report timeout error with the URL attempted
+- condition: stale ref after navigation | action: re-run snapshot -i before retrying click/fill
+
+## Capabilities
+
+- cli: `$HOME/.claude/skills/ftm-browse/bin/ftm-browse` | required | headless Chromium control CLI
+
+## Event Payloads
+
+### task_completed
+- skill: string — "ftm-browse"
+- workflow: string — description of the visual verification or interaction performed
+- screenshots: string[] — absolute paths to screenshots taken
+- duration_ms: number — total workflow duration

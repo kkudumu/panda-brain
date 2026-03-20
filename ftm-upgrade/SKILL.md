@@ -151,3 +151,44 @@ Map `CHECK_FAILED <reason>` codes to user-facing messages:
 **Cache location**: `~/.cache/ftm-brain/version-check`
 **Version file**: `~/.claude/skills/ftm-version.txt`
 **Repo**: `kkudumu/ftm-brain`
+
+## Requirements
+
+- tool: `gh` | required | GitHub CLI for querying releases from kkudumu/ftm-brain
+- reference: `~/.claude/skills/ftm-upgrade/scripts/check-version.sh` | required | version check and cache script
+- reference: `~/.claude/skills/ftm-upgrade/scripts/upgrade.sh` | required | download and install latest release script
+- reference: `~/.claude/skills/ftm-version.txt` | optional | locally installed version number
+
+## Risk
+
+- level: high_write
+- scope: downloads and overwrites skill files in ~/.claude/skills/ on upgrade; changes affect all ftm skill behavior going forward; irreversible without restoring previous version from backup or git
+- rollback: restore from ~/.claude/skills/ backup if one was made before upgrade; or reinstall specific version by downloading an older release tarball
+
+## Approval Gates
+
+- trigger: UPGRADE_AVAILABLE detected | action: show current and latest version with changelog URL, wait for explicit "yes" confirmation before running upgrade.sh
+- trigger: version check during preamble (passive notice pattern) | action: show one-line notice only, do NOT ask for confirmation or interrupt workflow
+- complexity_routing: micro → auto | small → auto | medium → auto | large → auto | xl → auto
+
+## Fallbacks
+
+- condition: gh not installed | action: report "GitHub CLI not installed" with brew install gh instructions
+- condition: no internet connection | action: report "Cannot reach GitHub. Check internet connection."
+- condition: kkudumu/ftm-brain repo not found | action: report repo not found, suggest verifying access
+- condition: no releases found | action: report "No releases found yet. Check back later."
+- condition: upgrade.sh exits non-zero | action: report failure output, suggest running script manually
+
+## Capabilities
+
+- cli: `gh` | required | GitHub CLI for release queries and download
+- cli: `bash` | required | for running check-version.sh and upgrade.sh
+
+## Event Payloads
+
+### task_completed
+- skill: string — "ftm-upgrade"
+- action: string — "check" | "upgrade" | "already_up_to_date"
+- current_version: string | null — version before upgrade
+- new_version: string | null — version after upgrade (null if no upgrade)
+- status: string — "success" | "failed" | "up_to_date" | "check_failed"
