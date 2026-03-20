@@ -1,0 +1,1 @@
+"""ftm-inbox data models."""
