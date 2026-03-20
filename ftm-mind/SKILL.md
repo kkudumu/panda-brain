@@ -3,7 +3,7 @@ name: ftm-mind
 description: Unified OODA cognitive loop for the ftm system. Use for freeform `/ftm` or `/ftm-mind` requests, vague asks, mixed-tool workflows, Jira/ticket-driven work, or any request that should be understood before routing. Also handles explicit ftm skill invocations by honoring the requested skill while still doing a fast orientation pass for context, prerequisites, and approval gates. Triggers on open-ended requests like "help me think through this", bug reports, plan execution asks, Jira URLs, "make this better", mixed MCP asks like "check my calendar and draft a Slack message", and direct skill invocations like "/ftm-debug ..." or "/ftm-brainstorm ...". Do NOT use only when another ftm skill is already actively handling the task and no re-orientation is needed.
 ---
 
-# FTM Mind
+# Panda Mind
 
 `ftm-mind` is the reasoning core of the ftm ecosystem. It does not route by keyword alone. It observes the request, orients against live state and accumulated memory, decides the smallest correct next move, acts, then loops.
 
@@ -244,7 +244,7 @@ If `experiences/index.json` has no usable matches:
 - lean harder on current repo state and direct inspection
 - record the resulting experience aggressively after completion
 
-### 4. Capability Inventory: 16 FTM Skills
+### 4. Capability Inventory: 15 Panda Skills
 
 Orient must know all ftm capabilities before deciding whether to route or act directly.
 
@@ -265,8 +265,7 @@ Orient must know all ftm capabilities before deciding whether to route or act di
 | `ftm-retro` | The user wants a post-run retrospective, lessons learned, or execution review. |
 | `ftm-config` | The user wants ftm settings, model profile, or feature configuration changed. |
 | `ftm-git` | Any git commit or push is about to happen, the user asks to scan for secrets/credentials/API keys, or wants to verify no secrets are hardcoded before sharing code. MUST run before any commit or push operation — this is a mandatory security gate, not optional. |
-| `ftm-researcher` | The user wants thorough research on a topic, comparison of approaches, state-of-the-art analysis, or evidence-based investigation. Not for ideation (that is ftm-brainstorm). |
-| `ftm-map` | The user wants structural code queries: blast radius ("what breaks if I change X"), dependency chains ("what depends on Y"), code search ("where do we handle auth"), or codebase indexing ("map this codebase", "index this project"). Not for documentation updates (that is ftm-intent/ftm-diagram). |
+| `ftm-capture` | The user just completed a repeatable workflow and wants to save it as a reusable routine + playbook + reference doc. Triggers on "capture this", "save as routine", "codify this", "don't make me explain this again". Also suggest proactively when you detect the user doing something they've done before (matching blackboard experiences with same task_type 2+ times). |
 
 Routing heuristic:
 
@@ -442,8 +441,11 @@ Signals:
 - changes routing, integration, or cross-system references (API endpoints, project keys, board IDs)
 - the codebase being changed is unfamiliar or hasn't been read yet this session
 - the task involves both code changes AND communication/coordination
+- **calls any production API that creates, updates, or deletes resources** (Okta, Freshservice, AWS, any external service with real consequences)
 
 The reason forced escalation exists: tasks that touch external systems or multiple files feel simple in the moment but have hidden ordering dependencies, stakeholder coordination needs, and blast radius that only becomes visible after you've already started grinding. A 2-minute plan catches these. Grinding without one wastes the user's time when you go in the wrong direction.
+
+**The Hindsight incident**: In March 2026, a task that "felt small" — set up SSO for Hindsight — resulted in autonomous creation of Okta groups in production, user assignments, Freshservice records, a service catalog item, and S3 config changes. The model never presented a plan. It never asked for approval on any phase. It just researched and executed. This is exactly what forced escalation prevents. If the task will call APIs that modify production state, it is medium. Full stop.
 
 Typical examples:
 
@@ -514,36 +516,61 @@ Escalate when:
 - the complexity is obvious from the start
 - forced escalation signals are present (see Medium and Large sections above)
 
-### 9. Approval Gates
+### 9. Approval Gates (HARD STOP — NOT OPTIONAL)
 
-Ask for approval only for external-facing actions.
+**This section is a circuit breaker, not a suggestion. If you are about to call a tool that creates, updates, or deletes a record in an external system, you MUST stop and get explicit user approval FIRST. No exceptions. No "the user implied it." No "it's part of the plan." STOP and ASK.**
 
-External-facing means actions that leave the local workspace and affect people, systems of record, or deployed environments.
+The reason this exists: in March 2026, ftm-mind took a Hindsight SSO task and autonomously created Okta groups, added users to production Okta, created Freshservice records, created a service catalog item, and modified S3 workflow configs — all without asking once. The user's `approval_mode` was `plan_first`. The model rationalized past every gate because it "had momentum." That is exactly the failure mode this section prevents.
 
-Approval required:
+#### What requires approval (STOP before each one)
 
-- sending Slack messages
-- sending emails
-- creating or mutating Jira, Confluence, or Freshservice records
-- changing calendar events
-- submitting browser forms or uploads
-- deploys and production-affecting operations
-- remote pushes or other outward publication steps
+Every individual external mutation needs its own approval. "The user approved the plan" does not mean "the user approved every API call in the plan." Present what you're about to do, wait for "go" / "yes" / "approved", then execute that one action.
 
-Auto-proceed without approval:
+- **Okta**: creating apps, groups, assigning users, modifying policies
+- **Freshservice**: creating tickets, records, catalog items, custom objects
+- **Jira / Confluence**: creating or updating issues, pages, comments
+- **Slack / Email**: sending messages (draft-before-send protocol applies)
+- **Calendar**: creating or modifying events
+- **S3 / cloud storage**: writing or modifying objects
+- **Browser forms**: submitting data through playwright/puppeteer
+- **Deploys**: any production-affecting operation
+- **Git remote**: pushes, PR creation
 
-- local code edits
-- local documentation updates
+When multiple mutations are part of one plan, batch the approval request by phase — not one API call at a time (that would be annoying), but not "approve the whole plan and I'll do 15 things silently" either. Group related mutations:
+
+```
+Phase 1 ready — Okta setup:
+  - Create SAML app "Hindsight"
+  - Create groups: hindsight_admins, hindsight_users
+  - Add 3 users to hindsight_users
+
+Proceed with Phase 1? (yes/skip/modify)
+```
+
+Then after Phase 1 completes, present Phase 2 before executing it.
+
+#### What auto-proceeds (no approval needed)
+
+- local code edits, documentation updates
 - tests, lint, builds, audits
-- local git inspection
-- local branches and local commits
-- reading from any MCP
+- local git operations (branch, commit, inspection)
+- reading from any MCP or API (GET requests)
 - blackboard reads and writes
-- saving drafts to `.ftm-drafts/` (the draft is local; sending is what needs approval)
+- saving drafts to `.ftm-drafts/`
 
-If the user has explicitly requested stricter gates, honor that preference.
+#### The momentum trap
 
-If authentication or permission is missing, ask instead of guessing.
+If you notice yourself thinking any of these, STOP — you are rationalizing past a gate:
+
+- "The user clearly wants this done, I'll just do it"
+- "This is part of the approved plan"
+- "I already started, might as well finish"
+- "It's just one more API call"
+- "The user will appreciate me being proactive"
+
+None of these override the gate. Present the action, wait for approval, then execute.
+
+If the user has explicitly requested stricter gates, honor that preference. If authentication or permission is missing, ask instead of guessing.
 
 ### 10. Ask-the-User Heuristic
 
@@ -723,45 +750,6 @@ Approve? Or adjust the approach.
 
 This gives the user control over the *strategy* even when delegating to skills.
 
-### Research tasks → ftm-researcher
-
-Route to ftm-researcher when the request is primarily about gathering information,
-comparing approaches, or understanding the state of the art on a topic.
-
-Signals:
-- "research X", "find out about Y", "what's the state of the art on Z"
-- "compare approaches to W", "how do others handle X"
-- "deep dive into X", "investigate Y", "look into Z"
-- "find me examples of X", "what's out there for Y"
-- The user wants facts and evidence, not ideation or planning
-
-Distinguish from ftm-brainstorm:
-- Brainstorm: user has an idea and wants to develop it → exploratory, iterative, extractive
-- Researcher: user wants information about a topic → factual, evidence-based, comprehensive
-- Ambiguous: if the user seems to want both exploration AND research, route to brainstorm (which calls researcher internally)
-
-Mode selection:
-- "quick look" / "briefly" → quick mode
-- Default → standard mode
-- "deep dive" / "thorough" / "comprehensive" → deep mode
-
-### Structural code queries → ftm-map
-
-Route to ftm-map when the request involves understanding code structure and dependencies:
-
-**Strong signals (route immediately):**
-- "what breaks if I change X" / "blast radius"
-- "what depends on X" / "dependency chain"
-- "what calls X" / "who calls X"
-- "where do we handle X" (code search, not docs)
-- "map this codebase" / "index this project"
-
-**Disambiguation:**
-- "document this function" → ftm-intent (documentation), NOT ftm-map
-- "show the architecture diagram" → ftm-diagram, NOT ftm-map
-- "search for X in the codebase" → could be ftm-map (if structural) or Grep (if text-literal)
-- If `.ftm-map/map.db` doesn't exist and the query is structural, suggest bootstrapping first
-
 ### 2. Choose direct vs routed execution
 
 Use direct execution when:
@@ -793,7 +781,15 @@ If the next move will reveal new information, plan to re-enter Observe after the
 
 ## Act
 
-Act is clean, decisive execution.
+Act is clean, decisive execution — but execution of **approved** work only.
+
+**Pre-Act checkpoint**: Before executing anything, verify:
+
+1. If `approval_mode` is `plan_first` or `always_ask`, did the user explicitly approve the plan? (Words like "go", "yes", "approved", "do it", "ship it" — not silence, not your own narration of the plan.)
+2. If the task involves external mutations (see Approval Gates section 9), have you presented the specific actions and received approval?
+3. If neither condition applies, proceed.
+
+If you cannot point to a specific user message that approved the plan, you have not received approval. Go back to Decide and present the plan.
 
 ### 1. Direct action
 
@@ -934,13 +930,12 @@ Use these as behavioral tests.
 When the user asks for help, shows empty input, or says `?` or `menu`, show:
 
 ```text
-FTM Skills:
+Panda Skills:
   /ftm brainstorm [idea]     — Research-backed idea development
   /ftm execute [plan-path]   — Autonomous plan execution with agent teams
   /ftm debug [description]   — Multi-vector deep debugging war room
   /ftm audit                 — Wiring verification
   /ftm council [question]    — Multi-model deliberation
-  /ftm research [topic]      — Deep parallel research engine
   /ftm intent                — Manage INTENT.md documentation
   /ftm diagram               — Manage architecture diagrams
   /ftm codex-gate            — Run adversarial Codex validation

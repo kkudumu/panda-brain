@@ -33,6 +33,7 @@ If input starts with a recognized skill name, route directly to that skill:
 | `upgrade` | ftm-upgrade |
 | `retro` | ftm-retro |
 | `config` | ftm-config |
+| `capture`, `codify`, `save as routine` | ftm-capture |
 | `mind` | ftm-mind |
 
 When routing to a specific skill:
@@ -77,6 +78,7 @@ FTM Skills:
   /ftm upgrade               — Check for and install skill updates
   /ftm retro                 — Post-execution retrospective
   /ftm config                — View and edit ftm configuration
+  /ftm capture [name]        — Extract routine + playbook from current session
 
 Or just describe what you need and ftm-mind will handle it.
 ```
