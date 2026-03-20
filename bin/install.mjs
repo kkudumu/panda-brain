@@ -7,10 +7,11 @@
  * and symlinking them into the Claude Code skills directory.
  */
 
-import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync, chmodSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync, chmodSync, cpSync } from "fs";
 import { join, basename, dirname } from "path";
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { fileURLToPath } from "url";
+import { execSync, spawnSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +21,10 @@ const SKILLS_DIR = join(HOME, ".claude", "skills");
 const STATE_DIR = join(HOME, ".claude", "ftm-state");
 const CONFIG_DIR = join(HOME, ".claude");
 const HOOKS_DIR = join(HOME, ".claude", "hooks");
+const INBOX_INSTALL_DIR = join(HOME, ".claude", "ftm-inbox");
+
+const ARGS = process.argv.slice(2);
+const WITH_INBOX = ARGS.includes("--with-inbox");
 
 function log(msg) {
   console.log(`  ${msg}`);
@@ -139,6 +144,100 @@ function main() {
   console.log("  Option B: Copy entries from hooks/settings-template.json manually");
   console.log("  See docs/HOOKS.md for details.");
   console.log("");
+
+  if (WITH_INBOX) {
+    installInbox();
+  } else {
+    console.log("Try: /ftm help");
+    console.log("     To also install the inbox service: npx feed-the-machine --with-inbox");
+  }
+}
+
+function installInbox() {
+  const inboxSrc = join(REPO_DIR, "ftm-inbox");
+  if (!existsSync(inboxSrc)) {
+    console.error("ERROR: ftm-inbox/ not found in package. Cannot install inbox service.");
+    process.exit(1);
+  }
+
+  console.log("Installing ftm-inbox service...");
+  console.log(`  Source:      ${inboxSrc}`);
+  console.log(`  Destination: ${INBOX_INSTALL_DIR}`);
+  console.log("");
+
+  // Copy ftm-inbox/ to ~/.claude/ftm-inbox/
+  ensureDir(INBOX_INSTALL_DIR);
+  cpSync(inboxSrc, INBOX_INSTALL_DIR, { recursive: true });
+  log("COPY ftm-inbox → ~/.claude/ftm-inbox/");
+
+  // Make shell scripts executable
+  const binDir = join(INBOX_INSTALL_DIR, "bin");
+  const scripts = ["start.sh", "stop.sh", "status.sh"];
+  for (const script of scripts) {
+    const scriptPath = join(binDir, script);
+    if (existsSync(scriptPath)) {
+      chmodSync(scriptPath, 0o755);
+      log(`CHMOD +x bin/${script}`);
+    }
+  }
+
+  // Install Node deps if package.json exists
+  const pkgJson = join(INBOX_INSTALL_DIR, "package.json");
+  if (existsSync(pkgJson)) {
+    console.log("");
+    console.log("Installing Node.js dependencies...");
+    const npmResult = spawnSync("npm", ["install", "--prefix", INBOX_INSTALL_DIR], {
+      stdio: "inherit",
+      cwd: INBOX_INSTALL_DIR,
+    });
+    if (npmResult.status !== 0) {
+      console.warn("WARNING: npm install failed. Check Node.js version and try manually.");
+    }
+  }
+
+  // Install Python deps if requirements.txt exists
+  const reqTxt = join(INBOX_INSTALL_DIR, "requirements.txt");
+  if (existsSync(reqTxt)) {
+    console.log("");
+    console.log("Installing Python dependencies...");
+    const pipResult = spawnSync("pip3", ["install", "-r", reqTxt], {
+      stdio: "inherit",
+      cwd: INBOX_INSTALL_DIR,
+    });
+    if (pipResult.status !== 0) {
+      console.warn("WARNING: pip3 install failed. Check Python 3 and try manually:");
+      console.warn(`  pip3 install -r ${reqTxt}`);
+    }
+  }
+
+  // Run setup wizard
+  console.log("");
+  console.log("Running setup wizard...");
+  const setupScript = join(binDir, "setup.mjs");
+  if (existsSync(setupScript)) {
+    const setupResult = spawnSync("node", [setupScript], { stdio: "inherit" });
+    if (setupResult.status !== 0) {
+      console.warn("WARNING: Setup wizard exited with errors.");
+      console.warn(`Re-run manually: node ${setupScript}`);
+    }
+  } else {
+    console.warn("WARNING: setup.mjs not found. Run setup manually.");
+  }
+
+  // Offer LaunchAgent (macOS only)
+  if (platform() === "darwin") {
+    console.log("");
+    console.log("macOS detected. To auto-start ftm-inbox on login, run:");
+    console.log(`  node ${join(binDir, "launchagent.mjs")}`);
+  }
+
+  console.log("");
+  console.log("ftm-inbox installed.");
+  console.log(`  Start:  ${join(binDir, "start.sh")}`);
+  console.log(`  Stop:   ${join(binDir, "stop.sh")}`);
+  console.log(`  Status: ${join(binDir, "status.sh")}`);
+  console.log("");
+  console.log("See docs/INBOX.md for full documentation.");
   console.log("Try: /ftm help");
 }
 
