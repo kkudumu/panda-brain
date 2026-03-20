@@ -1,7 +1,7 @@
 {
   "name": "feed-the-machine",
-  "version": "1.1.0",
-  "description": "A unified intelligence layer for Claude Code — 16 skills with OODA-based reasoning, persistent memory, and multi-model deliberation",
+  "version": "1.2.0",
+  "description": "A unified intelligence layer for Claude Code — 22 skills with OODA-based reasoning, persistent memory, multi-model deliberation, and optional operator cockpit inbox",
   "license": "MIT",
   "author": "kkudumu",
   "type": "module",
@@ -51,8 +51,12 @@
     "ftm-map/",
     "ftm-dashboard/",
     "ftm-routine/",
+    "ftm-capture/",
     "ftm-state/",
+    "ftm-inbox/",
     "ftm-config.default.yml",
+    "ftm-manifest.json",
+    "docs/INBOX.md",
     "README.md",
     "LICENSE"
   ],
