@@ -7,7 +7,7 @@
  * and symlinking them into the Claude Code skills directory.
  */
 
-import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync, chmodSync } from "fs";
 import { join, basename, dirname } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
@@ -19,6 +19,7 @@ const HOME = homedir();
 const SKILLS_DIR = join(HOME, ".claude", "skills");
 const STATE_DIR = join(HOME, ".claude", "ftm-state");
 const CONFIG_DIR = join(HOME, ".claude");
+const HOOKS_DIR = join(HOME, ".claude", "hooks");
 
 function log(msg) {
   console.log(`  ${msg}`);
@@ -106,8 +107,38 @@ function main() {
     log("INIT ftm-config.yml (from default template)");
   }
 
+  // Install hooks
+  const hooksDir = join(REPO_DIR, "hooks");
+  let hookCount = 0;
+  if (existsSync(hooksDir)) {
+    ensureDir(HOOKS_DIR);
+    console.log("");
+    console.log("Installing hooks...");
+
+    const hookFiles = readdirSync(hooksDir).filter(
+      (f) => f.startsWith("ftm-") && (f.endsWith(".sh") || f.endsWith(".mjs"))
+    );
+    for (const hook of hookFiles) {
+      const src = join(hooksDir, hook);
+      const dest = join(HOOKS_DIR, hook);
+      const action = existsSync(dest) ? "UPDATE" : "INSTALL";
+      copyFileSync(src, dest);
+      if (hook.endsWith(".sh")) {
+        chmodSync(dest, 0o755);
+      }
+      log(`${action} ${hook}`);
+      hookCount++;
+    }
+  }
+
   console.log("");
-  console.log(`Done. ${ymlFiles.length} skills linked.`);
+  console.log(`Done. ${ymlFiles.length} skills linked, ${hookCount} hooks installed.`);
+  console.log("");
+  console.log("To activate hooks, add them to ~/.claude/settings.json");
+  console.log("  Option A: ./install.sh --setup-hooks (auto-merge)");
+  console.log("  Option B: Copy entries from hooks/settings-template.json manually");
+  console.log("  See docs/HOOKS.md for details.");
+  console.log("");
   console.log("Try: /ftm help");
 }
 
