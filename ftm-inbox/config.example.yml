@@ -1,0 +1,55 @@
+# ftm-inbox configuration
+#
+# Copy this file to config.yml and fill in your credentials.
+# The adapter registry loads this on startup. Missing config.yml is
+# non-fatal — the backend starts with no adapters registered.
+#
+# Each adapter entry:
+#   name              : unique identifier, used as inbox.source value
+#   class             : dotted Python path to the adapter class
+#   interval_seconds  : how often the poller runs (scheduler not yet wired — reserved)
+#   credentials       : secrets (API tokens, passwords) — keep out of version control
+#   config            : non-secret settings (URLs, project keys, etc.)
+
+adapters:
+  - name: jira
+    class: ftm_inbox.adapters.jira.JiraAdapter
+    interval_seconds: 60
+    credentials:
+      api_token: "your-jira-api-token-here"
+      email: "you@yourorg.com"
+    config:
+      base_url: "https://yourorg.atlassian.net"
+      project_key: "OPS"
+      max_results: 100
+      jql: "project = OPS AND statusCategory != Done ORDER BY updated DESC"
+
+  - name: freshservice
+    class: ftm_inbox.adapters.freshservice.FreshserviceAdapter
+    interval_seconds: 90
+    credentials:
+      api_key: "your-freshservice-api-key-here"
+    config:
+      domain: "yourorg.freshservice.com"
+      per_page: 100
+
+  - name: slack
+    class: ftm_inbox.adapters.slack.SlackAdapter
+    interval_seconds: 30
+    credentials:
+      bot_token: "xoxb-your-slack-bot-token"
+    config:
+      channels:
+        - "C0123456789"   # ops-alerts
+        - "C0987654321"   # triage
+      lookback_hours: 24
+
+  - name: gmail
+    class: ftm_inbox.adapters.gmail.GmailAdapter
+    interval_seconds: 120
+    credentials:
+      credentials_json_path: "~/.config/ftm-inbox/gmail-credentials.json"
+      token_path: "~/.config/ftm-inbox/gmail-token.json"
+    config:
+      label_filter: "ftm-inbox"
+      max_results: 50
