@@ -1,3 +1,199 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── Kawaii CSS Custom Properties ─── */
+
+.theme-light {
+	--bg-primary: #e8f5e9;
+	--bg-secondary: #f1f8f1;
+	--bg-card: #fefefe;
+	--bg-sidebar: #f5fbf5;
+	--bg-drawer: #fafafa;
+	--border-accent: #a5d6a7;
+	--border-card: #c8e6c9;
+	--text-primary: #1b3a1b;
+	--text-secondary: #4a7a4a;
+	--text-muted: #7aaa7a;
+	--accent-primary: #4caf50;
+	--accent-hover: #388e3c;
+	--shadow-card: 0 4px 24px 0 rgba(76, 175, 80, 0.10);
+	--shadow-card-hover: 0 6px 32px 0 rgba(76, 175, 80, 0.18);
+	--grid-color: rgba(76, 175, 80, 0.07);
+	--scrollbar-thumb: #c8e6c9;
+	--scrollbar-track: #f1f8f1;
+}
+
+.theme-dark {
+	--bg-primary: #1b2e1b;
+	--bg-secondary: #1e331e;
+	--bg-card: #243824;
+	--bg-sidebar: #1e331e;
+	--bg-drawer: #1a2a1a;
+	--border-accent: #69f0ae;
+	--border-card: #2e7d32;
+	--text-primary: #e8f5e9;
+	--text-secondary: #a5d6a7;
+	--text-muted: #66bb6a;
+	--accent-primary: #69f0ae;
+	--accent-hover: #b2ffdb;
+	--shadow-card: 0 0 0 1px #69f0ae33, 0 4px 24px 0 rgba(105, 240, 174, 0.12);
+	--shadow-card-hover: 0 0 0 2px #69f0ae55, 0 6px 32px 0 rgba(105, 240, 174, 0.22);
+	--grid-color: rgba(105, 240, 174, 0.05);
+	--scrollbar-thumb: #2e7d32;
+	--scrollbar-track: #1b2e1b;
+}
+
+/* ─── Base Styles ─── */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	height: 100%;
+	font-size: 16px;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	min-height: 100vh;
+	background-color: var(--bg-primary);
+	color: var(--text-primary);
+	font-family: 'Nunito', 'Quicksand', sans-serif;
+	transition: background-color 0.3s ease, color 0.3s ease;
+	/* Graph-paper grid background */
+	background-image:
+		linear-gradient(var(--grid-color) 1px, transparent 1px),
+		linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+	background-size: 30px 30px;
+}
+
+/* ─── Scrollbar ─── */
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 9999px;
+}
+
+/* ─── Typography ─── */
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: 'Nunito', sans-serif;
+	font-weight: 800;
+	color: var(--text-primary);
+	margin: 0;
+}
+
+p {
+	margin: 0;
+	line-height: 1.6;
+}
+
+/* ─── Kawaii Card ─── */
+
+.card-kawaii {
+	background: var(--bg-card);
+	border: 2px solid var(--border-card);
+	border-radius: 16px;
+	box-shadow: var(--shadow-card);
+	transition: box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.card-kawaii:hover {
+	box-shadow: var(--shadow-card-hover);
+}
+
+/* ─── Pill Button ─── */
+
+.btn-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 1.25rem;
+	border-radius: 9999px;
+	font-family: 'Nunito', sans-serif;
+	font-weight: 700;
+	font-size: 0.875rem;
+	cursor: pointer;
+	border: none;
+	transition: transform 0.18s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+		box-shadow 0.18s ease,
+		background-color 0.18s ease;
+	user-select: none;
+}
+
+.btn-pill:hover {
+	transform: scale(1.06) translateY(-1px);
+}
+
+.btn-pill:active {
+	transform: scale(0.96);
+}
+
+.btn-pill-primary {
+	background-color: var(--accent-primary);
+	color: #fff;
+	box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.btn-pill-primary:hover {
+	background-color: var(--accent-hover);
+	box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
+}
+
+.btn-pill-ghost {
+	background-color: transparent;
+	color: var(--text-secondary);
+	border: 2px solid var(--border-card);
+}
+
+.btn-pill-ghost:hover {
+	border-color: var(--accent-primary);
+	color: var(--accent-primary);
+}
+
+/* ─── Status Badge Colors ─── */
+
+.badge-pending   { background: #fff9c4; color: #5d4037; }
+.badge-planning  { background: #bbdefb; color: #0d47a1; }
+.badge-approved  { background: #c8e6c9; color: #1b5e20; }
+.badge-executing { background: #ffe0b2; color: #bf360c; }
+.badge-complete  { background: #b2dfdb; color: #004d40; }
+.badge-failed    { background: #ffcdd2; color: #b71c1c; }
+
+/* ─── Animations ─── */
+
+@keyframes bounceIn {
+	0%   { opacity: 0; transform: scale(0.8); }
+	100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeUp {
+	0%   { opacity: 0; transform: translateY(8px); }
+	100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+	0%   { opacity: 0; transform: translateY(-8px); }
+	100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes drawerOpen {
+	0%   { transform: translateY(100%); }
+	100% { transform: translateY(0); }
+}
+
+.animate-bounce-in  { animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) both; }
+.animate-fade-up    { animation: fadeUp 0.3s ease-out both; }
+.animate-slide-down { animation: slideDown 0.3s ease-out both; }
