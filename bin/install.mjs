@@ -3,8 +3,13 @@
 /**
  * npx feed-the-machine — installs ftm skills into ~/.claude/skills/
  *
- * Works by finding the npm package root (where the skill files live)
- * and symlinking them into the Claude Code skills directory.
+ * Full install: skills, hooks, settings.json merge, and verification.
+ * Safe to re-run — idempotent.
+ *
+ * Flags:
+ *   --with-inbox    Also install the inbox service
+ *   --no-hooks      Skip hooks entirely
+ *   --skip-merge    Install hook files but don't touch settings.json
  */
 
 import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync, chmodSync, cpSync } from "fs";
@@ -21,13 +26,23 @@ const SKILLS_DIR = join(HOME, ".claude", "skills");
 const STATE_DIR = join(HOME, ".claude", "ftm-state");
 const CONFIG_DIR = join(HOME, ".claude");
 const HOOKS_DIR = join(HOME, ".claude", "hooks");
+const SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
 const INBOX_INSTALL_DIR = join(HOME, ".claude", "ftm-inbox");
 
 const ARGS = process.argv.slice(2);
 const WITH_INBOX = ARGS.includes("--with-inbox");
+const NO_HOOKS = ARGS.includes("--no-hooks");
+const SKIP_MERGE = ARGS.includes("--skip-merge");
+
+let warnCount = 0;
 
 function log(msg) {
   console.log(`  ${msg}`);
+}
+
+function warn(msg) {
+  console.log(`  WARN: ${msg}`);
+  warnCount++;
 }
 
 function ensureDir(dir) {
@@ -52,7 +67,212 @@ function safeSymlink(src, dest) {
   log(`LINK ${name}`);
 }
 
+function commandExists(cmd) {
+  try {
+    execSync(`command -v ${cmd}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function commandVersion(cmd, flag = "--version") {
+  try {
+    return execSync(`${cmd} ${flag}`, { encoding: "utf8" }).trim().split("\n")[0];
+  } catch {
+    return "unknown";
+  }
+}
+
+// --- Preflight ---
+
+function preflight() {
+  console.log("Preflight checks...");
+
+  if (!NO_HOOKS) {
+    // jq is required for all shell hooks (they parse JSON stdin via jq)
+    if (!commandExists("jq")) {
+      console.log("");
+      console.log("  ERROR: jq is required for FTM hooks.");
+      console.log("");
+      console.log("  Install it:");
+      console.log("    macOS:   brew install jq");
+      console.log("    Ubuntu:  sudo apt-get install jq");
+      console.log("    Alpine:  apk add jq");
+      console.log("");
+      console.log("  Or skip hooks: npx feed-the-machine --no-hooks");
+      process.exit(1);
+    }
+    log(`jq: ${commandVersion("jq")}`);
+    log(`node: ${process.version}`);
+  } else {
+    log("hooks skipped (--no-hooks)");
+  }
+
+  console.log("");
+}
+
+// --- Settings Merge ---
+
+function mergeHooksIntoSettings() {
+  const templatePath = join(REPO_DIR, "hooks", "settings-template.json");
+  if (!existsSync(templatePath)) {
+    warn("hooks/settings-template.json not found — hooks installed but not registered");
+    return;
+  }
+
+  console.log("");
+  console.log("Registering hooks in settings.json...");
+
+  // Read and expand ~ to actual home directory
+  const rawTemplate = readFileSync(templatePath, "utf8");
+  const expandedTemplate = rawTemplate.replace(/~\/.claude/g, join(HOME, ".claude"));
+  const template = JSON.parse(expandedTemplate);
+  const templateHooks = template.hooks || {};
+
+  if (!existsSync(SETTINGS_FILE)) {
+    // No settings.json — create one with just the hooks
+    writeFileSync(SETTINGS_FILE, JSON.stringify({ hooks: templateHooks }, null, 2) + "\n");
+    log("CREATED settings.json with FTM hooks");
+    return;
+  }
+
+  // Read existing settings
+  const existing = JSON.parse(readFileSync(SETTINGS_FILE, "utf8"));
+
+  // Backup
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+  const backupPath = `${SETTINGS_FILE}.ftm-backup-${ts}`;
+  copyFileSync(SETTINGS_FILE, backupPath);
+  log(`BACKUP ${backupPath}`);
+
+  // Ensure hooks key exists
+  if (!existing.hooks) {
+    existing.hooks = {};
+  }
+
+  // Merge each event type
+  const events = ["PreToolUse", "UserPromptSubmit", "PostToolUse", "Stop"];
+  for (const event of events) {
+    const templateEntries = templateHooks[event] || [];
+    const existingEntries = existing.hooks[event] || [];
+
+    if (templateEntries.length === 0) continue;
+
+    // Check if FTM hooks are already present by looking for ftm- in command paths
+    const existingCommands = JSON.stringify(existingEntries);
+    const alreadyPresent = templateEntries.some((entry) => {
+      const hooks = entry.hooks || [];
+      return hooks.some((h) => {
+        const cmd = h.command || "";
+        const cmdBase = basename(cmd.split(" ").pop()); // handle "node foo.mjs"
+        return existingCommands.includes(cmdBase);
+      });
+    });
+
+    if (alreadyPresent) {
+      log(`SKIP ${event} hooks (already configured)`);
+      continue;
+    }
+
+    existing.hooks[event] = [...existingEntries, ...templateEntries];
+    log(`MERGE ${event} hooks`);
+  }
+
+  writeFileSync(SETTINGS_FILE, JSON.stringify(existing, null, 2) + "\n");
+  log("UPDATED settings.json");
+  console.log("");
+  log("Hooks are active.");
+}
+
+// --- Verification ---
+
+function verify(skillCount, hookCount) {
+  console.log("");
+  console.log("Verifying installation...");
+
+  let errors = 0;
+
+  // Check skill symlinks resolve
+  let brokenLinks = 0;
+  const skillEntries = readdirSync(SKILLS_DIR).filter((f) => f.startsWith("ftm"));
+  for (const entry of skillEntries) {
+    const fullPath = join(SKILLS_DIR, entry);
+    try {
+      if (lstatSync(fullPath).isSymbolicLink() && !existsSync(fullPath)) {
+        warn(`broken symlink: ${entry}`);
+        brokenLinks++;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (brokenLinks === 0) {
+    log(`Skills: ${skillCount} linked, all symlinks valid`);
+  } else {
+    errors++;
+  }
+
+  // Check blackboard state
+  const contextFile = join(STATE_DIR, "blackboard", "context.json");
+  const patternsFile = join(STATE_DIR, "blackboard", "patterns.json");
+  if (existsSync(contextFile) && existsSync(patternsFile)) {
+    log("Blackboard: initialized");
+  } else {
+    warn("blackboard state incomplete");
+    errors++;
+  }
+
+  // Check config
+  if (existsSync(join(CONFIG_DIR, "ftm-config.yml"))) {
+    log("Config: present");
+  } else {
+    warn("ftm-config.yml missing");
+    errors++;
+  }
+
+  // Check hooks
+  if (!NO_HOOKS && hookCount > 0) {
+    const hookFiles = readdirSync(HOOKS_DIR).filter((f) => f.startsWith("ftm-"));
+    const allExecutable = hookFiles
+      .filter((f) => f.endsWith(".sh"))
+      .every((f) => {
+        try {
+          const stat = lstatSync(join(HOOKS_DIR, f));
+          return (stat.mode & 0o111) !== 0;
+        } catch {
+          return false;
+        }
+      });
+
+    if (allExecutable) {
+      log(`Hooks: ${hookCount} installed, all executable`);
+    } else {
+      warn("some hook files not executable");
+      errors++;
+    }
+
+    // Verify settings.json has FTM hooks
+    if (!SKIP_MERGE && existsSync(SETTINGS_FILE)) {
+      const settingsContent = readFileSync(SETTINGS_FILE, "utf8");
+      const ftmMatches = (settingsContent.match(/ftm-/g) || []).length;
+      if (ftmMatches > 0) {
+        log(`Settings: ${ftmMatches} FTM entries in settings.json`);
+      } else {
+        warn("no FTM hooks found in settings.json");
+        errors++;
+      }
+    }
+  }
+
+  return { errors };
+}
+
+// --- Main ---
+
 function main() {
+  preflight();
+
   console.log(`Installing ftm skills from: ${REPO_DIR}`);
   console.log(`Linking into: ${SKILLS_DIR}`);
   console.log("");
@@ -82,9 +302,13 @@ function main() {
     safeSymlink(join(REPO_DIR, dir), join(SKILLS_DIR, dir));
   }
 
+  console.log("");
+  log(`${ymlFiles.length} skills linked.`);
+
   // Set up blackboard state (copy templates, don't overwrite existing data)
   const bbDir = join(REPO_DIR, "ftm-state", "blackboard");
   if (existsSync(bbDir)) {
+    console.log("");
     ensureDir(join(STATE_DIR, "blackboard", "experiences"));
 
     const jsonFiles = readdirSync(bbDir).filter((f) => f.endsWith(".json"));
@@ -113,39 +337,62 @@ function main() {
   }
 
   // Install hooks
-  const hooksDir = join(REPO_DIR, "hooks");
   let hookCount = 0;
-  if (existsSync(hooksDir)) {
-    ensureDir(HOOKS_DIR);
-    console.log("");
-    console.log("Installing hooks...");
 
-    const hookFiles = readdirSync(hooksDir).filter(
-      (f) => f.startsWith("ftm-") && (f.endsWith(".sh") || f.endsWith(".mjs"))
-    );
-    for (const hook of hookFiles) {
-      const src = join(hooksDir, hook);
-      const dest = join(HOOKS_DIR, hook);
-      const action = existsSync(dest) ? "UPDATE" : "INSTALL";
-      copyFileSync(src, dest);
-      if (hook.endsWith(".sh")) {
-        chmodSync(dest, 0o755);
+  if (NO_HOOKS) {
+    console.log("");
+    console.log("Skipping hooks (--no-hooks).");
+  } else {
+    const hooksDir = join(REPO_DIR, "hooks");
+    if (existsSync(hooksDir)) {
+      ensureDir(HOOKS_DIR);
+      console.log("");
+      console.log("Installing hooks...");
+
+      const hookFiles = readdirSync(hooksDir).filter(
+        (f) => f.startsWith("ftm-") && (f.endsWith(".sh") || f.endsWith(".mjs"))
+      );
+      for (const hook of hookFiles) {
+        const src = join(hooksDir, hook);
+        const dest = join(HOOKS_DIR, hook);
+        const action = existsSync(dest) ? "UPDATE" : "INSTALL";
+        copyFileSync(src, dest);
+        if (hook.endsWith(".sh")) {
+          chmodSync(dest, 0o755);
+        }
+        log(`${action} ${hook}`);
+        hookCount++;
       }
-      log(`${action} ${hook}`);
-      hookCount++;
+
+      console.log("");
+      log(`${hookCount} hooks installed to ${HOOKS_DIR}`);
+    }
+
+    // Merge hooks into settings.json
+    if (SKIP_MERGE) {
+      console.log("");
+      log("Skipping settings.json merge (--skip-merge).");
+      log("Add entries from hooks/settings-template.json to ~/.claude/settings.json manually.");
+    } else {
+      mergeHooksIntoSettings();
     }
   }
 
+  // Verification
+  const { errors } = verify(ymlFiles.length, hookCount);
+
+  // Summary
   console.log("");
-  console.log(`Done. ${ymlFiles.length} skills linked, ${hookCount} hooks installed.`);
+  if (errors === 0 && warnCount === 0) {
+    console.log(`Done. ${ymlFiles.length} skills, ${hookCount} hooks. Everything checks out.`);
+  } else {
+    console.log(`Done. ${ymlFiles.length} skills, ${hookCount} hooks. ${warnCount} warning(s).`);
+  }
   console.log("");
-  console.log("To activate hooks, add them to ~/.claude/settings.json");
-  console.log("  Option A: ./install.sh --setup-hooks (auto-merge)");
-  console.log("  Option B: Copy entries from hooks/settings-template.json manually");
-  console.log("  See docs/HOOKS.md for details.");
-  console.log("");
+  console.log("Restart Claude Code (or start a new session) to pick up the skills.");
 
   if (WITH_INBOX) {
+    console.log("");
     installInbox();
   } else {
     console.log("Try: /ftm help");

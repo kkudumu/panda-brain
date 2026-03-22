@@ -2,11 +2,23 @@
 
 ## Install
 
+**Option A — npx (recommended):**
+
 ```bash
-git clone https://github.com/kkudumu/ftm-brain.git ~/ftm-brain
-cd ~/ftm-brain
+npx feed-the-machine@latest
+```
+
+**Option B — git clone:**
+
+```bash
+git clone https://github.com/kkudumu/feed-the-machine.git ~/feed-the-machine
+cd ~/feed-the-machine
 ./install.sh
 ```
+
+Both paths install skills, hooks, and merge hook config into `settings.json` automatically.
+
+**Prerequisites:** `jq` and `node` must be installed. The installer checks and tells you what's missing.
 
 Restart Claude Code (or start a new session) to pick up the skills.
 
@@ -18,7 +30,7 @@ Restart Claude Code (or start a new session) to pick up the skills.
 /ftm help
 ```
 
-Shows all 16 skills and what they do.
+Shows all 22 skills and what they do.
 
 ### 2. Let the mind route your request
 
