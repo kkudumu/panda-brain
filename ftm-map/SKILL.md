@@ -1,17 +1,17 @@
 ---
 name: ftm-map
-description: Persistent code knowledge graph powered by tree-sitter and SQLite with FTS5 full-text search. Builds structural dependency graphs for blast radius analysis, dependency chains, and keyword search. Use when user asks "what breaks if I change X", "blast radius", "what depends on", "where do we handle", "map codebase", "index project", "what calls", "dependency chain", "ftm-map".
+description: Persistent code knowledge graph powered by tree-sitter and SQLite with FTS5 full-text search. Uses a v2 hybrid architecture combining file-level PageRank with symbol-level blast radius analysis. Builds structural dependency graphs for blast radius, dependency chains, context selection, and keyword search. Use when user asks "what breaks if I change X", "blast radius", "what depends on", "where do we handle", "map codebase", "index project", "what calls", "dependency chain", "what's relevant for", "context for", "ftm-map".
 ---
 
 # ftm-map
 
-Persistent code knowledge graph powered by tree-sitter and SQLite with FTS5 full-text search. Parses the local codebase into a structural dependency graph stored in `.ftm-map/map.db`, then answers structural queries (blast radius, dependency chains, symbol lookup) and keyword searches without re-reading the source tree on every question.
+Persistent code knowledge graph powered by tree-sitter and SQLite with FTS5 full-text search. Uses a v2 hybrid architecture: file-level PageRank (via fast-pagerank with scipy sparse matrices) for broad relevance ranking, combined with symbol-level blast radius for precise impact analysis. Parses the local codebase using Aider-style def/ref extraction with tags.scm into a 5-table schema (files, symbols, refs, file_edges, symbol_edges) stored in `.ftm-map/map.db`, then answers structural queries (blast radius, dependency chains, context selection, symbol lookup) and keyword searches without re-reading the source tree on every question.
 
 ## Events
 
 ### Emits
 - `map_updated` — when the graph database has been updated (bootstrap or incremental)
-  - Payload: `{ project_path, symbols_count, edges_count, files_parsed, duration_ms, mode }`
+  - Payload: `{ project_path, symbols_count, edges_count, file_edges_count, reference_count, files_parsed, duration_ms, mode }`
 - `task_completed` — when any ftm-map operation finishes
 
 ### Listens To
@@ -43,8 +43,9 @@ Bootstrap:    "map this codebase" / "index this project" / no map.db exists yet
 Incremental:  Triggered by code_committed event or PostToolUse hook
               Parses only changed files and updates their graph entries.
 
-Query:        Structural or keyword question about existing graph
+Query:        Structural, keyword, or context question about existing graph
               Detects query type and runs appropriate script.
+              Includes context selection for token-budgeted file retrieval.
 ```
 
 If `.ftm-map/map.db` does not exist when a query arrives, fall back to offering bootstrap (see Graceful Degradation below).
@@ -98,15 +99,24 @@ Trigger: user asks a structural or keyword question about the codebase.
 | "find X in the codebase" | FTS5 keyword search | `--search "X"` |
 | "tell me about function X" | symbol info | `--info X` |
 | "show dependencies for X" | dependency chain | `--deps X` |
+| "what's relevant for X" | context selection | `--context --seed-keywords X` |
+| "context for X" | context selection | `--context --seed-keywords X` |
+| "important files for X" | context selection | `--context --seed-files X` |
+| "what should I look at for X" | context selection | `--context --seed-keywords X` |
+| "show stats" / "how big is the index" | statistics | `--stats` |
 
 ### Execution
 
 Run the appropriate query script with the venv python:
 ```
-ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --blast-radius <symbol>
-ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --deps <symbol>
-ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --search "<keywords>"
-ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --info <symbol>
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --blast-radius <symbol> --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --deps <symbol> --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --search "<keywords>" --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --info <symbol> --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --context --seed-files src/auth.py --token-budget 4000 --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --context --seed-keywords authenticate --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --context --seed-symbols handleAuth --token-budget 8000 --project-root .
+ftm-map/scripts/.venv/bin/python3 ftm-map/scripts/query.py --stats --project-root .
 ```
 
 ### Output Formatting
@@ -151,7 +161,27 @@ Symbol: authenticateUser
   Signature:  authenticateUser(token: string, opts?: AuthOptions) → Promise<Session>
   Callers:    3 direct, 5 transitive
   Callees:    validateToken, decodeJWT, createSession
+  References: 12 across codebase
   Dependents: 8 symbols total
+```
+
+**Context selection** — PageRank-ranked files with token budget:
+```
+Context for "authenticate" (budget: 4000 tokens):
+  1. src/auth/index.ts          score: 0.142   tokens: 850
+  2. src/handlers/auth.ts       score: 0.098   tokens: 620
+  3. src/middleware/session.ts   score: 0.076   tokens: 540
+  Total: 2010 / 4000 tokens
+```
+
+**Stats** — database overview:
+```
+Index statistics:
+  Files:        42
+  Symbols:      318
+  References:   1204
+  File edges:   86
+  Symbol edges: 542
 ```
 
 ## Graceful Degradation
@@ -170,11 +200,12 @@ All heavy lifting is done by Python scripts in `ftm-map/scripts/`. The skill orc
 | Script | Purpose |
 |--------|---------|
 | `setup.sh` | Creates virtualenv, installs tree-sitter and dependencies |
-| `db.py` | SQLite schema, CRUD operations, graph traversal queries |
-| `parser.py` | tree-sitter parsing and symbol/edge extraction |
-| `index.py` | Full bootstrap scan and incremental file indexing |
-| `query.py` | Blast radius, dependency chain, FTS5 keyword search, symbol info |
-| `views.py` | INTENT.md and .mmd generation from graph data |
+| `db.py` | 5-table SQLite schema (files, symbols, refs, file_edges, symbol_edges), CRUD, graph traversal |
+| `parser.py` | Aider-style def/ref extraction via tree-sitter tags.scm queries |
+| `index.py` | Full bootstrap scan and incremental file indexing with Aider weight heuristics |
+| `query.py` | Blast radius, dependency chain, FTS5 search, symbol info, context selection, stats |
+| `ranker.py` | PageRank-based file ranking with fast-pagerank and scipy sparse matrices |
+| `views.py` | INTENT.md and ARCHITECTURE.mmd generation from the 5-table graph |
 
 Always use the venv python — never the system python — to ensure tree-sitter bindings are available:
 ```
@@ -215,6 +246,7 @@ After `map_updated` or session end:
 - tool: `ftm-map/scripts/index.py` | required | bootstrap and incremental indexer
 - tool: `ftm-map/scripts/query.py` | required | blast radius, dependency, and FTS5 search queries
 - tool: `ftm-map/scripts/views.py` | required | INTENT.md and .mmd diagram generation from graph
+- tool: `ftm-map/scripts/ranker.py` | required | PageRank file ranking with fast-pagerank and scipy
 - tool: `git` | optional | changed file detection for incremental mode
 - config: `~/.claude/ftm-config.yml` | optional | model profile and skills.ftm-map.enabled flag
 
@@ -255,5 +287,5 @@ After `map_updated` or session end:
 ### task_completed
 - skill: string — "ftm-map"
 - operation: string — "bootstrap" | "incremental" | "query"
-- query_type: string | null — "blast-radius" | "deps" | "search" | "info" (for query mode)
+- query_type: string | null — "blast-radius" | "deps" | "search" | "info" | "context" | "stats" (for query mode)
 - duration_ms: number — total operation duration
