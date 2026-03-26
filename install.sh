@@ -117,7 +117,12 @@ for dir in "$REPO_DIR"/ftm*/; do
   echo "  LINK $name/"
 done
 
-SKILL_COUNT=$(ls "$REPO_DIR"/ftm*.yml 2>/dev/null | grep -v '.default.' | wc -l | tr -d ' ')
+SKILL_COUNT=0
+for _f in "$REPO_DIR"/ftm*.yml; do
+  [ -e "$_f" ] || continue
+  case "$_f" in *.default.*) continue ;; esac
+  SKILL_COUNT=$((SKILL_COUNT + 1))
+done
 echo ""
 echo "  $SKILL_COUNT skills linked."
 

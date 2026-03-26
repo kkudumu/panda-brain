@@ -161,13 +161,3 @@ Average plan modifications: 1.2 per plan
 
 ### (none)
 ftm-dashboard is read-only and does not emit events directly. It listens to task_completed for session tracking only.
-
-## Events
-
-### Listens To
-- `task_completed` — for session stats tracking
-
-### Blackboard Read
-- `context.json` — session metadata
-- `experiences/index.json` — experience inventory
-- `patterns.json` — pattern health

@@ -256,6 +256,24 @@ Guidelines for writing clear declarations:
 
 ---
 
+### capture_complete
+- **Description**: ftm-capture finished processing and persisting a captured item (snippet, link, thought, or known issue)
+- **Emitted by**: ftm-capture
+- **Listened to by**: ftm-mind (log capture on blackboard, optionally surface to user)
+- **Fast-path**: no
+- **Payload**: `{ capture_type, title, file_path, timestamp }`
+
+---
+
+### known_issue_recorded
+- **Description**: A known issue was captured and recorded for future reference, avoiding repeated investigation of the same problem
+- **Emitted by**: ftm-capture
+- **Listened to by**: ftm-mind (index known issue on blackboard for dedup during future debug sessions)
+- **Fast-path**: no
+- **Payload**: `{ issue_title, issue_description, file_path, tags: [string], timestamp }`
+
+---
+
 ## Fast-Path Summary
 
 | Event | Always triggers |
@@ -296,4 +314,6 @@ Use this table to quickly look up which skills are involved when an event fires:
 | secrets_found | git | executor, mind |
 | secrets_clear | git | executor, mind |
 | secrets_remediated | git | executor, mind |
+| capture_complete | capture | mind |
+| known_issue_recorded | capture | mind |
 | map_updated | map | mind, intent, diagram |

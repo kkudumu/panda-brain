@@ -14,7 +14,6 @@ description: Secret scanning and credential safety gate for git operations. Prev
 ### Listens To
 - `code_changed` — run a quick scan on modified files before they get staged
 - `code_committed` — verify the commit doesn't contain secrets (post-commit safety net)
-- `push_requested` — block push and run full scan if not already cleared
 
 ## Blackboard Read
 

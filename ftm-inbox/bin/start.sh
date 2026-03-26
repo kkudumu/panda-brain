@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start ftm-inbox backend + pollers
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit
 PORT=${FTM_INBOX_PORT:-8042}
 echo "Starting ftm-inbox on port $PORT..."
 python3 -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT &

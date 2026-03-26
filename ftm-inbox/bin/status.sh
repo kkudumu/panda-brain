@@ -1,5 +1,5 @@
 #!/bin/bash
-if [ -f /tmp/ftm-inbox.pid ] && kill -0 $(cat /tmp/ftm-inbox.pid) 2>/dev/null; then
+if [ -f /tmp/ftm-inbox.pid ] && kill -0 "$(cat /tmp/ftm-inbox.pid)" 2>/dev/null; then
     echo "ftm-inbox is running (PID: $(cat /tmp/ftm-inbox.pid))"
     # Show last poll times from DB if available
     CONFIG_DIR="$HOME/.claude/ftm-inbox"

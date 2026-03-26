@@ -14,6 +14,7 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2034
 INPUT=$(cat)
 
 STATE_DIR="$HOME/.claude/ftm-state"
