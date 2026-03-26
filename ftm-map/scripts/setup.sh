@@ -40,6 +40,17 @@ echo "Installing dependencies from requirements.txt..."
 "$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
 echo "Dependencies installed."
 
+echo "Verifying dependencies..."
+"$VENV_DIR/bin/python" -c "
+import tree_sitter_language_pack
+import scipy
+import pygments
+print('All dependencies verified')
+" || {
+    echo "ERROR: Dependency verification failed"
+    exit 1
+}
+
 # Verify the installation
 echo "Verifying installation..."
 "$VENV_DIR/bin/python3" -c "import sqlite_vec; from tree_sitter_language_pack import get_parser; print('ftm-map dependencies OK')"
