@@ -1,17 +1,31 @@
-; Functions
-(function_definition
-  name: (identifier) @name) @definition.function
+; Module-level constants
+(module
+  (expression_statement
+    (assignment
+      left: (identifier) @name.definition.constant) @definition.constant))
 
 ; Classes
 (class_definition
-  name: (identifier) @name) @definition.class
+  name: (identifier) @name.definition.class) @definition.class
 
-; Decorated functions
+; Functions
+(function_definition
+  name: (identifier) @name.definition.function) @definition.function
+
+; Decorated definitions (functions)
 (decorated_definition
   definition: (function_definition
-    name: (identifier) @name) @definition.function)
+    name: (identifier) @name.definition.function)) @definition.function
 
-; Decorated classes
+; Decorated definitions (classes)
 (decorated_definition
   definition: (class_definition
-    name: (identifier) @name) @definition.class)
+    name: (identifier) @name.definition.class)) @definition.class
+
+; Call references (direct function calls and attribute method calls)
+(call
+  function: [
+    (identifier) @name.reference.call
+    (attribute
+      attribute: (identifier) @name.reference.call)
+  ]) @reference.call
