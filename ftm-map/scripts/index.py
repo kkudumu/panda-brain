@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
-"""ftm-map indexer: builds the code knowledge graph from source files."""
+"""ftm-map indexer: builds the code knowledge graph from source files.
+
+Two-phase indexing:
+  Phase 1 — Parse each file with tree-sitter, insert file/symbol/ref rows.
+  Phase 2 — Materialize file_edges with Aider-style weight heuristics and
+             symbol_edges via enclosing-scope resolution.
+"""
 
 import argparse
 import json
+import math
 import os
+import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,13 +24,14 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from db import (
     get_connection,
+    add_file,
     add_symbol,
-    remove_symbols_by_file,
-    add_edge,
-    get_symbol_by_name,
+    add_reference,
+    remove_file,
     get_stats,
+    rebuild_symbol_edges,
 )
-from parser import parse_file, extract_relationships, EXTENSION_MAP
+from parser import get_tags, detect_language, EXTENSION_MAP, compute_content_hash
 
 META_REGISTRY = os.path.expanduser("~/.claude/ftm-state/maps/index.json")
 
@@ -67,60 +77,121 @@ def discover_files(project_root: str) -> list[str]:
 
 
 def index_files(conn, files: list[str], project_root: str) -> dict:
-    """Parse and insert symbols + edges for a list of absolute file paths.
+    """Parse and insert files, symbols, references, then materialize edges.
 
-    Two-phase approach:
-      Phase 1 — parse every file and insert all symbols so that the
-                 symbol table is fully populated before edge resolution.
-      Phase 2 — extract relationships and resolve source/target names to
-                 existing symbol IDs.  Unknown targets are silently skipped.
+    Phase 1 — For each file: read source, compute hash, insert file row,
+              extract def/ref tags via tree-sitter, insert symbol and ref rows.
+    Phase 2 — Build file_edges with Aider weight heuristics (long descriptive
+              names 10x, private 0.1x, overloaded 0.1x, sqrt-dampened counts).
+              Then rebuild symbol_edges via enclosing-scope resolution.
 
-    Returns a dict with 'symbols' and 'edges' counts.
+    Returns a dict with symbols, references, file_edges, symbol_edges counts.
     """
     total_symbols = 0
-    total_edges = 0
+    total_refs = 0
 
-    # Phase 1: insert all symbols first so cross-file edges can be resolved.
+    # ------------------------------------------------------------------
+    # Phase 1: parse each file and insert rows
+    # ------------------------------------------------------------------
     for fpath in files:
         if not os.path.exists(fpath):
             print(f"Warning: file not found, skipping: {fpath}", file=sys.stderr)
             continue
 
         rel_path = os.path.relpath(fpath, project_root)
-        symbols = parse_file(fpath)
+        lang = detect_language(fpath)
+        mtime = os.path.getmtime(fpath)
 
-        for sym in symbols:
-            add_symbol(
-                conn,
-                name=sym.name,
-                kind=sym.kind,
-                file_path=rel_path,
-                start_line=sym.start_line,
-                end_line=sym.end_line,
-                signature=sym.signature,
-                doc_comment=sym.doc_comment,
-                content_hash=sym.content_hash,
-            )
-            total_symbols += 1
-
-    # Phase 2: resolve and insert edges.
-    for fpath in files:
-        if not os.path.exists(fpath):
+        # Stream-friendly: read once, extract metadata, then release
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
+                source = fh.read()
+        except (IOError, OSError) as exc:
+            print(f"Warning: Cannot read {fpath}: {exc}", file=sys.stderr)
             continue
 
-        rels = extract_relationships(fpath)
-        for rel in rels:
-            source_rows = get_symbol_by_name(conn, rel.source_name)
-            target_rows = get_symbol_by_name(conn, rel.target_name)
+        line_count = source.count("\n") + 1
+        content_hash = compute_content_hash(source)
 
-            # Skip if either end of the relationship is unresolvable.
-            if not source_rows or not target_rows:
-                continue
+        # Insert file record
+        file_id = add_file(
+            conn, rel_path, lang, mtime,
+            hash=content_hash, line_count=line_count,
+        )
 
-            add_edge(conn, source_rows[0]["id"], target_rows[0]["id"], rel.kind)
-            total_edges += 1
+        # Extract def/ref tags via tree-sitter
+        tags = get_tags(fpath, rel_path)
 
-    return {"symbols": total_symbols, "edges": total_edges}
+        for tag in tags:
+            if tag.kind == "def":
+                add_symbol(conn, file_id, tag.name, "definition", tag.line, signature=None)
+                total_symbols += 1
+            elif tag.kind == "ref":
+                add_reference(conn, file_id, tag.name, tag.line, kind="call")
+                total_refs += 1
+
+    # ------------------------------------------------------------------
+    # Phase 2: materialize edges
+    # ------------------------------------------------------------------
+
+    # Build defines map: ident -> set of file_ids that define it
+    defines = {}
+    for row in conn.execute("SELECT name, file_id FROM symbols").fetchall():
+        defines.setdefault(row["name"], set()).add(row["file_id"])
+
+    # Build references map: ident -> list of file_ids that reference it
+    references_map = {}
+    for row in conn.execute("SELECT symbol_name, file_id FROM refs").fetchall():
+        references_map.setdefault(row["symbol_name"], []).append(row["file_id"])
+
+    # Materialize file_edges with Aider weight heuristics
+    conn.execute("DELETE FROM file_edges")
+
+    for ident, ref_file_ids in references_map.items():
+        definers = defines.get(ident, set())
+        if not definers:
+            continue
+
+        # Aider weight heuristics
+        mul = 1.0
+        # Long descriptive names (camelCase or snake_case, >= 8 chars) weighted higher
+        if len(ident) >= 8 and re.match(r"[a-z_]+[A-Z]|[a-z]+_[a-z]", ident):
+            mul *= 10
+        # Private names weighted lower
+        if ident.startswith("_"):
+            mul *= 0.1
+        # Overloaded names (defined in many files) weighted lower
+        if len(definers) >= 5:
+            mul *= 0.1
+
+        # Count refs per file, then create weighted edges
+        ref_counts = Counter(ref_file_ids)
+
+        for ref_file_id, count in ref_counts.items():
+            weight = mul * math.sqrt(count)
+            for def_file_id in definers:
+                if ref_file_id != def_file_id:  # No self-edges
+                    conn.execute(
+                        """INSERT INTO file_edges (source_file_id, target_file_id, weight)
+                           VALUES (?, ?, ?)
+                           ON CONFLICT(source_file_id, target_file_id)
+                           DO UPDATE SET weight = MAX(weight, excluded.weight)""",
+                        (ref_file_id, def_file_id, weight),
+                    )
+
+    # Materialize symbol_edges via enclosing-scope resolution
+    rebuild_symbol_edges(conn)
+
+    # Gather edge counts
+    file_edge_count = conn.execute("SELECT COUNT(*) FROM file_edges").fetchone()[0]
+    symbol_edge_count = conn.execute("SELECT COUNT(*) FROM symbol_edges").fetchone()[0]
+
+    return {
+        "symbols": total_symbols,
+        "references": total_refs,
+        "file_edges": file_edge_count,
+        "symbol_edges": symbol_edge_count,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -143,16 +214,14 @@ def bootstrap(project_root: str) -> None:
 
     conn = get_connection(abs_root)
     try:
-        # Full rebuild — clear existing content first.
-        # FTS5 rows must be removed before symbol rows because the content=
-        # table does not cascade deletes.
+        # Full rebuild — clear all tables. CASCADE handles symbols, refs, edges.
+        # FTS5 rows must be removed before symbol rows (content= table).
         symbol_ids = [
             row[0] for row in conn.execute("SELECT id FROM symbols").fetchall()
         ]
         for sid in symbol_ids:
             conn.execute("DELETE FROM symbols_fts WHERE rowid=?", (sid,))
-        conn.execute("DELETE FROM symbols")
-        conn.execute("DELETE FROM edges")
+        conn.execute("DELETE FROM files")
 
         stats = index_files(conn, files, abs_root)
         conn.commit()
@@ -162,7 +231,9 @@ def bootstrap(project_root: str) -> None:
             "mode": "bootstrap",
             "files_parsed": len(files),
             "symbols": stats["symbols"],
-            "edges": stats["edges"],
+            "references": stats["references"],
+            "file_edges": stats["file_edges"],
+            "symbol_edges": stats["symbol_edges"],
             "duration_s": round(duration, 2),
         }
         print(json.dumps(result))
@@ -185,8 +256,9 @@ def incremental(project_root: str, files_str: str) -> None:
     """Incremental update: re-index only the specified files.
 
     *files_str* is a comma-separated list of file paths (relative or absolute).
-    Old symbol/edge data for each file is removed before re-parsing so stale
-    entries do not accumulate.
+    Old file/symbol/ref/edge data for each file is cascade-deleted via
+    remove_file() before re-parsing so stale entries do not accumulate.
+    All edges are rebuilt since changes can ripple across files.
     """
     abs_root = os.path.abspath(project_root)
     start = time.time()
@@ -198,10 +270,10 @@ def incremental(project_root: str, files_str: str) -> None:
 
     conn = get_connection(abs_root)
     try:
-        # Remove stale data for all targeted files before re-parsing.
+        # Remove stale data for all targeted files (cascading delete).
         for fpath in abs_files:
             rel_path = os.path.relpath(fpath, abs_root)
-            remove_symbols_by_file(conn, rel_path)
+            remove_file(conn, rel_path)
 
         existing_files = [f for f in abs_files if os.path.exists(f)]
         if not existing_files:
@@ -221,11 +293,13 @@ def incremental(project_root: str, files_str: str) -> None:
             "mode": "incremental",
             "files_parsed": len(existing_files),
             "symbols": stats["symbols"],
-            "edges": stats["edges"],
+            "references": stats["references"],
+            "file_edges": stats["file_edges"],
+            "symbol_edges": stats["symbol_edges"],
             "duration_s": round(duration, 2),
         }
         print(json.dumps(result))
-        update_meta_registry(abs_root, db_stats["symbols"])
+        update_meta_registry(abs_root, db_stats["symbol_count"])
     except Exception as exc:  # noqa: BLE001
         print(f"Error during incremental update: {exc}", file=sys.stderr)
         conn.rollback()
