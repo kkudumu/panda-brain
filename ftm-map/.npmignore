@@ -1,0 +1,6 @@
+scripts/.venv/
+scripts/__pycache__/
+scripts/.pytest_cache/
+scripts/tests/
+*.pyc
+*.pyo
