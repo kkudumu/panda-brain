@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""View generators: produce INTENT.md and ARCHITECTURE.mmd from the code graph."""
+"""View generators: produce INTENT.md and ARCHITECTURE.mmd from the code graph.
+
+Updated for v2 hybrid architecture with 5-table schema:
+  files, symbols, refs, file_edges, symbol_edges
+"""
 
 import argparse
 import os
@@ -27,17 +31,18 @@ def _get_module_for_path(file_path: str) -> str:
 
 
 def get_modules(conn) -> dict:
-    """Group symbols by directory to identify modules.
+    """Group files by directory to identify modules.
 
+    Queries the files table directly (symbols no longer carry file_path).
     Returns a dict mapping module name -> set of file paths.
     """
     rows = conn.execute(
-        "SELECT DISTINCT file_path FROM symbols ORDER BY file_path"
+        "SELECT DISTINCT path FROM files ORDER BY path"
     ).fetchall()
 
     modules: dict = defaultdict(set)
     for row in rows:
-        fp = row["file_path"]
+        fp = row["path"]
         module = _get_module_for_path(fp)
         modules[module].add(fp)
 
@@ -45,22 +50,37 @@ def get_modules(conn) -> dict:
 
 
 def _get_symbols_for_module(conn, module: str, files: set) -> list:
-    """Return all symbol rows for a module (identified by its set of files)."""
+    """Return all symbol rows for a module (identified by its set of files).
+
+    Joins symbols with files to resolve file_path and maps column names
+    to the view-layer conventions (file_path, start_line, end_line).
+    """
     placeholders = ",".join("?" * len(files))
     rows = conn.execute(
-        f"SELECT * FROM symbols WHERE file_path IN ({placeholders}) ORDER BY file_path, start_line",
+        f"""
+        SELECT s.id, s.name, s.qualified_name, s.kind,
+               s.line_start AS start_line, s.line_end AS end_line,
+               s.signature, s.parent_id,
+               f.path AS file_path
+        FROM symbols s
+        JOIN files f ON f.id = s.file_id
+        WHERE f.path IN ({placeholders})
+        ORDER BY f.path, s.line_start
+        """,
         list(files),
     ).fetchall()
     return [dict(r) for r in rows]
 
 
 def _get_callers(conn, symbol_id: int) -> list:
-    """Return direct callers (symbols that call this one)."""
+    """Return direct callers (symbols that call this one) via symbol_edges."""
     rows = conn.execute(
         """
-        SELECT s.name, s.file_path
-        FROM edges e JOIN symbols s ON s.id = e.source_id
-        WHERE e.target_id = ?
+        SELECT s.name, f.path AS file_path
+        FROM symbol_edges se
+        JOIN symbols s ON s.id = se.source_symbol_id
+        JOIN files f ON f.id = s.file_id
+        WHERE se.target_symbol_id = ?
         LIMIT 10
         """,
         (symbol_id,),
@@ -69,12 +89,14 @@ def _get_callers(conn, symbol_id: int) -> list:
 
 
 def _get_callees(conn, symbol_id: int) -> list:
-    """Return direct callees (symbols this one calls)."""
+    """Return direct callees (symbols this one calls) via symbol_edges."""
     rows = conn.execute(
         """
-        SELECT s.name, s.file_path
-        FROM edges e JOIN symbols s ON s.id = e.target_id
-        WHERE e.source_id = ?
+        SELECT s.name, f.path AS file_path
+        FROM symbol_edges se
+        JOIN symbols s ON s.id = se.target_symbol_id
+        JOIN files f ON f.id = s.file_id
+        WHERE se.source_symbol_id = ?
         LIMIT 10
         """,
         (symbol_id,),
@@ -82,9 +104,18 @@ def _get_callees(conn, symbol_id: int) -> list:
     return [dict(r) for r in rows]
 
 
+def _get_ref_count(conn, symbol_name: str) -> int:
+    """Return the number of references to a symbol from the refs table."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM refs WHERE symbol_name = ?",
+        (symbol_name,),
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
 def _top_symbols(symbols: list, n: int = 5) -> list:
     """Return top n function/method symbols from a list, falling back to any kind."""
-    funcs = [s for s in symbols if s["kind"] in ("function", "method")]
+    funcs = [s for s in symbols if s["kind"] in ("function", "method", "definition")]
     selection = funcs if funcs else symbols
     return selection[:n]
 
@@ -123,6 +154,8 @@ def _infer_purpose(module: str, symbols: list) -> str:
         return f"Module defining {kind_counts['class']} class(es)."
     if dominant == "function":
         return f"Module with {kind_counts['function']} function(s)."
+    if dominant == "definition":
+        return f"Module with {kind_counts['definition']} definition(s)."
     return f"Module containing {len(symbols)} symbols."
 
 
@@ -250,6 +283,9 @@ def _write_root_intent(conn, project_root: str, project_name: str, modules: dict
 |---|---|---|
 | Code indexing | SQLite + FTS5 | Persistent, queryable graph without external dependencies |
 | Symbol extraction | tree-sitter | Language-agnostic AST parsing with multi-language support |
+| Edge extraction | Aider-style def/ref with tags.scm | Reliable cross-language reference detection |
+| Ranking | fast-pagerank with scipy sparse matrices | Hybrid file-level PageRank + symbol-level blast radius |
+| Schema | 5-table (files, symbols, refs, file_edges, symbol_edges) | Separated concerns for file-level and symbol-level analysis |
 | View generation | Markdown + Mermaid | Human-readable output compatible with most documentation tools |
 
 ## Module Map
@@ -273,12 +309,13 @@ def _write_module_intent(conn, project_root: str, module: str, symbols: list) ->
     # Build function entries
     entries = []
     for sym in symbols:
-        if sym["kind"] not in ("function", "method", "class"):
+        if sym["kind"] not in ("function", "method", "class", "definition"):
             continue
 
         does = _infer_function_does(sym)
         callers = _get_callers(conn, sym["id"])
         callees = _get_callees(conn, sym["id"])
+        ref_count = _get_ref_count(conn, sym["name"])
 
         called_by_str = ", ".join(c["name"] for c in callers) if callers else "none found"
         calls_str = ", ".join(c["name"] for c in callees) if callees else "none found"
@@ -287,6 +324,7 @@ def _write_module_intent(conn, project_root: str, module: str, symbols: list) ->
 - **Does**: {does}
 - **Why**: Supports the `{module_name}` module's responsibilities.
 - **Relationships**: calls [{calls_str}], called by [{called_by_str}]
+- **References**: {ref_count} reference(s) across codebase
 - **Decisions**: `{sym.get("signature", "") or sym["name"]}` (line {sym.get("start_line", "?")} – {sym.get("end_line", "?")})
 """
         entries.append(entry)
@@ -351,20 +389,35 @@ def generate_diagrams(project_root: str, only_modules: set | None = None) -> Non
 
 
 def _write_root_diagram(conn, project_root: str, modules: dict) -> None:
-    """Write root ARCHITECTURE.mmd showing module-level dependencies."""
+    """Write root ARCHITECTURE.mmd showing module-level dependencies.
+
+    Uses the file_edges table for module-level dependency information,
+    which is more efficient than walking symbol-level edges.
+    """
     module_list = sorted(modules.keys())
 
-    # Build module -> set of modules it imports from
-    module_deps: dict = defaultdict(set)
-
+    # Build a file_path -> module lookup
+    file_to_module = {}
     for module, files in modules.items():
-        symbols = _get_symbols_for_module(conn, module, files)
-        for sym in symbols:
-            callees = _get_callees(conn, sym["id"])
-            for callee in callees:
-                target_module = _get_module_for_path(callee["file_path"])
-                if target_module != module:
-                    module_deps[module].add(target_module)
+        for fp in files:
+            file_to_module[fp] = module
+
+    # Query file_edges and aggregate into module-level dependencies
+    module_deps: dict = defaultdict(set)
+    rows = conn.execute(
+        """
+        SELECT sf.path AS source_path, tf.path AS target_path, fe.weight
+        FROM file_edges fe
+        JOIN files sf ON sf.id = fe.source_file_id
+        JOIN files tf ON tf.id = fe.target_file_id
+        """
+    ).fetchall()
+
+    for row in rows:
+        src_module = _get_module_for_path(row["source_path"])
+        tgt_module = _get_module_for_path(row["target_path"])
+        if src_module != tgt_module:
+            module_deps[src_module].add(tgt_module)
 
     # Build mermaid lines
     lines = ["graph LR"]
@@ -395,7 +448,10 @@ def _write_root_diagram(conn, project_root: str, modules: dict) -> None:
 
 
 def _write_module_diagram(conn, project_root: str, module: str, symbols: list) -> None:
-    """Write per-module DIAGRAM.mmd showing function-level call graph."""
+    """Write per-module DIAGRAM.mmd showing function-level call graph.
+
+    Uses symbol_edges for intra-module edges.
+    """
     if not symbols:
         return
 
@@ -406,7 +462,7 @@ def _write_module_diagram(conn, project_root: str, module: str, symbols: list) -
     lines = ["graph TD"]
 
     # Node declarations for all symbols with interesting kinds
-    interesting = [s for s in symbols if s["kind"] in ("function", "method", "class")]
+    interesting = [s for s in symbols if s["kind"] in ("function", "method", "class", "definition")]
     if not interesting:
         interesting = symbols
 
@@ -414,7 +470,7 @@ def _write_module_diagram(conn, project_root: str, module: str, symbols: list) -
         safe_id = _mermaid_id(f"{sym['name']}_{sym['id']}")
         lines.append(f"    {safe_id}[{sym['name']}]")
 
-    # Edge declarations — only intra-module edges
+    # Edge declarations — only intra-module edges via symbol_edges
     edges_added = False
     for sym in interesting:
         callees = _get_callees(conn, sym["id"])
@@ -485,41 +541,30 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python3 views.py generate-intent /path/to/project\n"
-            "  python3 views.py generate-diagrams /path/to/project\n"
-            "  python3 views.py generate-intent /path/to/project --files src/foo.ts,src/bar.py\n"
-            "  python3 views.py generate-diagrams /path/to/project --files src/foo.ts\n"
+            "  python3 views.py --intent --project-root /path/to/project\n"
+            "  python3 views.py --diagram --project-root /path/to/project\n"
+            "  python3 views.py --intent --files src/foo.ts,src/bar.py --project-root /path/to/project\n"
+            "  python3 views.py --diagram --files src/foo.ts --project-root /path/to/project\n"
         ),
     )
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # generate-intent subcommand
-    intent_parser = subparsers.add_parser(
-        "generate-intent",
+    parser.add_argument(
+        "--intent",
+        action="store_true",
         help="Generate root INTENT.md and per-module INTENT.md files.",
     )
-    intent_parser.add_argument(
-        "project_root",
-        help="Path to the project root directory.",
-    )
-    intent_parser.add_argument(
-        "--files",
-        metavar="FILE_LIST",
-        default=None,
-        help="Comma-separated list of changed files (incremental mode — only regenerate affected modules).",
-    )
-
-    # generate-diagrams subcommand
-    diag_parser = subparsers.add_parser(
-        "generate-diagrams",
+    parser.add_argument(
+        "--diagram",
+        action="store_true",
         help="Generate root ARCHITECTURE.mmd and per-module DIAGRAM.mmd files.",
     )
-    diag_parser.add_argument(
-        "project_root",
-        help="Path to the project root directory.",
+    parser.add_argument(
+        "--project-root",
+        metavar="PATH",
+        default=os.getcwd(),
+        help="Path to the project root directory (default: cwd).",
     )
-    diag_parser.add_argument(
+    parser.add_argument(
         "--files",
         metavar="FILE_LIST",
         default=None,
@@ -528,17 +573,18 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if not args.intent and not args.diagram:
+        parser.print_help()
+        sys.exit(1)
+
     only_modules: set | None = None
     if args.files:
         only_modules = _files_to_modules(args.files)
 
-    if args.command == "generate-intent":
+    if args.intent:
         generate_intent(args.project_root, only_modules)
-    elif args.command == "generate-diagrams":
+    if args.diagram:
         generate_diagrams(args.project_root, only_modules)
-    else:
-        parser.print_help()
-        sys.exit(1)
 
 
 if __name__ == "__main__":
