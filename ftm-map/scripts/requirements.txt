@@ -1,2 +1,5 @@
 tree-sitter-language-pack>=0.4.0
 sqlite-vec>=0.1.6
+scipy>=1.10.0
+fast-pagerank>=0.0.4
+pygments>=2.15.0
