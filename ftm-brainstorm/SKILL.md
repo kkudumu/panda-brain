@@ -24,6 +24,17 @@ Before dispatching any agents, read `~/.claude/ftm-config.yml`:
 - Example: if profile is `balanced`, agents get `model: opus`
 - If config missing, use session default
 
+## Blackboard Read
+
+Before starting, load context from the blackboard:
+1. Read `~/.claude/ftm-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
+2. Read `~/.claude/ftm-state/blackboard/experiences/index.json` — filter by task_type "feature"/"investigation"
+3. Load top 3-5 matching experience files for past brainstorm lessons
+4. Read `~/.claude/ftm-state/blackboard/patterns.json` — check execution_patterns and user_behavior
+
+If missing or empty, proceed without.
+
+
 ## Research Sprint Dispatch
 
 Each research sprint invokes ftm-researcher rather than dispatching agents directly.
@@ -43,15 +54,6 @@ The brainstorm skill consumes the researcher's structured output and weaves it i
 - Challenges based on contested claims from the disagreement map
 - Targeted questions based on research gaps
 
-## Blackboard Read
-
-Before starting, load context from the blackboard:
-1. Read `~/.claude/ftm-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
-2. Read `~/.claude/ftm-state/blackboard/experiences/index.json` — filter by task_type "feature"/"investigation"
-3. Load top 3-5 matching experience files for past brainstorm lessons
-4. Read `~/.claude/ftm-state/blackboard/patterns.json` — check execution_patterns and user_behavior
-
-If missing or empty, proceed without.
 
 ---
 
@@ -61,14 +63,27 @@ This skill is a **multi-turn research conversation**. Every single turn after th
 
 ```
 EVERY TURN (after initial intake):
-  1. RESEARCH SPRINT  — invoke ftm-researcher with context
+  1. RESEARCH SPRINT  — 3 agents search in parallel from different vectors
   2. SYNTHESIZE       — merge findings into suggestions with evidence
-  3. CHALLENGE        — push back on weak assumptions, surface trade-offs
-  4. ASK              — 1-2 targeted questions to extract more from the user
+  3. CHALLENGE        — observations that push back on assumptions (NOT questions)
+  4. ASK VIA UI       — use AskUserQuestion tool (1-4 questions, clickable options)
   5. >>> STOP <<<     — wait for the user. Do NOT continue.
 ```
 
 The research sprints get progressively deeper. The questions get progressively sharper. Each cycle builds on everything before it. The goal is to extract the user's complete vision AND ground it in real-world evidence before generating any plan.
+
+**Use `AskUserQuestion` for all questions.** This gives the user a clickable selection UI instead of making them type answers. Format every question with 2-4 labeled options, each with a short description of the trade-off. The user clicks their choice (or picks "Other" to type a custom answer). This is faster, less friction, and prevents answers from getting lost.
+
+**Batching rules:** `AskUserQuestion` supports 1-4 questions per call. Use this intelligently:
+- **Batch independent questions together** (up to 4) when the answer to one doesn't affect the options for another. Example: "Output format?" and "Config file approach?" are independent — batch them.
+- **Ask sequentially** when answers are dependent — if the answer to question 1 changes what you'd ask for question 2, don't batch them. Ask question 1 first, process the answer, then ask question 2 on the next turn.
+- **After each batch, run a research sprint** before asking the next batch. The answers may open new research directions.
+
+**Use previews for concrete comparisons.** When options involve code patterns, file structures, or architectural layouts, use the `preview` field to show the user what each option looks like. Example: showing a flat transcript format vs a timestamped JSON format side by side.
+
+**Use `multiSelect: true`** when choices aren't mutually exclusive. Example: "Which meeting apps should we support?" — the user might want both Zoom and Meet.
+
+**Track what's been answered.** Before asking anything, check your context register. If the user already addressed a topic (even as an aside in a longer message), mark it answered and move on. Never re-ask something the user has already addressed, even if they answered it in a different format than you expected.
 
 **You maintain a CONTEXT REGISTER** — a running mental document of everything learned so far. Every research sprint receives this register so agents don't re-search old ground. After each turn, append what you learned.
 
@@ -100,27 +115,30 @@ Detect which path you're on:
 
 ## Path A: Fresh Idea (short/vague message)
 
-**Turn 1 ONLY:** Ask 1-2 questions to understand the core idea. What is it, who is it for, what problem does it solve. One question at a time. If the opening message covers some of these, skip ahead.
+**Turn 1 ONLY:** Ask ONE question to understand the core idea — the single most important unknown. If the opening message covers basics (what, who, problem), skip to the first research sprint.
 
 **>>> STOP. Wait for response. <<<**
 
-**Turn 2:** Take the user's answer. NOW run your first research sprint (3 agents, BROAD depth — see below). Synthesize, challenge, ask 1-2 more questions about architecture and constraints. Propose specific options from the research rather than open-ended questions.
+**Turn 2:** Take the user's answer. NOW run your first research sprint (3 agents, BROAD depth — see below). Synthesize, challenge (observations only), then ask ONE question — the single most important decision point that research surfaced. Frame it with specific options from the research.
 
 **>>> STOP. Wait for response. <<<**
 
-**Turn 3+:** You're now in the core loop. Every turn from here follows the cycle: research sprint -> synthesize -> challenge -> ask -> STOP.
+**Turn 3+:** You're now in the core loop. Every turn from here follows the cycle: research sprint -> synthesize -> challenge (observations) -> ask ONE question -> STOP.
 
 ## Path B: Brain Dump (large paste, notes, transcript)
 
-**Turn 1:** Parse the entire paste. Extract: decisions already made, open questions, assumptions to validate, contradictions, gaps. Present structured summary. Ask for confirmation + any gaps (success criteria, v1 scope, non-negotiables). Do NOT ask basic questions already answered in the paste.
+**Turn 1:** Parse the entire paste. Extract: decisions already made, open questions, assumptions to validate, contradictions, gaps. Present structured summary. Then ask ONE confirmation question — the single biggest gap or ambiguity. Do NOT ask basic questions already answered in the paste. Do NOT list all open questions — pick the most critical one.
 
 **>>> STOP. Wait for confirmation. <<<**
 
-**Turn 2:** Take the confirmation. Run first research sprint in BRAIN DUMP MODE (agents search for each specific architectural claim from the paste). Present novelty map. Synthesize, challenge, ask.
+**Turn 2:** Take the confirmation. Run first research sprint in BRAIN DUMP MODE (agents search for each specific architectural claim from the paste). Present novelty map. Synthesize, challenge (observations only), then ask ONE question about the most important decision point the research surfaced.
 
 **>>> STOP. Wait for response. <<<**
 
-**Turn 3+:** Core loop continues.
+**Turn 3+:** Core loop continues. One question per turn.
+
+---
+
 
 ---
 
@@ -138,7 +156,7 @@ Discuss mode activates when:
 
 ## Flow
 
-Instead of the standard brainstorm research → synthesis → suggestions flow:
+Instead of the standard brainstorm research -> synthesis -> suggestions flow:
 
 1. **Parse the spec** — Extract: what's being built, key components, tech stack, constraints
 2. **Identify gray areas** — Find the parts that aren't specified:
@@ -169,8 +187,6 @@ Instead of the standard brainstorm research → synthesis → suggestions flow:
 | Data pipeline | Failure modes, retry logic, idempotency, monitoring, backpressure |
 | Integration | Auth flow, webhook handling, rate limits, data mapping, error recovery |
 | Config change | Rollback plan, feature flags, gradual rollout, monitoring |
-
----
 
 # PHASE 2: RESEARCH + CHALLENGE LOOP
 
@@ -214,29 +230,77 @@ If research was thin, present fewer suggestions. Quality over quantity. If all 3
 |---|---|---|
 | [claim] | Solved / Partially Solved / Novel | [link or explanation] |
 
-## Step 3: Challenge and Extract
+## Step 3: Challenge (Observations, NOT Questions)
 
-After suggestions, challenge the user's thinking. Pick 2-3 challenge patterns:
+After suggestions, share 2-3 observations that challenge or refine the user's thinking. These are STATEMENTS, not questions. The user can respond to them if they want, but they don't create answer obligations.
 
-- **"Have you considered..."** — surface a pattern they may not know about
-- **"What happens when..."** — probe edge cases and scaling
-- **"The evidence suggests..."** — when research contradicts an assumption
-- **"A simpler approach might be..."** — when they're over-engineering
-- **"Users of [product] complained about..."** — inject real feedback
+Good challenge formats (declarative):
+- **"Worth noting that..."** — surface a pattern they may not know about
+- **"At scale, X typically becomes a bottleneck because..."** — flag edge cases
+- **"The evidence suggests X contradicts the assumption about Y..."** — when research contradicts something
+- **"Successful implementations of this (e.g., [product]) launched with only..."** — YAGNI signal
+- **"Users of [product] reported frustration with..."** — inject real feedback
 
-**YAGNI instinct:** Actively look for scope to cut. If research shows successful products launched with less, argue for smaller v1 scope.
+Bad challenge formats (these are disguised questions — do NOT use):
+- ~~"Have you considered..."~~ — this demands a yes/no answer
+- ~~"What happens when..."~~ — this demands the user think through a scenario
+- ~~"How would you handle..."~~ — this is just a question with extra steps
 
-## Step 4: Ask 1-2 Targeted Questions + Invite Continuation
+**YAGNI instinct:** Actively look for scope to cut. If research shows successful products launched with less, state it as an observation.
 
-Then ask **1-2 questions** that will make the next research sprint more productive. The questions should:
-- Narrow scope based on what research surfaced
-- Reveal constraints research can't discover
-- Test commitment to specific approaches
-- Uncover success criteria and non-negotiables
+## Step 4: Ask Questions via AskUserQuestion
 
-Prefer multiple-choice when the answer space is bounded. Each question should unlock a NEW research vector for next turn.
+Use the `AskUserQuestion` tool for every question. Never just type a question in chat — always use the tool so the user gets the clickable selection UI.
 
-**After your questions, always signal that more depth is available.** Something like: "Answer these and I'll run another research sprint focused on [next topic]. Or if you feel we've covered enough ground, just say the word and we'll move to planning." The user should never feel like the brainstorm is wrapping up unless THEY decide it is. Your default posture is: there's always more to explore.
+**Maintain a question queue internally.** Prioritize by:
+1. Which question unlocks the most downstream decisions (answering it resolves or narrows others)
+2. Which requires the user's judgment (can't be answered by more research)
+3. Which has the highest impact on the architecture
+
+**Batch independent questions (up to 4 per call).** Review your queue — if the top 2-3 questions don't depend on each other's answers, send them in a single `AskUserQuestion` call. The user clicks through them quickly in the UI. If answers ARE dependent, send only the blocking question and save the rest.
+
+**Format each question well:**
+- `header`: Short tag, max 12 chars (e.g., "Output", "Trigger", "Auth")
+- `options`: 2-4 choices, each with a clear `label` (1-5 words) and `description` (trade-off explanation)
+- Put your recommended option first with "(Recommended)" in the label
+- `multiSelect: true` when choices aren't exclusive
+- `preview` for code/config/layout comparisons
+
+**Example AskUserQuestion call:**
+```json
+{
+  "questions": [
+    {
+      "question": "How should recordings be triggered?",
+      "header": "Trigger",
+      "multiSelect": true,
+      "options": [
+        {"label": "Manual CLI (Recommended)", "description": "Simple start/stop command. Fastest to build, most reliable."},
+        {"label": "Process detection", "description": "Auto-detect when Zoom/Meet launches. More complex but hands-free."},
+        {"label": "Calendar-aware", "description": "Watch your calendar and auto-start at meeting time. Requires calendar API integration."}
+      ]
+    },
+    {
+      "question": "What output format for transcripts?",
+      "header": "Output",
+      "multiSelect": false,
+      "options": [
+        {"label": "Markdown (Recommended)", "description": "Human-readable .md files with meeting metadata header."},
+        {"label": "Plain text", "description": "Simple .txt, no formatting overhead."},
+        {"label": "JSON with timestamps", "description": "Structured data with word-level timing. Good for building on top of."}
+      ]
+    }
+  ]
+}
+```
+
+Some questions will become unnecessary as earlier answers clarify things — drop them from the queue when that happens.
+
+**When your initial question queue runs dry, DO NOT suggest wrapping up.** Instead, run a fresh research sprint using EVERYTHING you've learned so far. This sprint should go deeper than any previous one because now you have the user's full picture. The research will surface new unknowns, edge cases, failure modes, and implementation details that generate NEW questions. Present the findings with new suggestions and observations, then ask ONE question from the new unknowns the research surfaced. The loop keeps going — research always generates more questions if you dig deep enough.
+
+**Research-driven question generation:** After each research sprint, actively mine the findings for questions the user hasn't considered yet. Examples: "The research surfaced that CoreAudio Taps require re-granting permissions weekly on Sonoma — how do you want to handle that UX?" or "Three of the repos I found use a daemon model instead of start/stop — worth considering?" The best brainstorms surface things the user didn't know to ask about. If your research isn't generating new questions, your research queries aren't specific enough — reformulate and go deeper.
+
+**After your question, signal what's next.** Something like: "Answer this and I'll dig into [next topic area]." Do NOT offer to move to planning — let the user tell you when they're ready. The user should never feel like the brainstorm is wrapping up unless THEY decide it is.
 
 ## Step 5: STOP
 
@@ -248,7 +312,7 @@ This is non-negotiable. The user's response is the input for the next research s
 
 ## Feature-Type Detection
 
-When you learn enough to classify the feature, add type-specific questions. Pick 2-3 unknowns, don't dump everything.
+When you learn enough to classify the feature, use the type-specific questions below to inform your internal question queue. Pick the single most impactful unknown from the relevant type as your ONE question for that turn.
 
 | Type | Signals | Key Questions |
 |---|---|---|
@@ -257,21 +321,26 @@ When you learn enough to classify the feature, add type-specific questions. Pick
 | Data/Storage | "database", "store", "persist" | SQL vs NoSQL? Read/write ratio? Consistency requirements? |
 | Integration | "connect to", "sync with" | Push/pull/both? Real-time or batch? Retry handling? |
 | Automation | "automate", "trigger", "schedule" | Trigger mechanism? Failure notification? Idempotency? |
-| CLI Tool | "command", "CLI", "terminal" | Interactive or not? Output format? Config file approach? |
+| CLI Tool | "command", "CLI", "terminal" | Interactive or not? Output format? Config file approach? Installation/distribution method? Dependency management? Update strategy? Shell completions? Daemon vs one-shot? Error recovery (what happens mid-recording if crash)? Config file vs flags vs env vars? Logging/verbosity levels? |
 | AI/ML | "AI", "model", "generate", "LLM" | Which model? Latency tolerance? Fallback? Cost ceiling? |
 
 ---
 
 ## When to Suggest Phase 3
 
-You may SUGGEST moving to plan generation when:
-- User explicitly says "ok I think I know what I want", "let's plan", "I'm ready" or similar
-- Research returns diminishing returns AND user seems satisfied (same patterns keep appearing across 2+ sprints)
-- You've covered: core architecture, key technical decisions, data model, integrations AND the user isn't raising new questions
+**Depth is dynamic, not counted.** Don't track a minimum question number. Instead, measure whether your research is still producing new, useful information. The brainstorm is deep enough when research sprints stop surfacing unknowns — not when you've hit some arbitrary question count. A simple CLI wrapper might genuinely need 3-4 questions. A distributed system with multiple integration points might need 15. Let the research tell you.
 
-**Default posture: keep exploring.** Never suggest Phase 3 just because a certain number of turns have passed. Some ideas need 3 turns, some need 15. The user decides when they're done, not you. If research is thin on a topic, try reformulating the search before suggesting you've exhausted the space.
+**How to judge depth: the "new information" test.** After each research sprint, ask yourself: did this sprint surface anything the user hasn't already addressed or that I couldn't have inferred from prior answers? If yes, there's more to explore — formulate a question from the new finding. If two consecutive sprints return the same repos, same patterns, and no new unknowns, the research is saturated for this idea.
 
-**HARD GATE: The user must explicitly approve.** Present a brief summary:
+**The key behavior change: when your question queue empties, don't offer to wrap up — run another research sprint first.** The sprint might surface new angles (failure modes, deployment concerns, maintenance patterns, edge cases from similar projects) that generate fresh questions. Only when the sprint comes back dry should you consider the brainstorm naturally complete.
+
+**Never proactively suggest Phase 3.** Don't say "Ready to turn this into an implementation plan?" or "Want to move to planning?" or any variation. Instead, when research is genuinely saturated, just ask your next research-driven question. If there truly isn't one, present your latest findings and observations — the user will tell you when they're ready to move on. The user controls the pace, not you.
+
+**The one exception:** If research has been genuinely dry across 2+ consecutive sprints AND you have no new questions, you may say something like: "I've dug into [X, Y, Z areas] and the research is converging — happy to keep exploring if there's anything else on your mind, or we can shape this up." This is a status update, not a push. Say it once. If the user asks anything, go back to the research loop.
+
+**Before Phase 3, scan your context register.** Every question you've asked should have an answer recorded. If any are unanswered, ask them ONE AT A TIME in subsequent turns before Phase 3. Do NOT re-ask questions the user already answered — even if their answer was embedded in a longer message or phrased differently than expected.
+
+**HARD GATE: The user must explicitly say they're ready.** When they do, present a brief summary:
 
 ```
 Here's what I think we've landed on:
@@ -280,11 +349,9 @@ Here's what I think we've landed on:
 **Core approach:** [recommended architecture/pattern]
 **Key decisions:** [2-3 bullets]
 **Scope for v1:** [what's in, what's deferred]
-
-Ready to turn this into an implementation plan, or more to explore?
 ```
 
-If they say yes, proceed. If they raise new questions, stay in Phase 2.
+Then proceed to Phase 3. If they raise corrections, address them before proceeding.
 
 ---
 
@@ -302,6 +369,7 @@ Read `references/plan-template.md` for the full template and rules. Present the 
 If user already completed superpowers:brainstorming, point to ftm-executor instead. If user explicitly invokes this skill, always run it.
 
 ---
+
 
 ## Context Compression
 

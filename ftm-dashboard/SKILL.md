@@ -118,6 +118,16 @@ Average plan modifications: 1.2 per plan
 - Keep output concise — one screen max
 - If data sources are empty (fresh install), show: "No data yet. Use FTM for a few sessions and check back."
 
+## Events
+
+### Listens To
+- `task_completed` — for session stats tracking
+
+### Blackboard Read
+- `context.json` — session metadata
+- `experiences/index.json` — experience inventory
+- `patterns.json` — pattern health
+
 ## Requirements
 
 - reference: `~/.claude/ftm-state/events.log` | optional | JSONL event log for skill invocation tracking

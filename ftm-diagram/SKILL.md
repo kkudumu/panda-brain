@@ -18,6 +18,7 @@ Two-level diagram system: a root subway map of modules and per-module street map
 
 ---
 
+
 ## Graph-Powered Mode (ftm-map integration)
 
 Before running the standard analysis, check if the project has a code knowledge graph:
@@ -225,7 +226,6 @@ Add `sendEmail` node with edges to `src/notifications/DIAGRAM.mmd`.
 **View current architecture:**
 > "show architecture"
 Read and display `ARCHITECTURE.mmd` + list available module diagrams.
-
 ---
 
 ### Auto-Invocation by ftm-executor

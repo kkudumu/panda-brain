@@ -13,7 +13,7 @@ description: Self-upgrade mechanism for ftm skills ecosystem. Checks GitHub Rele
 
 # ftm-upgrade
 
-Self-upgrade mechanism for the ftm skills ecosystem. Fetches the latest release from `kkudumu/ftm-brain` on GitHub, compares it to the locally installed version, and copies updated skill files in place.
+Self-upgrade mechanism for the ftm skills ecosystem. Fetches the latest release from `kkudumu/ftm-skills` on GitHub, compares it to the locally installed version, and copies updated skill files in place.
 
 ---
 
@@ -135,7 +135,7 @@ Map `CHECK_FAILED <reason>` codes to user-facing messages:
 |---|---|
 | `gh_not_installed` | GitHub CLI is not installed. Install it with: `brew install gh` (macOS) or see https://cli.github.com |
 | `no_internet` | Cannot reach GitHub. Check your internet connection and try again. |
-| `repo_not_found` | Repository `kkudumu/ftm-brain` not found. Verify you have access to the repository. |
+| `repo_not_found` | Repository `kkudumu/ftm-skills` not found. Verify you have access to the repository. |
 | `no_releases_found` | No releases found in the repository yet. Check back later. |
 | any other reason | Version check failed: `<reason>`. Try running manually: `bash ~/.claude/skills/ftm-upgrade/scripts/check-version.sh` |
 
@@ -148,9 +148,9 @@ Map `CHECK_FAILED <reason>` codes to user-facing messages:
 | `~/.claude/skills/ftm-upgrade/scripts/check-version.sh` | Query GitHub for latest release, cache result 60 min |
 | `~/.claude/skills/ftm-upgrade/scripts/upgrade.sh` | Download and install latest release |
 
-**Cache location**: `~/.cache/ftm-brain/version-check`
+**Cache location**: `~/.cache/ftm-skills/version-check`
 **Version file**: `~/.claude/skills/ftm-version.txt`
-**Repo**: `kkudumu/ftm-brain`
+**Repo**: `kkudumu/ftm-skills`
 
 ## Requirements
 

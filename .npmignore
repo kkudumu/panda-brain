@@ -1,8 +1,10 @@
 # Python artifacts
-__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 .venv/
+ftm-inbox/*.db
+ftm-inbox/node_modules/
 
 # Test/dev files
 tests/

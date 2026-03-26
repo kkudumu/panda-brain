@@ -23,10 +23,10 @@ description: Autonomous plan execution engine. Takes any plan document and execu
 
 Before starting, load context from the blackboard:
 
-1. Read `/Users/kioja.kudumu/.claude/ftm-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
-2. Read `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json` — filter entries by task_type matching plan tasks and tags overlapping with the plan domain
+1. Read `~/.claude/ftm-state/blackboard/context.json` — check current_task, recent_decisions, active_constraints
+2. Read `~/.claude/ftm-state/blackboard/experiences/index.json` — filter entries by task_type matching plan tasks and tags overlapping with the plan domain
 3. Load top 3-5 matching experience files for relevant lessons on agent performance and timing
-4. Read `/Users/kioja.kudumu/.claude/ftm-state/blackboard/patterns.json` — check execution_patterns for agent performance and timing accuracy patterns
+4. Read `~/.claude/ftm-state/blackboard/patterns.json` — check execution_patterns for agent performance and timing accuracy patterns
 
 If index.json is empty or no matches found, proceed normally without experience-informed shortcuts.
 
@@ -648,12 +648,12 @@ Use `ftm-executor` when: human says "just go" and trusts the plan.
 
 After completing, update the blackboard:
 
-1. Update `/Users/kioja.kudumu/.claude/ftm-state/blackboard/context.json`:
+1. Update `~/.claude/ftm-state/blackboard/context.json`:
    - Set current_task status to "complete"
    - Append decision summary to recent_decisions (cap at 10)
    - Update session_metadata.skills_invoked and last_updated
-2. Write an experience file to `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json` capturing task_type, agent team used, wave count, audit outcomes, and lessons learned
-3. Update `/Users/kioja.kudumu/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
+2. Write an experience file to `~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json` capturing task_type, agent team used, wave count, audit outcomes, and lessons learned
+3. Update `~/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
 4. Emit `task_completed` event
 
 ## Requirements

@@ -190,7 +190,6 @@ When updating after changes:
 4. Write updates — add missing entries, remove stale entries, update changed fields
 5. If new modules were added, create their INTENT.md and add rows to root module map
 6. Report: list of files updated, entries added, entries removed, entries modified
-
 ---
 
 ### Auto-Invocation by ftm-executor

@@ -188,7 +188,7 @@ At the beginning of any ftm skill execution:
 
 ### Mapping Stages to FTM Skills
 
-| Stage | Config Key | FTM Skills That Use It |
+| Stage | Config Key | Panda Skills That Use It |
 |-------|-----------|--------------------------|
 | **Planning** | `profiles.<active>.planning` | ftm-brainstorm, ftm (research/plan generation phase) |
 | **Execution** | `profiles.<active>.execution` | ftm-executor (all spawned task agents) |
