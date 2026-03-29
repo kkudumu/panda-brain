@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0 — 2026-03-29
+
+### Added
+- **ftm-executor**: `agent_mode` config option in `execution` section of ftm-config.yml — controls permission mode for all spawned agents (default: `bypassPermissions`). Prevents agents from downgrading to `acceptEdits` during execution.
+
 ## 1.5.1 — 2026-03-28
 
 ### Fixed

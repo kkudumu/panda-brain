@@ -136,9 +136,9 @@ If the plan checker finds file conflicts between tasks in the same wave, automat
 
 ---
 
-### Phase 0.7: Load Model Profile
+### Phase 0.7: Load Model Profile and Agent Mode
 
-Read `~/.claude/ftm-config.yml` to determine which models to use for agent dispatch. If the file doesn't exist, use balanced defaults:
+Read `~/.claude/ftm-config.yml` to determine which models and permission mode to use for agent dispatch. If the file doesn't exist, use balanced defaults:
 - Planning agents: opus
 - Execution agents: sonnet
 - Review/audit agents: sonnet
@@ -149,6 +149,8 @@ When spawning agents in subsequent phases, pass the `model` parameter based on t
 - Phase 4.5 (audit): use `review` model
 
 If the profile specifies `inherit`, omit the `model` parameter (uses session default).
+
+**Agent permission mode**: Read `execution.agent_mode` from ftm-config.yml. Pass this as the `mode` parameter on every Agent tool call. Default: `bypassPermissions`. This ensures spawned agents inherit the user's preferred permission level and do not downgrade to `acceptEdits` or `default`.
 
 ---
 

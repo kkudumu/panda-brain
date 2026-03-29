@@ -14,6 +14,9 @@ ftm-browse/bin/ftm-browse
 **/.venv/
 **/.ftm-map/
 
+# Environment secrets
+.env
+
 # macOS
 .DS_Store
 

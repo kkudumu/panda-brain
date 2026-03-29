@@ -33,6 +33,8 @@ profiles:
 
 # Execution preferences
 execution:
+  agent_mode: bypassPermissions   # permission mode for ALL spawned agents
+                                  # options: bypassPermissions, acceptEdits, dontAsk, default, auto
   max_parallel_agents: 5          # max agents dispatched simultaneously
   per_skill_overrides:              # skills read their own override, fall back to global
     ftm-researcher: 10

@@ -1,8 +1,8 @@
-# Phase 0.7 — Model Profile Loading
+# Phase 0.7 — Model Profile and Agent Mode Loading
 
 ## Reading ftm-config.yml
 
-Read `~/.claude/ftm-config.yml` to determine which models to use when spawning agents. If the file doesn't exist, use these balanced defaults:
+Read `~/.claude/ftm-config.yml` to determine which models and permission mode to use when spawning agents. If the file doesn't exist, use these balanced defaults:
 
 | Role | Default Model |
 |------|--------------|
@@ -23,10 +23,25 @@ When spawning agents in subsequent phases, pass the `model` parameter based on r
 
 If the profile specifies `inherit` for a role, omit the `model` parameter entirely — the agent uses the session default.
 
+## Agent Permission Mode
+
+Read `execution.agent_mode` from ftm-config.yml. Pass this as the `mode` parameter on **every** Agent tool call in all phases. This controls the permission level for spawned agents.
+
+| Value | Behavior |
+|-------|----------|
+| `bypassPermissions` | Agent runs without prompting user (default) |
+| `acceptEdits` | Agent can edit files but prompts for other actions |
+| `dontAsk` | Agent makes all decisions autonomously |
+| `default` | Uses Claude Code's default permission behavior |
+| `auto` | Automatic permission selection |
+
+If `agent_mode` is not set in config, default to `bypassPermissions`.
+
 ## Example ftm-config.yml Structure
 
 ```yaml
-active_profile: balanced
+execution:
+  agent_mode: bypassPermissions   # permission mode for all spawned agents
 
 profiles:
   balanced:
