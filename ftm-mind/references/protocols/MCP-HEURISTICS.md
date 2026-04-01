@@ -4,7 +4,7 @@
 
 Use the smallest relevant MCP set.
 
-- Jira issue key or Atlassian URL → `mcp-atlassian-personal`
+- Jira issue key or Atlassian URL → `mcp-atlassian-personal` (default; configured via `ops.mcp_account_rules.personal` in ftm-config.yml)
 - "internal docs", "runbook", "Klaviyo", "Glean" → `glean_default`
 - "how do I use X library" → `context7`
 - "calendar", "meeting", "free time" → `google-calendar`

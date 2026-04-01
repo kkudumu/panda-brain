@@ -128,7 +128,7 @@ Use these as behavioral tests.
 | `rename this variable` | one obvious local edit | handle directly as `micro` |
 | `what would other AIs think` | multi-model request | route to `ftm-council` |
 | `audit the wiring` | structural verification | route to `ftm-audit` |
-| Jira ticket URL only | ticket-driven, intent unclear | fetch via `mcp-atlassian-personal`, re-orient |
+| Jira ticket URL only | ticket-driven, intent unclear | fetch via `mcp-atlassian-personal` (configured name), re-orient |
 | `check my calendar and draft a slack message` | mixed-domain | read calendar, draft Slack, ask before send |
 | `make this better` | ambiguous | ask one focused clarifying question |
 | `what's blocking me?` | ops/task request | route to `ftm-ops` |

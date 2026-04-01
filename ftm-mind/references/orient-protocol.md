@@ -43,8 +43,8 @@ Orient must know the available MCPs and their contextual triggers.
 | `sequential-thinking` | The problem genuinely needs multi-step reflective reasoning or trade-off analysis. |
 | `slack` | You need to read Slack context, inspect channels or threads, or send a Slack update. |
 | `gmail` | You need inbox search, email reading, drafting, sending, labels, or filters. |
-| `mcp-atlassian-personal` | Personal Jira or Confluence reads and writes: tickets, sprints, docs, comments, status changes. Default Atlassian account. |
-| `mcp-atlassian` | Admin-scope Jira or Confluence operations that must run with elevated org credentials. |
+| `mcp-atlassian-personal` | Personal Jira or Confluence reads and writes: tickets, sprints, docs, comments, status changes. Default Atlassian account. *(Server names are configurable via `ops.mcp_account_rules` in ftm-config.yml. This table shows defaults.)* |
+| `mcp-atlassian` | Admin-scope Jira or Confluence operations that must run with elevated org credentials. *(Configurable via `ops.mcp_account_rules.admin` in ftm-config.yml.)* |
 | `freshservice-mcp` | IT ticketing, requesters, agent groups, products, or service requests. |
 | `context7` | External library and framework documentation. |
 | `glean_default` | Internal company docs, policies, runbooks, and institutional knowledge. |
@@ -56,7 +56,7 @@ Orient must know the available MCPs and their contextual triggers.
 
 Use the smallest relevant MCP set.
 
-- Jira issue key or Atlassian URL -> `mcp-atlassian-personal`
+- Jira issue key or Atlassian URL -> `mcp-atlassian-personal` (or the configured personal account name)
 - "internal docs", "runbook", "Klaviyo", "Glean" -> `glean_default`
 - "how do I use X library" -> `context7`
 - "calendar", "meeting", "free time" -> `google-calendar`
