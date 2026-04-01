@@ -35,6 +35,7 @@ If input starts with a recognized skill name, route directly to that skill:
 | `config` | ftm-config |
 | `capture`, `codify`, `save as routine` | ftm-capture |
 | `mind` | ftm-mind |
+| `ops`, `eng-buddy` | ftm-ops |
 
 When routing to a specific skill:
 1. Update the blackboard context: read `~/.claude/ftm-state/blackboard/context.json`, set `current_task` to reflect the incoming request, append to `session_metadata.skills_invoked`, write back.
@@ -53,6 +54,7 @@ If ftm-mind fails (errors, timeouts, no actionable output) AND `legacy_router_fa
 - "bug", "broken", "error", "fix", "crash", "failing" → ftm-debug
 - "plan", "think", "build", "design", "how should" → ftm-brainstorm
 - file path + "execute"/"go"/"run" → ftm-executor
+- "task", "capacity", "burnout", "blocking", "stakeholder", "wrap up", "what happened" → ftm-ops
 - All other → ftm-brainstorm (default)
 
 This fallback can be disabled after stable operation.
@@ -79,6 +81,7 @@ FTM Skills:
   /ftm retro                 — Post-execution retrospective
   /ftm config                — View and edit ftm configuration
   /ftm capture [name]        — Extract routine + playbook from current session
+  /ftm ops [request]         — Task management, capacity, stakeholders, meetings
 
 Or just describe what you need and ftm-mind will handle it.
 ```
