@@ -1,6 +1,6 @@
 {
   "name": "feed-the-machine",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "A unified intelligence layer for Claude Code — 22 skills with OODA-based reasoning, persistent memory, multi-model deliberation, and optional operator cockpit inbox",
   "license": "MIT",
   "author": "kkudumu",

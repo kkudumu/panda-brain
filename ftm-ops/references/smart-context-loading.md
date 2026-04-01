@@ -29,17 +29,17 @@ date +%Y-%m-%d
 date +%Y-W%V
 
 # Today's tasks
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --tasks --task-json
+python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json
 
 # Today's daily file
-~/.claude/eng-buddy/daily/YYYY-MM-DD.md
+~/.claude/ftm-ops/daily/YYYY-MM-DD.md
 # (create it if it doesn't exist — see daily-weekly-analysis.md for structure)
 
 # Overdue follow-ups
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-list --overdue
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-list --overdue
 
 # Active blockers
-~/.claude/eng-buddy/dependencies/active-blockers.md
+~/.claude/ftm-ops/dependencies/active-blockers.md
 ```
 
 **Token budget for Layer 1**: ~2-3K tokens
@@ -48,7 +48,7 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-list --overdue
 
 ```bash
 # Last session snapshot — preserves conversation context across sessions
-ls -t ~/.claude/eng-buddy/sessions/ | head -1
+ls -t ~/.claude/ftm-ops/sessions/ | head -1
 # Load that file
 ```
 
@@ -59,7 +59,7 @@ This is the most important recovery mechanism. If the daily file is empty, the s
 ### Layer 3: Load Weekly Summary (Filtered)
 
 ```bash
-~/.claude/eng-buddy/weekly/YYYY-WNN.md
+~/.claude/ftm-ops/weekly/YYYY-WNN.md
 ```
 
 Load only: open action items, active blockers, major decisions. Skip completed items and verbose meeting notes.
@@ -84,9 +84,9 @@ Load based on what the user is talking about:
 Load on Monday mornings or when user reports an issue:
 
 ```bash
-~/.claude/eng-buddy/patterns/recurring-issues.md
-~/.claude/eng-buddy/patterns/recurring-questions.md
-~/.claude/eng-buddy/patterns/documentation-gaps.md
+~/.claude/ftm-ops/patterns/recurring-issues.md
+~/.claude/ftm-ops/patterns/recurring-questions.md
+~/.claude/ftm-ops/patterns/documentation-gaps.md
 ```
 
 **Token budget for Layer 5**: ~1K tokens total (these files should be kept lean)
@@ -96,7 +96,7 @@ Load on Monday mornings or when user reports an issue:
 Load before generating any stakeholder communication or update:
 
 ```bash
-~/.claude/eng-buddy/stakeholders/communication-log.md
+~/.claude/ftm-ops/stakeholders/communication-log.md
 ```
 
 Combined with `--followup-list` from brain.py.
@@ -109,10 +109,10 @@ Load when discussing production issues:
 
 ```bash
 # Always load the index first
-~/.claude/eng-buddy/incidents/incident-index.md
+~/.claude/ftm-ops/incidents/incident-index.md
 
 # Then load specific incident files only when referenced
-~/.claude/eng-buddy/incidents/YYYY-MM-DD-incident-name.md
+~/.claude/ftm-ops/incidents/YYYY-MM-DD-incident-name.md
 ```
 
 Never load all incident files. Use the index to identify which ones matter.
@@ -124,7 +124,7 @@ Never load all incident files. Use the index to identify which ones matter.
 Load only when actively using that API in the current session:
 
 ```bash
-~/.claude/eng-buddy/references/freshservice-custom-objects-api.md
+~/.claude/ftm-ops/references/freshservice-custom-objects-api.md
 # (other API docs as needed)
 ```
 

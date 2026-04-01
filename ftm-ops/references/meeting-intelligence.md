@@ -63,7 +63,7 @@ Owner disambiguation: if "we" means you, attribute to yourself. If ambiguous, no
 - [Decision] — Rationale: [why] — Made by: [who] — Date: [date]
 ```
 
-Write decisions to `~/.claude/eng-buddy/knowledge/decisions.md` if they have lasting architectural or operational impact.
+Write decisions to `~/.claude/ftm-ops/knowledge/decisions.md` if they have lasting architectural or operational impact.
 
 ---
 
@@ -77,7 +77,7 @@ Commitments are promises made in the meeting — by you or to you.
 
 **Commitments made to you:**
 - Track as blockers if they're on a critical path
-- Add to `~/.claude/eng-buddy/dependencies/active-blockers.md` if blocking your work
+- Add to `~/.claude/ftm-ops/dependencies/active-blockers.md` if blocking your work
 
 ---
 
@@ -112,7 +112,7 @@ When user shares Slack thread or messages:
 
 ## Daily File Integration
 
-After processing any meeting, append to today's daily file `~/.claude/eng-buddy/daily/YYYY-MM-DD.md`:
+After processing any meeting, append to today's daily file `~/.claude/ftm-ops/daily/YYYY-MM-DD.md`:
 
 ```markdown
 ## Meetings & Notes

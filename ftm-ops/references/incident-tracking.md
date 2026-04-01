@@ -9,7 +9,7 @@ Manages incident opening, timeline tracking, root cause analysis, and follow-up 
 When user reports a production issue, outage, or significant failure:
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --incident-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --incident-add \
   --title "Brief incident name" \
   --severity critical|high|medium|low \
   --status investigating \
@@ -18,8 +18,8 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --incident-add \
   --impact "Brief impact description"
 ```
 
-Also create a file: `~/.claude/eng-buddy/incidents/YYYY-MM-DD-incident-name.md`  
-And update the index: `~/.claude/eng-buddy/incidents/incident-index.md`
+Also create a file: `~/.claude/ftm-ops/incidents/YYYY-MM-DD-incident-name.md`  
+And update the index: `~/.claude/ftm-ops/incidents/incident-index.md`
 
 ---
 
@@ -72,7 +72,7 @@ And update the index: `~/.claude/eng-buddy/incidents/incident-index.md`
 
 ## Incident Index Structure
 
-`~/.claude/eng-buddy/incidents/incident-index.md`:
+`~/.claude/ftm-ops/incidents/incident-index.md`:
 
 ```markdown
 # Incident Index
@@ -128,10 +128,10 @@ After mitigation, before closing:
 
 ```bash
 # List all incidents
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --incident-list
+python3 ~/.claude/skills/ftm/bin/brain.py --incident-list
 
 # Check for patterns on a specific system
-grep -i "auth\|authentication" ~/.claude/eng-buddy/incidents/incident-index.md
+grep -i "auth\|authentication" ~/.claude/ftm-ops/incidents/incident-index.md
 ```
 
 When user asks "what happened with [system]" or "have we seen this before":
@@ -157,7 +157,7 @@ After resolving any incident:
 Convert incident follow-ups to tasks:
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-add \
   --stakeholder "Team / Person" \
   --topic "Incident follow-up: [action]" \
   --due YYYY-MM-DD \

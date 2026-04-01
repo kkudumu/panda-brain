@@ -11,11 +11,11 @@ Produces data-backed narrative summaries of the day or week. Reads daily/weekly 
 ### Steps
 
 1. **Get today's date**: `date +%Y-%m-%d`
-2. **Read today's daily file**: `~/.claude/eng-buddy/daily/YYYY-MM-DD.md`
+2. **Read today's daily file**: `~/.claude/ftm-ops/daily/YYYY-MM-DD.md`
 3. **Pull open tasks from brain.py**: `--tasks --task-json`
 4. **Check follow-ups**: `--followup-list --overdue`
 5. **Analyze capacity signals**: context switches, hours worked, unplanned work count
-6. **Check blocker status**: `~/.claude/eng-buddy/dependencies/active-blockers.md`
+6. **Check blocker status**: `~/.claude/ftm-ops/dependencies/active-blockers.md`
 7. **Write narrative summary** (see format below)
 8. **Log capacity entry** via brain.py `--capacity-log`
 9. **Update daily-index.md** with today's entry
@@ -60,7 +60,7 @@ Produces data-backed narrative summaries of the day or week. Reads daily/weekly 
 ### Steps
 
 1. **Get current week**: `date +%Y-W%V`
-2. **Read weekly summary**: `~/.claude/eng-buddy/weekly/YYYY-WNN.md`
+2. **Read weekly summary**: `~/.claude/ftm-ops/weekly/YYYY-WNN.md`
 3. **Pull all tasks completed this week** from brain.py
 4. **Pull patterns from this week**: `--pattern-list`
 5. **Pull incidents from this week**: `--incident-list`
@@ -110,7 +110,7 @@ Produces data-backed narrative summaries of the day or week. Reads daily/weekly 
 
 ## Weekly File Structure
 
-The weekly file at `~/.claude/eng-buddy/weekly/YYYY-WNN.md` should accumulate throughout the week:
+The weekly file at `~/.claude/ftm-ops/weekly/YYYY-WNN.md` should accumulate throughout the week:
 
 ```markdown
 # Weekly Summary — YYYY Week NN
@@ -138,7 +138,7 @@ The weekly file at `~/.claude/eng-buddy/weekly/YYYY-WNN.md` should accumulate th
 
 ## Daily File Structure
 
-`~/.claude/eng-buddy/daily/YYYY-MM-DD.md`:
+`~/.claude/ftm-ops/daily/YYYY-MM-DD.md`:
 
 ```markdown
 # Daily Log — YYYY-MM-DD (Day Name)

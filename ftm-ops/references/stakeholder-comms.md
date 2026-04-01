@@ -11,7 +11,7 @@ Handles communication drafts, follow-up tracking, and stakeholder relationship i
 ### Steps
 
 1. Determine filename: `[recipient]-[topic]-[YYYY-MM-DD].md`
-2. **Write the file** to `~/.claude/eng-buddy/drafts/` using Write tool
+2. **Write the file** to `~/.claude/ftm-ops/drafts/` using Write tool
 3. Include metadata header in file:
    ```
    Date: YYYY-MM-DD
@@ -89,7 +89,7 @@ Keep it short. Lead with what you need, why, and the time ask.
 Add a stakeholder when they become a recurring point of contact:
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --stakeholder-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-add \
   --name "Name" \
   --role "Role / Team" \
   --channel "Slack / Email" \
@@ -98,10 +98,10 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --stakeholder-add \
 
 List stakeholders:
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --stakeholder-list
+python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-list
 ```
 
-Also maintain `~/.claude/eng-buddy/stakeholders/communication-log.md` for conversation history. Read this file before generating any stakeholder update to maintain continuity.
+Also maintain `~/.claude/ftm-ops/stakeholders/communication-log.md` for conversation history. Read this file before generating any stakeholder update to maintain continuity.
 
 ---
 
@@ -110,7 +110,7 @@ Also maintain `~/.claude/eng-buddy/stakeholders/communication-log.md` for conver
 Track every promised follow-up:
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-add \
   --stakeholder "Name" \
   --topic "What was promised / what's needed" \
   --due YYYY-MM-DD \
@@ -120,7 +120,7 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-add \
 On session start, check follow-up list and surface overdue items:
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-list --overdue
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-list --overdue
 ```
 
 **Overdue follow-up alert:**
@@ -160,7 +160,7 @@ When user shares Slack messages or email threads:
 
 Before writing any stakeholder communication:
 
-1. Read `~/.claude/eng-buddy/stakeholders/communication-log.md` for history with this person
+1. Read `~/.claude/ftm-ops/stakeholders/communication-log.md` for history with this person
 2. Check `--followup-list` for any outstanding promises to them
 3. Check task list for relevant in-progress work they care about
 4. Calibrate tone to their known preferences (detail level, formality)

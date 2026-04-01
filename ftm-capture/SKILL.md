@@ -20,7 +20,7 @@ Turns what you just did into reusable automation. Reads the current session's wo
 
 ## Why This Exists
 
-Every time you complete a repeatable workflow (SSO setup, service catalog creation, vendor onboarding, incident response), the knowledge lives only in the conversation. Next session starts from zero. ftm-capture closes this gap by extracting the pattern while context is fresh and writing it to durable storage that ftm-mind, ftm-routine, and eng-buddy can all access.
+Every time you complete a repeatable workflow (SSO setup, service catalog creation, vendor onboarding, incident response), the knowledge lives only in the conversation. Next session starts from zero. ftm-capture closes this gap by extracting the pattern while context is fresh and writing it to durable storage that ftm-mind, ftm-routine, and ftm-ops can all access.
 
 ## Output Artifacts
 
@@ -29,7 +29,7 @@ ftm-capture writes to **three locations** simultaneously:
 | Artifact | Location | Format | Consumer |
 |---|---|---|---|
 | **Routine** | `~/.ftm/routines/{name}.yml` | YAML with phases/steps | `ftm-routine` (executable) |
-| **Playbook** | `~/.claude/eng-buddy/playbooks/{name}.json` | JSON with exact tool params | eng-buddy playbook engine |
+| **Playbook** | `~/.claude/ftm-ops/playbooks/{name}.json` | JSON with exact tool params | ftm-ops playbook engine |
 | **Reference Doc** | `~/Documents/Code/panda/docs/playbooks/{name}.md` | Markdown with gotchas | Future agents + humans |
 
 All three are kept in sync. The routine is the executable version, the playbook has exact tool parameters, and the reference doc has the context and gotchas.
@@ -58,13 +58,13 @@ Read these files in order:
 
 1. **Blackboard context**: `~/.claude/ftm-state/blackboard/context.json`
    - Extract: `current_task`, `recent_decisions`, `active_constraints`
-2. **Today's daily log**: `~/.claude/eng-buddy/daily/{today}.md`
+2. **Today's daily log**: `~/.claude/ftm-ops/daily/{today}.md`
    - Extract: completed items, tool calls, blockers encountered, lessons learned
 3. **Recent experiences**: `~/.claude/ftm-state/blackboard/experiences/index.json`
    - Filter for entries from today's session
    - Load matching experience files for their `lessons` and `decisions_made`
 4. **Existing routines**: `ls ~/.ftm/routines/` — check if a routine for this workflow already exists
-5. **Existing playbooks**: `ls ~/.claude/eng-buddy/playbooks/` — check for existing playbook
+5. **Existing playbooks**: `ls ~/.claude/ftm-ops/playbooks/` — check for existing playbook
 6. **Existing reference docs**: `ls ~/Documents/Code/panda/docs/playbooks/` — check for existing doc
 
 If an existing artifact covers this workflow, the capture becomes an **update** not a create. Load the existing version and merge new learnings.
@@ -143,9 +143,9 @@ known_issues:
 - Include `known_issues` section with every API/tool gotcha discovered during the session
 - Include environment assumptions (repo, API access, etc.) in the description
 
-### Step 5: Write the Playbook (`~/.claude/eng-buddy/playbooks/{name}.json`)
+### Step 5: Write the Playbook (`~/.claude/ftm-ops/playbooks/{name}.json`)
 
-Follow the exact JSON format used by eng-buddy playbooks:
+Follow the exact JSON format used by ftm-ops playbooks:
 
 ```json
 {
@@ -182,7 +182,7 @@ Follow the exact JSON format used by eng-buddy playbooks:
 ```
 
 **Critical rules for playbook writing:**
-- Every step must have exact `tool` and `tool_params` — eng-buddy executes these literally
+- Every step must have exact `tool` and `tool_params` — ftm-ops executes these literally
 - Include `rollback` section with exact reversal steps
 - Set `requires_human: true` for steps needing auth, visual verification, or judgment
 - `source: "captured"` distinguishes from `"manual"` or `"observed"`
@@ -235,7 +235,7 @@ Write to `~/.claude/ftm-state/blackboard/experiences/{name}-capture.json`:
   "lessons": ["{key learnings encoded}"],
   "files_touched": [
     "~/.ftm/routines/{name}.yml",
-    "~/.claude/eng-buddy/playbooks/{name}.json",
+    "~/.claude/ftm-ops/playbooks/{name}.json",
     "~/Documents/Code/panda/docs/playbooks/{name}.md"
   ],
   "confidence": 1.0
@@ -259,7 +259,7 @@ Captured: {workflow name}
 
 Written to:
   Routine:   ~/.ftm/routines/{name}.yml
-  Playbook:  ~/.claude/eng-buddy/playbooks/{name}.json
+  Playbook:  ~/.claude/ftm-ops/playbooks/{name}.json
   Reference: ~/Documents/Code/panda/docs/playbooks/{name}.md
 
 Known issues encoded: {count}
@@ -300,8 +300,8 @@ After ftm-retro scores an execution, if the workflow is repeatable, it should no
 ### ftm-routine
 ftm-routine reads from `~/.ftm/routines/`. Anything ftm-capture writes there becomes immediately available via `/ftm-routine {name}`.
 
-### eng-buddy
-eng-buddy's playbook engine reads from `~/.claude/eng-buddy/playbooks/`. Captured playbooks show up on the dashboard's Playbooks tab.
+### ftm-ops
+ftm-ops's playbook engine reads from `~/.claude/ftm-ops/playbooks/`. Captured playbooks show up on the dashboard's Playbooks tab.
 
 ### Environment Awareness
 
@@ -315,16 +315,16 @@ This prevents future sessions from trying to use APIs they don't have access to.
 ## Requirements
 
 - reference: `~/.claude/ftm-state/blackboard/context.json` | required | current task and recent decisions for pattern extraction
-- reference: `~/.claude/eng-buddy/daily/{today}.md` | optional | daily log for completed items and tool calls
+- reference: `~/.claude/ftm-ops/daily/{today}.md` | optional | daily log for completed items and tool calls
 - reference: `~/.claude/ftm-state/blackboard/experiences/index.json` | required | today's session experiences
 - reference: `~/.ftm/routines/` | optional | check for existing routines before creating new one
-- reference: `~/.claude/eng-buddy/playbooks/` | optional | check for existing playbooks before creating
+- reference: `~/.claude/ftm-ops/playbooks/` | optional | check for existing playbooks before creating
 - reference: `~/Documents/Code/panda/docs/playbooks/` | optional | check for existing reference docs before creating
 
 ## Risk
 
 - level: low_write
-- scope: writes YAML routine to ~/.ftm/routines/, JSON playbook to ~/.claude/eng-buddy/playbooks/, and Markdown reference doc to ~/Documents/Code/panda/docs/playbooks/; writes experience to blackboard; does not modify project source code
+- scope: writes YAML routine to ~/.ftm/routines/, JSON playbook to ~/.claude/ftm-ops/playbooks/, and Markdown reference doc to ~/Documents/Code/panda/docs/playbooks/; writes experience to blackboard; does not modify project source code
 - rollback: delete the three written artifact files; remove experience entry from blackboard experiences/
 
 ## Approval Gates

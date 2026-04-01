@@ -20,7 +20,7 @@ Monitors workload against sustainable thresholds and proactively flags burnout i
 ## Logging a Capacity Entry
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --capacity-log \
+python3 ~/.claude/skills/ftm/bin/brain.py --capacity-log \
   --date YYYY-MM-DD \
   --capacity-pct 95 \
   --context-switches 18 \
@@ -34,7 +34,7 @@ Log entries:
 - When user explicitly says "log my capacity"
 - When a burnout indicator is detected during conversation
 
-Also append a summary entry to `~/.claude/eng-buddy/capacity/weekly-capacity.md`.
+Also append a summary entry to `~/.claude/ftm-ops/capacity/weekly-capacity.md`.
 
 ---
 
@@ -116,7 +116,7 @@ Recommendations:
 
 ## Weekly Burnout File
 
-Read `~/.claude/eng-buddy/capacity/burnout-indicators.md` when analyzing multi-week trends. It tracks:
+Read `~/.claude/ftm-ops/capacity/burnout-indicators.md` when analyzing multi-week trends. It tracks:
 - Running capacity percentages by week
 - Context switch counts
 - Weekend work occurrences

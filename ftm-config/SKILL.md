@@ -99,7 +99,7 @@ ops:
     recurring_question_threshold: 3    # times before suggesting documentation
 
   drafts:
-    directory: ~/.claude/eng-buddy/drafts/  # where communication drafts are stored
+    directory: ~/.claude/ftm-ops/drafts/  # where communication drafts are stored
     naming: "[recipient]-[topic]-[YYYY-MM-DD].md"
     write_before_display: true         # always write file before showing draft in chat
 ```
@@ -312,7 +312,7 @@ The `ops:` section configures `ftm-ops` behavior for personal engineering operat
 - `recurring_question_threshold`: Number of times the same question is asked before ftm-ops suggests creating documentation (default 3).
 
 **`ops.drafts`** — Controls how communication drafts are written and stored.
-- `directory`: Filesystem path where draft files are saved before display. Default `~/.claude/eng-buddy/drafts/`.
+- `directory`: Filesystem path where draft files are saved before display. Default `~/.claude/ftm-ops/drafts/`.
 - `naming`: Filename template for draft files. Variables: `[recipient]`, `[topic]`, `[YYYY-MM-DD]`.
 - `write_before_display`: If `true`, ftm-ops always writes the draft file to disk before showing it in chat. Ensures drafts are never lost if the conversation is interrupted.
 

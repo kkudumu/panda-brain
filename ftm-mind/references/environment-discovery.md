@@ -10,6 +10,8 @@ List connected MCP servers by checking which tool namespaces are available.
 
 For each known MCP server (serena, supabase, playwright, freshservice-mcp, slack, gmail, mcp-atlassian-personal, lusha, apple-doc-mcp), check if tools with that prefix exist.
 
+> **Config note**: The Atlassian server names (`mcp-atlassian-personal`, `mcp-atlassian`) are defaults. Read `ops.mcp_account_rules` from `ftm-config.yml` for the configured names and probe those instead if they differ.
+
 Record: server name, tools available, verified status.
 
 ### 2. CLI Probe

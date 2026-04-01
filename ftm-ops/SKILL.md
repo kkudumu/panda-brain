@@ -46,13 +46,17 @@ When a request spans multiple domains (e.g., "wrap up today and check my capacit
 
 ---
 
+> **Path note**: brain.py lives at `~/.claude/skills/ftm/bin/brain.py` (the ftm skill install directory).
+> The brain.py path and ops data directory are configurable via `paths.brain_py` and `paths.ops_data_dir` in `ftm-config.yml`.
+> Ops data defaults to `~/.claude/ftm-ops/`.
+
 ## Startup Protocol
 
 On every invocation:
 
-1. **Check tasks**: `python3 ~/.claude/skills/eng-buddy/bin/brain.py --tasks --task-json`
+1. **Check tasks**: `python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json`
    - Inform user: "Loaded X tasks from tasks.db"
-   - Fallback: read `~/.claude/eng-buddy/active-tasks.md` if brain.py fails
+   - Fallback: read `~/.claude/ftm-ops/active-tasks.md` if brain.py fails
 2. **Get current date**: `date +%Y-%m-%d` and week: `date +%Y-W%V`
 3. **Load smart context**: See `references/smart-context-loading.md` for the 9-layer strategy
 4. **Route request**: Match to sub-routing table above, load the reference, then respond
@@ -63,32 +67,34 @@ On every invocation:
 
 All database operations delegate to brain.py. Never write directly to SQLite.
 
+brain.py is at `~/.claude/skills/ftm/bin/brain.py` (configurable via `paths.brain_py` in `ftm-config.yml`).
+
 ```bash
 # Task operations
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --tasks --task-json      # list all tasks as JSON
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --help                   # show all commands
+python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json      # list all tasks as JSON
+python3 ~/.claude/skills/ftm/bin/brain.py --help                   # show all commands
 
 # Capacity (added by Task 4)
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --capacity-log           # log capacity entry
+python3 ~/.claude/skills/ftm/bin/brain.py --capacity-log           # log capacity entry
 
 # Stakeholders (added by Task 4)
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --stakeholder-add        # add stakeholder
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --stakeholder-list       # list stakeholders
+python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-add        # add stakeholder
+python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-list       # list stakeholders
 
 # Incidents (added by Task 4)
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --incident-add           # open incident
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --incident-list          # list incidents
+python3 ~/.claude/skills/ftm/bin/brain.py --incident-add           # open incident
+python3 ~/.claude/skills/ftm/bin/brain.py --incident-list          # list incidents
 
 # Patterns (added by Task 4)
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add            # record pattern observation
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-list           # list patterns
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-add            # record pattern observation
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-list           # list patterns
 
 # Follow-ups (added by Task 4)
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-add           # add follow-up
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --followup-list          # list follow-ups
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-add           # add follow-up
+python3 ~/.claude/skills/ftm/bin/brain.py --followup-list          # list follow-ups
 ```
 
-**Error handling**: brain.py returns JSON errors as `{"error": "description", "code": "ERROR_TYPE"}`. On failure, fall back to the markdown file equivalents in `~/.claude/eng-buddy/`.
+**Error handling**: brain.py returns JSON errors as `{"error": "description", "code": "ERROR_TYPE"}`. On failure, fall back to the markdown file equivalents in `~/.claude/ftm-ops/`.
 
 ---
 
@@ -119,7 +125,7 @@ Read `references/stakeholder-comms.md` for full protocol.
 
 **Critical rule**: Write the draft file FIRST before showing content in chat.
 - Filename: `[recipient]-[topic]-[YYYY-MM-DD].md`
-- Write to: `~/.claude/eng-buddy/drafts/`
+- Write to: `~/.claude/ftm-ops/drafts/` (configurable via `paths.drafts_dir` in `ftm-config.yml`)
 - Return file path in chat, then show content
 
 ### 4. Meeting Intelligence

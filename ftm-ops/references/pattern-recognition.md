@@ -21,10 +21,10 @@ Auto-trigger pattern analysis when:
 
 ```bash
 # Check for existing pattern
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-list --type issue --keyword "auth timeout"
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-list --type issue --keyword "auth timeout"
 
 # Add/update pattern observation
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-add \
   --type issue \
   --title "Database connection timeouts" \
   --occurred YYYY-MM-DD \
@@ -32,7 +32,7 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
   --fix "Restart connection pool"
 ```
 
-Also check: `~/.claude/eng-buddy/patterns/recurring-issues.md`
+Also check: `~/.claude/ftm-ops/patterns/recurring-issues.md`
 
 **Alert threshold: 2+ occurrences in 30 days**
 
@@ -66,7 +66,7 @@ Alert format:
 **Trigger**: User answers a question someone asked them.
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-add \
   --type question \
   --title "How do I reset the production cache?" \
   --asked-by "Support team" \
@@ -74,7 +74,7 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
   --channel "Slack #support"
 ```
 
-Also update: `~/.claude/eng-buddy/patterns/recurring-questions.md`
+Also update: `~/.claude/ftm-ops/patterns/recurring-questions.md`
 
 **Alert threshold: 3+ occurrences from any combination of people**
 
@@ -104,7 +104,7 @@ Signals that trigger gap detection:
 - User re-researches something they've done before (mentions "I had to look this up again")
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-add \
   --type doc-gap \
   --system "Auth Service" \
   --evidence "4 recurring issues + 3 people asking about OAuth" \
@@ -112,7 +112,7 @@ python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-add \
   --suggested-doc "Auth service runbook"
 ```
 
-Also update: `~/.claude/eng-buddy/patterns/documentation-gaps.md`
+Also update: `~/.claude/ftm-ops/patterns/documentation-gaps.md`
 
 Alert format:
 > "Documentation gap detected: Auth Service
@@ -156,9 +156,9 @@ When user asks "have we seen this before" or "is this a pattern":
 4. Synthesize: "Yes — this has occurred [N] times. Here's the pattern..."
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --pattern-list
-grep -i "[keyword]" ~/.claude/eng-buddy/patterns/recurring-issues.md
-grep -i "[keyword]" ~/.claude/eng-buddy/incidents/incident-index.md
+python3 ~/.claude/skills/ftm/bin/brain.py --pattern-list
+grep -i "[keyword]" ~/.claude/ftm-ops/patterns/recurring-issues.md
+grep -i "[keyword]" ~/.claude/ftm-ops/incidents/incident-index.md
 ```
 
 ---

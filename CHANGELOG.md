@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.7.0 — 2026-04-01
+
+### Added
+- **ftm-ops**: New personal operations intelligence skill — task management, capacity/burnout tracking, stakeholder comms, meeting intelligence, incident lifecycle, pattern recognition, and daily/weekly narrative analysis with 8 reference files
+- **brain.py bundled**: brain.py, tasks_db.py, and playbook_engine now ship with the repo at bin/ — no external dependency on eng-buddy install path
+- **9 new brain.py CLI commands**: --capacity-log, --stakeholder-add/list, --incident-add/list, --pattern-add/list, --followup-add/list
+- **7 new inbox.db tables**: capacity_logs, stakeholder_contacts, incidents, pattern_observations (with FTS5), follow_ups, burnout_indicators
+- **Migration script**: bin/migrate-eng-buddy-data.py for one-time import of eng-buddy markdown data into inbox.db ops tables (dry-run mode, archive, reconciliation)
+- **6 hooks migrated to ftm namespace**: ftm-auto-log, ftm-learning-capture, ftm-session-snapshot, ftm-pre-compaction, ftm-post-compaction, ftm-session-end
+- **Configurable paths**: New `paths:` section in ftm-config.yml for brain_py, ops_data_dir, drafts_dir, inbox_db — enables team distribution without path conflicts
+- **Configurable MCP names**: Atlassian MCP server names read from `ops.mcp_account_rules` config instead of hardcoded
+- **Optional personal profile**: personality.md degrades gracefully when no user profile exists
+
+### Changed
+- **ftm-mind slimmed from 87KB to 10KB** via progressive disclosure — 6 new reference files (orient-protocol, blackboard-protocol, complexity-sizing, decide-act-protocol, direct-execution, environment-discovery)
+- **ftm-mind Orient phase** now loads tasks via brain.py and personality context automatically
+- **ftm router** recognizes `ops` and `eng-buddy` as routing prefixes to ftm-ops
+- **All eng-buddy paths migrated** from `~/.claude/eng-buddy/` to configurable `~/.claude/ftm-ops/`
+- **All brain.py references** updated from `~/.claude/skills/eng-buddy/bin/` to `~/.claude/skills/ftm/bin/`
+- **Hardcoded email addresses removed** from personality and MCP reference files
+
+### Deprecated
+- **eng-buddy skill**: Now a redirect stub forwarding to /ftm. Phase 1 (forwarding) through 2026-07-01, Phase 2 (warning) through 2026-10-01, Phase 3 (removal) after 2026-10-01
+
 ## 1.6.0 — 2026-03-29
 
 ### Added

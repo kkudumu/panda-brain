@@ -7,12 +7,12 @@ Handles all task CRUD, prioritization, and TaskCreate surfacing. All persistence
 ## Reading Tasks
 
 ```bash
-python3 ~/.claude/skills/eng-buddy/bin/brain.py --tasks --task-json
+python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json
 ```
 
 Parse JSON output. Present as prioritized list — never dump raw JSON to the user.
 
-**Fallback**: If brain.py fails, read `~/.claude/eng-buddy/active-tasks.md`.
+**Fallback**: If brain.py fails, read `~/.claude/ftm-ops/active-tasks.md`.
 
 Inform user: "Loaded X tasks from tasks.db" (or "Loaded from fallback file").
 
@@ -80,7 +80,7 @@ When user says "done", "mark complete", "close", "finished":
 When a task is blocked:
 
 1. Log the blocker explicitly (what's needed, who owns it)
-2. Check `~/.claude/eng-buddy/dependencies/active-blockers.md` for related context
+2. Check `~/.claude/ftm-ops/dependencies/active-blockers.md` for related context
 3. Calculate blocker age — flag if >1 week, escalate if >2 weeks
 4. Suggest follow-up or escalation path
 

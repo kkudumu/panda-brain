@@ -63,7 +63,9 @@
 
 ### Project Management
 
-#### `mcp-atlassian-personal` (personal Jira + Confluence account)
+#### `mcp-atlassian-personal` (personal Jira + Confluence account) {#atlassian-personal}
+
+> **Config note**: This server name is the default. The actual name is read from `ops.mcp_account_rules.personal` in `ftm-config.yml`. Update that value to change which MCP server is used for personal Atlassian operations.
 | Field | Detail |
 |-------|--------|
 | **Tools** | Jira: `jira_search`, `jira_get_issue`, `jira_create_issue`, `jira_update_issue`, `jira_delete_issue`, `jira_transition_issue`, `jira_add_comment`, `jira_edit_comment`, `jira_get_transitions`, `jira_get_all_projects`, `jira_get_project_issues`, `jira_get_board_issues`, `jira_get_sprint_issues`, `jira_get_sprints_from_board`, `jira_get_agile_boards`, `jira_create_sprint`, `jira_update_sprint`, `jira_add_issues_to_sprint`, `jira_batch_create_issues`, `jira_create_issue_link`, `jira_remove_issue_link`, `jira_get_link_types`, `jira_add_worklog`, `jira_get_worklog`, `jira_add_watcher`, `jira_remove_watcher`, `jira_get_issue_watchers`, `jira_get_user_profile`, `jira_download_attachments`, `jira_get_issue_images`, `jira_link_to_epic`, `jira_get_project_components`, `jira_get_project_versions`, `jira_batch_create_versions`, `jira_create_version`, `jira_get_issue_sla`, `jira_get_issue_dates`, `jira_get_issue_development_info`, `jira_get_issues_development_info`, `jira_batch_get_changelogs`, `jira_get_queue_issues`, `jira_get_service_desk_for_project`, `jira_get_service_desk_queues`, `jira_create_remote_issue_link`, `jira_search_fields`, `jira_get_field_options`, `jira_get_issue_proforma_forms`, `jira_get_proforma_form_details`, `jira_update_proforma_form_answers` | Confluence: `confluence_search`, `confluence_get_page`, `confluence_create_page`, `confluence_update_page`, `confluence_delete_page`, `confluence_add_comment`, `confluence_reply_to_comment`, `confluence_get_comments`, `confluence_add_label`, `confluence_get_labels`, `confluence_get_page_children`, `confluence_get_page_history`, `confluence_get_page_diff`, `confluence_get_page_views`, `confluence_move_page`, `confluence_upload_attachment`, `confluence_upload_attachments`, `confluence_get_attachments`, `confluence_delete_attachment`, `confluence_download_attachment`, `confluence_download_content_attachments`, `confluence_get_page_images`, `confluence_search_user` |
@@ -71,7 +73,9 @@
 | **When NOT to use** | IT admin operations (use `mcp-atlassian` instead); service desk ticket management (use `freshservice-mcp`) |
 | **Approval required** | Auto: all `get_*`, `search*`, `list_*`, `download_*` (read). Needs approval: `create_issue`, `update_issue`, `delete_issue`, `transition_issue`, `add_comment`, `create_page`, `update_page`, `delete_page`, `add_worklog` |
 
-#### `mcp-atlassian` (IT admin Jira + Confluence account)
+#### `mcp-atlassian` (IT admin Jira + Confluence account) {#atlassian-admin}
+
+> **Config note**: This server name is the default. The actual name is read from `ops.mcp_account_rules.admin` in `ftm-config.yml`.
 | Field | Detail |
 |-------|--------|
 | **Tools** | Same tool set as `mcp-atlassian-personal` |

@@ -10,7 +10,7 @@ Use these as behavioral tests for the Orient → Decide pipeline.
 | `rename this variable` | one obvious local edit, tiny blast radius | handle directly as `micro` |
 | `what would other AIs think about this approach` | explicit multi-model request | route to `ftm-council` |
 | `audit the wiring` | structural verification request | route to `ftm-audit` |
-| Jira ticket URL only | ticket-driven work, intent not yet clear | fetch via `mcp-atlassian-personal`, then re-orient |
+| Jira ticket URL only | ticket-driven work, intent not yet clear | fetch via `mcp-atlassian-personal` (configured name — see `ops.mcp_account_rules` in ftm-config.yml), then re-orient |
 | `check my calendar and draft a slack message` | mixed-domain workflow, read + external draft/send boundary | read calendar, draft Slack, ask before send |
 | `make this better` | ambiguous, insufficient anchor | ask one focused clarifying question |
 | `/ftm help` | explicit help/menu request | show help menu |

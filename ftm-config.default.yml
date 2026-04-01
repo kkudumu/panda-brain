@@ -108,9 +108,16 @@ ops:
     recurring_question_threshold: 3    # times before suggesting documentation
 
   drafts:
-    directory: ~/.claude/eng-buddy/drafts/  # where communication drafts are stored
+    directory: ~/.claude/ftm-ops/drafts/  # where communication drafts are stored
     naming: "[recipient]-[topic]-[YYYY-MM-DD].md"
     write_before_display: true         # always write file before showing draft in chat
+
+# Paths configuration — override for team distribution
+paths:
+  brain_py: bin/brain.py                    # relative to skill install dir, or absolute
+  ops_data_dir: ~/.claude/ftm-ops/          # base directory for ops data (daily/, weekly/, patterns/, etc.)
+  drafts_dir: ~/.claude/ftm-ops/drafts/     # communication drafts
+  inbox_db: ~/.claude/ftm-ops/inbox.db      # SQLite database for ops tables
 
 # Session management
 session:
