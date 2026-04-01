@@ -41,6 +41,10 @@ Preserve: the full user text, any explicit skill names, file paths, URLs, ticket
 
 Note but do not finalize: likely task type (`feature`, `bug`, `refactor`, `investigation`, `configuration`, `documentation`, `test`, `deploy`, `communication`, `research`, `ops`, `multi`), likely scope (`answer`, `edit`, `workflow`, `orchestration`), and whether this continues the current session or branches.
 
+### 2.5. Personality Loading
+
+On first invocation per session, read `references/personality.md` for personality context, profile DO/DON'T rules, and Atlassian MCP account routing.
+
 ### 3. Load active session state
 
 Read `~/.claude/ftm-state/blackboard/context.json`. Extract: `current_task`, `recent_decisions`, `active_constraints`, `user_preferences`, `session_metadata.skills_invoked`. If missing or malformed, treat as empty state.

@@ -202,6 +202,21 @@ The interview should be 2-4 focused questions:
 - The task is purely local with no external dependencies
 - The user explicitly says "just do it" or "no questions, go"
 
+## Brain.py Task Loading (Observe Phase)
+
+During the Orient phase, enrich session context with the user's active operational state by loading tasks via brain.py:
+
+```
+python3 ~/.claude/skills/eng-buddy/bin/brain.py --tasks --task-json
+```
+
+Parse the JSON output for active tasks. Surface high-priority or blocking tasks via `TaskCreate` with the task details so they appear in the session task list. This gives ftm-mind awareness of what the user is carrying before deciding on the next move.
+
+Skip this step if:
+- brain.py is not present or returns an error (fail gracefully, do not block orientation)
+- The session context already contains recently loaded task state (within 15 minutes)
+- The request is purely local with no operational relevance (e.g., pure code edits)
+
 ## Orient Synthesis
 
 Before leaving Orient, silently synthesize all signals into one internal picture:
