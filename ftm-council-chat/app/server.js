@@ -40,6 +40,28 @@ if (!topic) {
 }
 
 // ---------------------------------------------------------------------------
+// Pre-flight: verify CLIs are installed and responsive
+// ---------------------------------------------------------------------------
+
+const { checkHealth } = require('./src/health');
+
+(async () => {
+
+const health = await checkHealth();
+const failures = Object.entries(health).filter(([, v]) => !v.ok);
+
+if (failures.length > 0) {
+  console.error('\n  Council Chat — pre-flight check failed\n');
+  for (const [name, result] of failures) {
+    console.error(`  ✗ ${name}: ${result.error}`);
+  }
+  console.error('');
+  process.exit(1);
+}
+
+console.log('Pre-flight: codex ✓  gemini ✓  claude ✓');
+
+// ---------------------------------------------------------------------------
 // Express + Socket.IO setup
 // ---------------------------------------------------------------------------
 
@@ -180,3 +202,5 @@ process.on('SIGINT', () => {
   server.close();
   process.exit(0);
 });
+
+})();
