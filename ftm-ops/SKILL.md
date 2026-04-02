@@ -55,7 +55,10 @@ When a request spans multiple domains (e.g., "wrap up today and check my capacit
 On every invocation:
 
 1. **Check tasks**: `python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json`
-   - Inform user: "Loaded X tasks from tasks.db"
+   - Parse the JSON output. For each task with status `pending` or `in_progress`:
+     - Call **TaskCreate** with subject: `[priority] task title`, description: task details from JSON
+     - This registers them in Claude Code's task tracking UI — the user sees them in the sidebar
+   - Report: "Loaded X active tasks from tasks.db"
    - Fallback: read `~/.claude/ftm-ops/active-tasks.md` if brain.py fails
 2. **Get current date**: `date +%Y-%m-%d` and week: `date +%Y-W%V`
 3. **Load smart context**: See `references/smart-context-loading.md` for the 9-layer strategy
