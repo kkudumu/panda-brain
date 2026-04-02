@@ -56,6 +56,16 @@
         ]
       },
       {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ftm-task-loader.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|mcp__git__git_commit",
         "hooks": [
           {
