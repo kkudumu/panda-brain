@@ -7,9 +7,13 @@ set -euo pipefail
 # Safe to re-run — idempotent.
 #
 # Usage:
-#   ./install.sh              # Full install (skills + hooks + settings merge)
-#   ./install.sh --no-hooks   # Skills and state only, skip hooks entirely
-#   ./install.sh --skip-merge # Install hook files but don't touch settings.json
+#   ./install.sh                              # Full install (all skills + hooks)
+#   ./install.sh --only ftm-council-chat      # Install specific skill(s)
+#   ./install.sh --only ftm-mind,ftm-debug    # Install multiple specific skills
+#   ./install.sh --list                       # List available skills
+#   ./install.sh --no-hooks                   # Skills only, skip hooks
+#   ./install.sh --only ftm-mind --with-hooks # Specific skills + all hooks
+#   ./install.sh --skip-merge                 # Install hook files but don't touch settings.json
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$HOME/.claude/skills"
@@ -20,19 +24,83 @@ SETTINGS_FILE="$CONFIG_DIR/settings.json"
 
 NO_HOOKS=false
 SKIP_MERGE=false
-for arg in "$@"; do
+WITH_HOOKS=false
+LIST_MODE=false
+ONLY_SKILLS=""
+
+i=1
+while [ "$i" -le "$#" ]; do
+  arg="${!i}"
   case "$arg" in
     --no-hooks) NO_HOOKS=true ;;
     --skip-merge) SKIP_MERGE=true ;;
+    --with-hooks) WITH_HOOKS=true ;;
+    --list) LIST_MODE=true ;;
+    --only=*) ONLY_SKILLS="${arg#--only=}" ;;
+    --only)
+      i=$((i + 1))
+      ONLY_SKILLS="${!i}"
+      ;;
     # Keep --setup-hooks for backwards compat (now a no-op since merge is default)
     --setup-hooks) ;;
   esac
+  i=$((i + 1))
 done
+
+# When --only is used, skip hooks by default unless --with-hooks
+if [ -n "$ONLY_SKILLS" ] && [ "$WITH_HOOKS" != true ]; then
+  NO_HOOKS=true
+fi
 
 WARN_COUNT=0
 warn() {
   echo "  WARN: $1"
   WARN_COUNT=$((WARN_COUNT + 1))
+}
+
+# --- List Mode ---
+
+if [ "$LIST_MODE" = true ]; then
+  echo ""
+  echo "Available FTM skills:"
+  echo ""
+  for yml in "$REPO_DIR"/ftm-*.yml; do
+    [ -f "$yml" ] || continue
+    name=$(basename "$yml" .yml)
+    [[ "$name" == *".default"* ]] && continue
+    desc=$(grep '^description:' "$yml" | head -1 | sed 's/^description: *//' | cut -c1-80)
+    printf "  %-22s %s\n" "$name" "$desc"
+  done
+  echo ""
+  echo "Install specific skills: ./install.sh --only ftm-council-chat,ftm-mind"
+  echo "Install everything:      ./install.sh"
+  exit 0
+fi
+
+# --- Skill Filter ---
+
+declare -a SKILL_FILTER=()
+if [ -n "$ONLY_SKILLS" ]; then
+  # Always include base dependencies
+  SKILL_FILTER+=("ftm" "ftm-config")
+  IFS=',' read -ra REQUESTED <<< "$ONLY_SKILLS"
+  for s in "${REQUESTED[@]}"; do
+    s=$(echo "$s" | xargs) # trim whitespace
+    SKILL_FILTER+=("$s")
+  done
+fi
+
+skill_wanted() {
+  local name="$1"
+  if [ ${#SKILL_FILTER[@]} -eq 0 ]; then
+    return 0  # no filter = install all
+  fi
+  for wanted in "${SKILL_FILTER[@]}"; do
+    if [ "$name" = "$wanted" ]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 # --- Preflight Checks ---
@@ -76,7 +144,11 @@ else
 fi
 
 echo ""
-echo "Installing FTM skills from: $REPO_DIR"
+if [ -n "$ONLY_SKILLS" ]; then
+  echo "Installing selected FTM skills: $ONLY_SKILLS (+ ftm, ftm-config)"
+else
+  echo "Installing all FTM skills from: $REPO_DIR"
+fi
 echo "Linking into: $SKILLS_DIR"
 echo ""
 
@@ -84,12 +156,13 @@ mkdir -p "$SKILLS_DIR"
 
 # --- Skills ---
 
-# Link all ftm*.yml files
+# Link ftm*.yml files (filtered by --only if set)
 for yml in "$REPO_DIR"/ftm*.yml; do
   [ -f "$yml" ] || continue
   name=$(basename "$yml")
   # Skip ftm-config.default.yml — it's a template, not a skill
   [[ "$name" == *".default."* ]] && continue
+  skill_wanted "${name%.yml}" || continue
   target="$SKILLS_DIR/$name"
   if [ -L "$target" ]; then
     rm "$target"
@@ -101,11 +174,12 @@ for yml in "$REPO_DIR"/ftm*.yml; do
   echo "  LINK $name"
 done
 
-# Link all ftm* directories (skills with SKILL.md)
+# Link ftm* directories (filtered by --only if set)
 for dir in "$REPO_DIR"/ftm*/; do
   [ -d "$dir" ] || continue
   name=$(basename "$dir")
   [ "$name" = "ftm-state" ] && continue  # state is handled separately
+  skill_wanted "$name" || continue
   target="$SKILLS_DIR/$name"
   if [ -L "$target" ]; then
     rm "$target"
@@ -121,6 +195,8 @@ SKILL_COUNT=0
 for _f in "$REPO_DIR"/ftm*.yml; do
   [ -e "$_f" ] || continue
   case "$_f" in *.default.*) continue ;; esac
+  _name=$(basename "$_f" .yml)
+  skill_wanted "$_name" || continue
   SKILL_COUNT=$((SKILL_COUNT + 1))
 done
 echo ""

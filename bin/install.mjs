@@ -7,9 +7,12 @@
  * Safe to re-run — idempotent.
  *
  * Flags:
- *   --with-inbox    Also install the inbox service
- *   --no-hooks      Skip hooks entirely
- *   --skip-merge    Install hook files but don't touch settings.json
+ *   --only skill1,skill2  Install specific skills (always includes ftm + ftm-config)
+ *   --list                List available skills with descriptions
+ *   --with-inbox          Also install the inbox service
+ *   --no-hooks            Skip hooks entirely
+ *   --with-hooks          Include hooks even with --only
+ *   --skip-merge          Install hook files but don't touch settings.json
  */
 
 import { existsSync, mkdirSync, readdirSync, lstatSync, readFileSync, writeFileSync, copyFileSync, symlinkSync, unlinkSync, chmodSync, cpSync } from "fs";
@@ -31,8 +34,25 @@ const INBOX_INSTALL_DIR = join(HOME, ".claude", "ftm-inbox");
 
 const ARGS = process.argv.slice(2);
 const WITH_INBOX = ARGS.includes("--with-inbox");
-const NO_HOOKS = ARGS.includes("--no-hooks");
 const SKIP_MERGE = ARGS.includes("--skip-merge");
+const LIST_MODE = ARGS.includes("--list");
+const WITH_HOOKS_FLAG = ARGS.includes("--with-hooks");
+
+// Parse --only (supports --only=x,y and --only x,y)
+const ONLY_RAW = ARGS.find(a => a.startsWith("--only="))?.split("=")[1]
+  || (ARGS.includes("--only") ? ARGS[ARGS.indexOf("--only") + 1] : null);
+
+const ONLY_SKILLS = ONLY_RAW
+  ? new Set(["ftm", "ftm-config", ...ONLY_RAW.split(",").map(s => s.trim())])
+  : null;
+
+// When --only is used, skip hooks unless --with-hooks or explicit --no-hooks
+const NO_HOOKS = ARGS.includes("--no-hooks") || (ONLY_SKILLS && !WITH_HOOKS_FLAG);
+
+function skillWanted(name) {
+  if (!ONLY_SKILLS) return true;
+  return ONLY_SKILLS.has(name);
+}
 
 let warnCount = 0;
 
@@ -268,29 +288,58 @@ function verify(skillCount, hookCount) {
   return { errors };
 }
 
+// --- List Mode ---
+
+function listSkills() {
+  console.log("\nAvailable FTM skills:\n");
+  const ymlFiles = readdirSync(REPO_DIR).filter(
+    (f) => f.startsWith("ftm-") && f.endsWith(".yml") && !f.includes("config.default")
+  );
+  for (const yml of ymlFiles) {
+    const name = yml.replace(".yml", "");
+    const content = readFileSync(join(REPO_DIR, yml), "utf8");
+    const descMatch = content.match(/^description:\s*(.+)/m);
+    const desc = descMatch ? descMatch[1].slice(0, 80) : "";
+    console.log(`  ${name.padEnd(22)} ${desc}`);
+  }
+  console.log("\nInstall specific skills: npx feed-the-machine --only ftm-council-chat,ftm-mind");
+  console.log("Install everything:      npx feed-the-machine\n");
+  process.exit(0);
+}
+
 // --- Main ---
 
 function main() {
+  if (LIST_MODE) {
+    listSkills();
+  }
+
   preflight();
 
-  console.log(`Installing ftm skills from: ${REPO_DIR}`);
+  if (ONLY_SKILLS) {
+    const requested = [...ONLY_SKILLS].filter(s => s !== "ftm" && s !== "ftm-config").join(", ");
+    console.log(`Installing selected FTM skills: ${requested} (+ ftm, ftm-config)`);
+  } else {
+    console.log(`Installing all FTM skills from: ${REPO_DIR}`);
+  }
   console.log(`Linking into: ${SKILLS_DIR}`);
   console.log("");
 
   ensureDir(SKILLS_DIR);
 
-  // Link all ftm*.yml files
+  // Link ftm*.yml files (filtered by --only if set)
   const ymlFiles = readdirSync(REPO_DIR).filter(
     (f) => f.startsWith("ftm") && f.endsWith(".yml") && !f.includes("config.default")
-  );
+  ).filter((f) => skillWanted(f.replace(".yml", "")));
   for (const yml of ymlFiles) {
     safeSymlink(join(REPO_DIR, yml), join(SKILLS_DIR, yml));
   }
 
-  // Link all ftm* directories (skills with SKILL.md)
+  // Link ftm* directories (filtered by --only if set)
   const dirs = readdirSync(REPO_DIR).filter((f) => {
     if (!f.startsWith("ftm")) return false;
     if (f === "ftm-state") return false;
+    if (!skillWanted(f)) return false;
     const fullPath = join(REPO_DIR, f);
     try {
       return lstatSync(fullPath).isDirectory();

@@ -24,11 +24,23 @@ Think of it like this: regular AI is a blank whiteboard every time you walk into
 
 ## Install
 
+**Everything** (26 skills + 15 hooks):
 ```bash
 npx feed-the-machine@latest
 ```
 
-That's it. Takes 30 seconds. Works with any existing Claude Code setup.
+**Just the skills you want:**
+```bash
+npx feed-the-machine --only ftm-council-chat,ftm-mind
+```
+This always includes `ftm` (the router) and `ftm-config` as base dependencies.
+
+**See what's available:**
+```bash
+npx feed-the-machine --list
+```
+
+Works with any existing Claude Code setup. After install, restart Claude Code or start a new session.
 
 ---
 
@@ -236,7 +248,9 @@ Everything else runs on Claude Code alone.
 
 ```bash
 git clone https://github.com/kkudumu/feed-the-machine.git ~/feed-the-machine
-cd ~/feed-the-machine && ./install.sh
+cd ~/feed-the-machine && ./install.sh                          # everything
+# or: ./install.sh --only ftm-council-chat                     # just one skill
+# or: ./install.sh --list                                      # see what's available
 ```
 
 **Uninstall:** `./uninstall.sh` (removes skills, keeps your memory data)
