@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIM Council Chat</title>
+  <link rel="stylesheet" href="/98.css/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+
+  <style>
+    /* =============================================
+       INLINE PROTOCOL FALLBACK CONSTANTS
+       (mirrors src/protocol.js when not yet served)
+    ============================================= */
+    /* (defined in JS below) */
+
+    /* =============================================
+       BASE RESET & LAYOUT
+    ============================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 14px;
+      background: #008080;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* =============================================
+       SIGN-ON SCREEN
+    ============================================= */
+    #signon-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #FFB800;
+      z-index: 9999;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #signon-screen:hover { background: #FFC820; }
+
+    .signon-box {
+      background: #1C3A6B;
+      border: 3px solid #FFB800;
+      border-radius: 4px;
+      padding: 32px 48px;
+      text-align: center;
+      box-shadow: 4px 4px 0 #000;
+      pointer-events: none;
+    }
+
+    .aim-logo {
+      font-size: 64px;
+      line-height: 1;
+      margin-bottom: 8px;
+      animation: aim-run 0.6s steps(2) infinite;
+    }
+
+    @keyframes aim-run {
+      0%   { transform: translateX(0); }
+      50%  { transform: translateX(4px); }
+      100% { transform: translateX(0); }
+    }
+
+    .signon-title {
+      color: #FFB800;
+      font-size: 28px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-family: 'Arial Black', Arial, sans-serif;
+    }
+
+    .signon-subtitle {
+      color: #AABBD4;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    .signon-divider {
+      border: none;
+      border-top: 1px solid #3A5A8B;
+      margin: 16px 0;
+    }
+
+    .signon-btn {
+      background: #FFB800;
+      color: #1C3A6B;
+      border: 2px solid #CC9200;
+      padding: 10px 32px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      box-shadow: 2px 2px 0 #000;
+      font-family: Tahoma, Arial, sans-serif;
+      pointer-events: auto;
+    }
+
+    .signon-btn:hover { background: #FFC820; transform: translate(-1px, -1px); }
+    .signon-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #000; }
+
+    .signon-tagline {
+      color: #7798BB;
+      font-size: 10px;
+      margin-top: 16px;
+    }
+
+    /* Running Man ASCII art */
+    .running-man {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 12px;
+      animation: run 0.4s steps(1) infinite;
+    }
+
+    /* =============================================
+       MAIN CHAT VIEW
+    ============================================= */
+    #main-view {
+      display: none;
+      flex-direction: row;
+      height: 100vh;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    #main-view.visible { display: flex; }
+
+    /* =============================================
+       BUDDY LIST (left sidebar)
+    ============================================= */
+    #buddy-list-window {
+      width: 200px;
+      min-width: 160px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Override 98.css window to fill height */
+    #buddy-list-window.window {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #buddy-list-window .window-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+      background: #fff;
+    }
+
+    .buddy-section-header {
+      background: #1C3A6B;
+      color: #FFB800;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 3px 6px;
+      margin: 4px 0 2px 0;
+      cursor: pointer;
+    }
+
+    .buddy-list-entry {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 6px;
+      font-size: 14px;
+      cursor: default;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+
+    .buddy-list-entry:hover { background: #E8F0FF; }
+
+    .buddy-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.3);
+      flex-shrink: 0;
+      display: inline-block;
+    }
+
+    .dot-online  { background: #00BB00; }
+    .dot-away    { background: #DDAA00; }
+    .dot-offline { background: #999999; }
+
+    .buddy-name {
+      font-weight: bold;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .buddy-name.model-claude  { color: #0000CC; }
+    .buddy-name.model-codex   { color: #006600; }
+    .buddy-name.model-gemini  { color: #660066; }
+    .buddy-name.model-user    { color: #000000; }
+
+    .buddy-away-msg {
+      font-size: 10px;
+      color: #888;
+      font-style: italic;
+      padding: 0 4px 2px 17px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 98.css title-bar AIM accent */
+    #buddy-list-window .title-bar {
+      background: #1C3A6B !important;
+    }
+
+    /* =============================================
+       CHAT PANEL (main area)
+    ============================================= */
+    #chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    #chat-window.window {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #chat-window .window-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 4px;
+      background: #fff;
+    }
+
+    #chat-window .title-bar {
+      background: #1C3A6B !important;
+    }
+
+    /* =============================================
+       MESSAGE AREA
+    ============================================= */
+    #message-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 6px;
+      border: inset 2px #808080;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .msg-line {
+      margin: 4px 0;
+      padding: 3px 6px;
+      word-wrap: break-word;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .msg-line.user-msg {
+      text-align: right;
+      background: #F0F8FF;
+      border-left: none;
+      border-right: 3px solid #0000CC;
+      padding: 1px 6px 1px 2px;
+      margin-left: 20%;
+    }
+
+    .msg-header {
+      display: inline;
+    }
+
+    .msg-screenname {
+      font-weight: bold;
+    }
+
+    .msg-screenname.model-claude  { color: #0000FF; }
+    .msg-screenname.model-codex   { color: #008000; }
+    .msg-screenname.model-gemini  { color: #800080; }
+    .msg-screenname.model-user    { color: #000000; }
+
+    .msg-timestamp {
+      color: #888;
+      font-size: 12px;
+      margin-left: 4px;
+    }
+
+    .msg-body {
+      display: inline;
+      margin-left: 2px;
+    }
+
+    /* System messages */
+    .msg-system {
+      color: #888;
+      font-style: italic;
+      font-size: 13px;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    /* Researching / away message style */
+    .msg-researching {
+      background: #FFFFC0;
+      border: 1px solid #CCCC88;
+      border-radius: 2px;
+      padding: 3px 8px;
+      margin: 4px 0;
+      font-style: italic;
+      color: #555500;
+      font-size: 11px;
+    }
+
+    /* Streaming token accumulation */
+    .msg-streaming {
+      background: #F8F8FF;
+      border-left: 2px solid #AAAAFF;
+      padding-left: 4px;
+    }
+
+    /* =============================================
+       TYPING INDICATOR
+    ============================================= */
+    #typing-bar {
+      min-height: 22px;
+      padding: 4px 8px;
+      font-style: italic;
+      color: #333;
+      font-size: 13px;
+      background: #FFFFC0;
+      border-top: 1px solid #C8C8C8;
+    }
+    #typing-bar:empty {
+      background: #F5F5F5;
+    }
+
+    /* =============================================
+       INPUT AREA
+    ============================================= */
+    #input-area {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0 0 0;
+      align-items: stretch;
+      position: relative;
+    }
+
+    #msg-input {
+      flex: 1;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 12px;
+      padding: 3px 5px;
+      border: inset 2px #808080;
+      resize: none;
+      height: 52px;
+      outline: none;
+    }
+
+    #send-btn {
+      align-self: flex-end;
+      padding: 6px 14px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    /* =============================================
+       @ MENTION AUTOCOMPLETE DROPDOWN
+    ============================================= */
+    #mention-dropdown {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: #fff;
+      border: 2px solid #1C3A6B;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      z-index: 500;
+      min-width: 160px;
+      display: none;
+    }
+
+    #mention-dropdown.visible { display: block; }
+
+    .mention-option {
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .mention-option:hover { background: #1C3A6B; color: #FFB800; }
+
+    /* =============================================
+       AIM-ACCENT OVERRIDES FOR 98.CSS
+    ============================================= */
+    .window > .title-bar {
+      background: #1C3A6B;
+    }
+
+    .title-bar-text {
+      color: #FFB800 !important;
+      font-weight: bold;
+    }
+
+    .title-bar-controls button { background: #C0C0C0; }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 12px; }
+    ::-webkit-scrollbar-track { background: #C0C0C0; }
+    ::-webkit-scrollbar-thumb { background: #808080; border: 1px solid #fff; }
+
+    /* Connection status bar at very bottom */
+    #status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 18px;
+      background: #C0C0C0;
+      border-top: 1px solid #808080;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      font-size: 10px;
+      color: #333;
+      z-index: 100;
+    }
+
+    #status-bar span { margin-right: 16px; }
+    #conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #999;
+      display: inline-block;
+      margin-right: 4px;
+      border: 1px solid #666;
+    }
+    #conn-dot.connected { background: #00BB00; }
+
+    /* =============================================
+       VERDICT CARD
+    ============================================= */
+    .verdict-card {
+      border: 3px solid #FFB800;
+      background: #FFFEF0;
+      margin: 12px 4px;
+      padding: 0;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+    }
+
+    .verdict-card .title-bar {
+      background: #1C3A6B !important;
+      padding: 3px 6px;
+    }
+
+    .verdict-card .title-bar-text {
+      color: #FFB800 !important;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .verdict-card-body {
+      padding: 12px 16px;
+    }
+
+    .verdict-topic {
+      font-size: 14px;
+      font-weight: bold;
+      color: #1C3A6B;
+      margin-bottom: 8px;
+    }
+
+    .verdict-meta {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .verdict-positions {
+      margin-bottom: 12px;
+    }
+
+    .verdict-position {
+      padding: 6px 8px;
+      margin: 4px 0;
+      border-left: 3px solid #ccc;
+      font-size: 13px;
+    }
+
+    .verdict-position.model-claude  { border-left-color: #0000FF; }
+    .verdict-position.model-codex   { border-left-color: #008000; }
+    .verdict-position.model-gemini  { border-left-color: #800080; }
+
+    .verdict-position-label {
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .verdict-consensus {
+      padding: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      text-align: center;
+      border: 1px solid #DDA800;
+      background: #FFF8DD;
+      border-radius: 2px;
+    }
+
+    .verdict-consensus.has-consensus { color: #006600; }
+    .verdict-consensus.no-consensus  { color: #CC6600; }
+
+    .verdict-footer {
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #E0E0E0;
+    }
+
+    /* Disabled input state */
+    #msg-input:disabled {
+      background: #E0E0E0;
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    #send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+<!-- =============================================
+     SIGN-ON SCREEN
+============================================= -->
+<div id="signon-screen">
+  <div class="signon-box">
+    <div class="aim-logo">🏃</div>
+    <div class="signon-title">AIM</div>
+    <div class="signon-subtitle">AOL Instant Messenger — Council Chat Edition</div>
+    <hr class="signon-divider">
+    <button class="signon-btn" id="enter-btn">Sign On</button>
+    <div class="signon-tagline">© 2003 America Online, Inc. (definitely)</div>
+  </div>
+</div>
+
+<!-- =============================================
+     MAIN CHAT VIEW
+============================================= -->
+<div id="main-view">
+
+  <!-- Buddy List sidebar -->
+  <div id="buddy-list-window" class="window">
+    <div class="title-bar">
+      <div class="title-bar-text">Buddy List</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize"></button>
+        <button aria-label="Maximize"></button>
+        <button aria-label="Close"></button>
+      </div>
+    </div>
+    <div class="window-body" id="buddy-list-body">
+      <div class="buddy-section-header">Online (0/3)</div>
+      <div id="buddy-entries"></div>
+    </div>
+  </div>
+
+  <!-- Chat panel -->
+  <div id="chat-panel">
+    <div id="chat-window" class="window">
+      <div class="title-bar">
+        <div class="title-bar-text" id="chat-title">AIM Chat</div>
+        <div class="title-bar-controls">
+          <button aria-label="Minimize"></button>
+          <button aria-label="Maximize"></button>
+          <button aria-label="Close"></button>
+        </div>
+      </div>
+      <div class="window-body">
+        <div id="message-area"></div>
+        <div id="typing-bar"></div>
+        <div id="input-area">
+          <div id="mention-dropdown"></div>
+          <textarea id="msg-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)"></textarea>
+          <button id="send-btn" class="default">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <span id="conn-dot"></span>
+  <span id="conn-status">Disconnected</span>
+  <span id="session-status"></span>
+</div>
+
+<!-- Optional protocol.js (gracefully no-ops if not served yet) -->
+<script>
+  // Inline fallback — mirrors src/protocol.js PROTOCOL.EVENTS
+  window.PROTOCOL = window.PROTOCOL || {
+    EVENTS: {
+      // Server → Client
+      SESSION_START:    'session_start',
+      TYPING_START:     'typing_start',
+      RESEARCHING:      'researching',
+      TOKEN:            'token',
+      MESSAGE_COMPLETE: 'message_complete',
+      MODEL_JOINED:     'model_joined',
+      MODEL_ERROR:      'model_error',
+      WRAP_UP_START:    'wrap_up_start',
+      VERDICT:          'verdict',
+      // Client → Server
+      USER_MESSAGE:     'user_message',
+      USER_MENTION:     'user_mention',
+    }
+  };
+</script>
+<script src="/src/protocol.js" onerror="console.info('protocol.js not yet served — using inline fallback')"></script>
+
+<script>
+  'use strict';
+
+  /* ------------------------------------------------
+     PROTOCOL EVENT NAME ALIASES
+     (use window.PROTOCOL.EVENTS so if protocol.js
+     loads later it wins; fallback defined above)
+  ------------------------------------------------ */
+  const EV = window.PROTOCOL.EVENTS;
+
+  /* ------------------------------------------------
+     MODEL → CSS CLASS MAPPING
+  ------------------------------------------------ */
+  const MODEL_CLASS = {
+    claude: 'model-claude',
+    codex:  'model-codex',
+    gemini: 'model-gemini',
+    user:   'model-user',
+  };
+
+  /* ------------------------------------------------
+     STATE
+  ------------------------------------------------ */
+  const state = {
+    screennames: {},          // { claude: 'xXClaude97Xx', ... }
+    topic: '',
+    onlineModels: new Set(),
+    awayModels: new Set(),
+    typingTimers: {},
+    streamBuffers: {},        // model → { el, text } for token streaming
+    audioReady: false,
+    socket: null,
+    mentionModels: [],        // list for autocomplete
+  };
+
+  /* ------------------------------------------------
+     DOM REFS
+  ------------------------------------------------ */
+  const $msgArea       = document.getElementById('message-area');
+  const $typingBar     = document.getElementById('typing-bar');
+  const $msgInput      = document.getElementById('msg-input');
+  const $sendBtn       = document.getElementById('send-btn');
+  const $chatTitle     = document.getElementById('chat-title');
+  const $buddyEntries  = document.getElementById('buddy-entries');
+  const $buddyHeader   = document.querySelector('.buddy-section-header');
+  const $mentionDD     = document.getElementById('mention-dropdown');
+  const $connDot       = document.getElementById('conn-dot');
+  const $connStatus    = document.getElementById('conn-status');
+  const $sessionStatus = document.getElementById('session-status');
+  const $signonScreen  = document.getElementById('signon-screen');
+  const $mainView      = document.getElementById('main-view');
+
+  /* ------------------------------------------------
+     SOUND EFFECTS
+  ------------------------------------------------ */
+  const sounds = {};
+
+  function loadSounds() {
+    const names = ['buddyin', 'buddyout', 'dooropen', 'doorslam', 'imrcv', 'imsend'];
+    names.forEach(function(name) {
+      const a = new Audio('/sounds/' + name + '.wav');
+      a.preload = 'auto';
+      sounds[name] = a;
+    });
+  }
+
+  function playSound(name) {
+    if (!state.audioReady || !sounds[name]) return;
+    try {
+      const clone = sounds[name].cloneNode();
+      clone.volume = 0.7;
+      clone.play().catch(function() {});
+    } catch(e) {}
+  }
+
+  /* ------------------------------------------------
+     SIGN-ON
+  ------------------------------------------------ */
+  document.getElementById('enter-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    enterChat();
+  });
+
+  document.getElementById('signon-screen').addEventListener('click', function() {
+    enterChat();
+  });
+
+  function enterChat() {
+    if ($mainView.classList.contains('visible')) return;
+
+    // Satisfy autoplay gesture requirement
+    state.audioReady = true;
+    loadSounds();
+
+    // Transition
+    $signonScreen.style.display = 'none';
+    $mainView.classList.add('visible');
+
+    // Connect socket
+    connectSocket();
+  }
+
+  /* ------------------------------------------------
+     SOCKET.IO
+  ------------------------------------------------ */
+  function connectSocket() {
+    const socket = io();
+    state.socket = socket;
+
+    socket.on('connect', function() {
+      $connDot.classList.add('connected');
+      $connStatus.textContent = 'Connected';
+    });
+
+    socket.on('disconnect', function() {
+      $connDot.classList.remove('connected');
+      $connStatus.textContent = 'Disconnected';
+      appendSystem('Connection lost. Waiting to reconnect...');
+    });
+
+    // --- session_start ---
+    socket.on(EV.SESSION_START, function(data) {
+      // data: { screennames, topic }
+      state.screennames = data.screennames || {};
+      state.topic = data.topic || 'Council Chat';
+      $chatTitle.textContent = 'AIM Chat \u2014 ' + state.topic;
+      $sessionStatus.textContent = 'Topic: ' + state.topic;
+
+      // Rebuild mention list from screennames (exclude user)
+      state.mentionModels = Object.entries(state.screennames)
+        .filter(function(kv) { return kv[0] !== 'user'; })
+        .map(function(kv) { return { model: kv[0], name: kv[1] }; });
+
+      renderBuddyList();
+      appendSystem('Welcome to the Council Chat: ' + state.topic);
+      setTimeout(function() { playSound('buddyin'); }, 800);
+    });
+
+    // --- model_joined ---
+    socket.on(EV.MODEL_JOINED, function(data) {
+      // data: { model }
+      const model = data.model;
+      state.onlineModels.add(model);
+      state.awayModels.delete(model);
+      renderBuddyList();
+      const name = getScreenname(model);
+      appendSystem(name + ' has entered the chat.');
+      playSound('dooropen');
+    });
+
+    // --- typing_start ---
+    socket.on(EV.TYPING_START, function(data) {
+      // data: { model }
+      const model = data.model;
+      const name = getScreenname(model);
+      showTyping(model, name + ' is typing...');
+    });
+
+    // --- researching ---
+    socket.on(EV.RESEARCHING, function(data) {
+      // data: { model, tool_name }
+      const model = data.model;
+      const name = getScreenname(model);
+      const tool = data.tool_name || 'something';
+
+      // Update buddy list to "away"
+      state.awayModels.add(model);
+      renderBuddyList();
+      updateBuddyAway(model, 'Researching: ' + tool);
+
+      // Show in typing bar
+      showTyping(model, name + ' is researching: ' + tool + '...');
+
+      // Show as away-message block in chat
+      appendResearching(name, tool);
+    });
+
+    // --- token (streaming) ---
+    socket.on(EV.TOKEN, function(data) {
+      // data: { model, delta }
+      const model = data.model;
+      clearTyping(model);
+      appendToken(model, data.delta || '');
+    });
+
+    // --- message_complete ---
+    socket.on(EV.MESSAGE_COMPLETE, function(data) {
+      // data: { model, text, timestamp }
+      const model = data.model;
+      const name = getScreenname(model);
+
+      // Clear any streaming buffer
+      finishStream(model);
+
+      clearTyping(model);
+      clearResearching(model);
+      state.awayModels.delete(model);
+      renderBuddyList();
+      updateBuddyAway(model, null);
+
+      appendMessage(model, name, data.full_text || data.text || '', data.timestamp);
+      if (model !== 'user') {
+        playSound('imrcv');
+      }
+    });
+
+    // --- model_error ---
+    socket.on(EV.MODEL_ERROR, function(data) {
+      // data: { model, error }
+      const model = data.model;
+      const name = getScreenname(model);
+      appendSystem(name + ' has gone away: ' + (data.error || 'unknown error'));
+      state.onlineModels.delete(model);
+      state.awayModels.delete(model);
+      renderBuddyList();
+    });
+
+    // --- wrap_up_start ---
+    socket.on(EV.WRAP_UP_START, function(data) {
+      appendSystem('Deliberation concluding... (' + (data.reason || 'unknown') + ')');
+      // Disable input
+      $msgInput.disabled = true;
+      $msgInput.placeholder = 'Chat has ended';
+      $sendBtn.disabled = true;
+    });
+
+    // --- verdict ---
+    socket.on(EV.VERDICT, function(data) {
+      renderVerdict(data);
+    });
+  }
+
+  /* ------------------------------------------------
+     SCREENNAME HELPER
+  ------------------------------------------------ */
+  function getScreenname(model) {
+    return state.screennames[model] || model;
+  }
+
+  function modelClass(model) {
+    return MODEL_CLASS[model] || 'model-user';
+  }
+
+  /* ------------------------------------------------
+     BUDDY LIST RENDERING
+  ------------------------------------------------ */
+  function renderBuddyList() {
+    const models = ['claude', 'codex', 'gemini'];
+    const online = models.filter(function(m) { return state.onlineModels.has(m); });
+    $buddyHeader.textContent = 'Online (' + online.length + '/3)';
+
+    $buddyEntries.innerHTML = '';
+
+    models.forEach(function(model) {
+      const name = getScreenname(model);
+      const isOnline  = state.onlineModels.has(model);
+      const isAway    = state.awayModels.has(model);
+      const dotClass  = isAway ? 'dot-away' : isOnline ? 'dot-online' : 'dot-offline';
+
+      const row = document.createElement('div');
+      row.className = 'buddy-list-entry';
+      row.id = 'buddy-' + model;
+
+      const dot = document.createElement('span');
+      dot.className = 'buddy-status-dot ' + dotClass;
+      dot.id = 'dot-' + model;
+
+      const label = document.createElement('span');
+      label.className = 'buddy-name ' + modelClass(model);
+      label.textContent = name;
+
+      row.appendChild(dot);
+      row.appendChild(label);
+      $buddyEntries.appendChild(row);
+
+      // Away message sub-row (initially hidden)
+      const awayRow = document.createElement('div');
+      awayRow.className = 'buddy-away-msg';
+      awayRow.id = 'buddy-away-' + model;
+      awayRow.style.display = 'none';
+      $buddyEntries.appendChild(awayRow);
+    });
+
+    // Add user entry
+    const userRow = document.createElement('div');
+    userRow.className = 'buddy-list-entry';
+
+    const userDot = document.createElement('span');
+    userDot.className = 'buddy-status-dot dot-online';
+
+    const userLabel = document.createElement('span');
+    userLabel.className = 'buddy-name model-user';
+    userLabel.textContent = getScreenname('user') || 'Me';
+
+    userRow.appendChild(userDot);
+    userRow.appendChild(userLabel);
+    $buddyEntries.appendChild(userRow);
+  }
+
+  function updateBuddyAway(model, msg) {
+    const awayRow = document.getElementById('buddy-away-' + model);
+    const dot = document.getElementById('dot-' + model);
+    if (!awayRow) return;
+    if (msg) {
+      awayRow.textContent = msg;
+      awayRow.style.display = 'block';
+      if (dot) { dot.className = 'buddy-status-dot dot-away'; }
+    } else {
+      awayRow.style.display = 'none';
+      if (dot) {
+        const cls = state.onlineModels.has(model) ? 'dot-online' : 'dot-offline';
+        dot.className = 'buddy-status-dot ' + cls;
+      }
+    }
+  }
+
+  /* ------------------------------------------------
+     TYPING INDICATOR
+  ------------------------------------------------ */
+  const typingState = {};  // model → message
+
+  function showTyping(model, text) {
+    typingState[model] = text;
+    refreshTypingBar();
+    // Auto-clear after 120s (model turns can take a while)
+    clearTimeout(state.typingTimers[model]);
+    state.typingTimers[model] = setTimeout(function() {
+      clearTyping(model);
+    }, 120000);
+  }
+
+  function clearTyping(model) {
+    delete typingState[model];
+    clearTimeout(state.typingTimers[model]);
+    refreshTypingBar();
+  }
+
+  function refreshTypingBar() {
+    const msgs = Object.values(typingState);
+    $typingBar.textContent = msgs.join(' \u2022 ');
+  }
+
+  /* ------------------------------------------------
+     MESSAGE RENDERING
+  ------------------------------------------------ */
+  function formatTime(ts) {
+    const d = ts ? new Date(ts) : new Date();
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function scrollToBottom() {
+    $msgArea.scrollTop = $msgArea.scrollHeight;
+  }
+
+  function appendMessage(model, screenname, text, timestamp) {
+    const isUser = (model === 'user');
+    const line = document.createElement('div');
+    line.className = 'msg-line' + (isUser ? ' user-msg' : '');
+
+    const cls = modelClass(model);
+    const timeStr = formatTime(timestamp);
+
+    line.innerHTML =
+      '<span class="msg-header">' +
+        '<span class="msg-screenname ' + cls + '">' + escapeHtml(screenname) + '</span>' +
+        '<span class="msg-timestamp">(' + escapeHtml(timeStr) + ')</span>' +
+        ':&nbsp;' +
+      '</span>' +
+      '<span class="msg-body">' + escapeHtml(text) + '</span>';
+
+    $msgArea.appendChild(line);
+    scrollToBottom();
+    return line;
+  }
+
+  function appendSystem(text) {
+    const line = document.createElement('div');
+    line.className = 'msg-system';
+    line.textContent = '--- ' + text + ' ---';
+    $msgArea.appendChild(line);
+    scrollToBottom();
+  }
+
+  const _researchingElements = {}; // model -> DOM element
+  function appendResearching(screenname, toolName) {
+    // Find the model key from the screenname
+    var modelKey = null;
+    for (var k in state.screennames) {
+      if (state.screennames[k] === screenname) { modelKey = k; break; }
+    }
+    var key = modelKey || screenname;
+
+    // Reuse existing researching block for this model, or create new
+    if (_researchingElements[key] && _researchingElements[key].parentNode) {
+      _researchingElements[key].textContent = screenname + ' is researching: ' + toolName + '...';
+    } else {
+      var line = document.createElement('div');
+      line.className = 'msg-researching';
+      line.textContent = screenname + ' is researching: ' + toolName + '...';
+      $msgArea.appendChild(line);
+      _researchingElements[key] = line;
+    }
+    scrollToBottom();
+  }
+
+  // Clear researching block when model finishes
+  function clearResearching(modelKey) {
+    if (_researchingElements[modelKey] && _researchingElements[modelKey].parentNode) {
+      _researchingElements[modelKey].parentNode.removeChild(_researchingElements[modelKey]);
+    }
+    delete _researchingElements[modelKey];
+  }
+
+  /* ------------------------------------------------
+     VERDICT RENDERING
+  ------------------------------------------------ */
+  function renderVerdict(verdict) {
+    var card = document.createElement('div');
+    card.className = 'verdict-card window';
+
+    // Title bar
+    var titleBar = document.createElement('div');
+    titleBar.className = 'title-bar';
+    var titleText = document.createElement('div');
+    titleText.className = 'title-bar-text';
+    titleText.textContent = 'Council Verdict';
+    titleBar.appendChild(titleText);
+    card.appendChild(titleBar);
+
+    // Body
+    var body = document.createElement('div');
+    body.className = 'verdict-card-body';
+
+    // Topic
+    var topic = document.createElement('div');
+    topic.className = 'verdict-topic';
+    topic.textContent = verdict.topic || 'Unknown topic';
+    body.appendChild(topic);
+
+    // Meta
+    var meta = document.createElement('div');
+    meta.className = 'verdict-meta';
+    meta.textContent = 'Rounds: ' + (verdict.rounds || '?') + ' | Ended: ' + (verdict.reason || 'unknown').replace(/_/g, ' ');
+    body.appendChild(meta);
+
+    // Positions
+    var positions = document.createElement('div');
+    positions.className = 'verdict-positions';
+
+    var modelNames = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+    var modelClasses = { claude: 'model-claude', codex: 'model-codex', gemini: 'model-gemini' };
+
+    ['claude', 'codex', 'gemini'].forEach(function(model) {
+      if (!verdict.positions || !verdict.positions[model]) return;
+      var pos = document.createElement('div');
+      pos.className = 'verdict-position ' + (modelClasses[model] || '');
+
+      var label = document.createElement('div');
+      label.className = 'verdict-position-label';
+      label.textContent = (modelNames[model] || model) + ' \u2014 Final Position:';
+      pos.appendChild(label);
+
+      var text = document.createElement('div');
+      text.textContent = verdict.positions[model];
+      pos.appendChild(text);
+
+      positions.appendChild(pos);
+    });
+
+    body.appendChild(positions);
+
+    // Consensus
+    var consensus = document.createElement('div');
+    if (verdict.consensus && verdict.consensus.detected) {
+      consensus.className = 'verdict-consensus has-consensus';
+      var agreedNames = (verdict.consensus.agreed_by || []).map(function(m) {
+        return modelNames[m] || m;
+      });
+      consensus.textContent = 'Consensus: ' + agreedNames.join(' & ') + ' agree';
+      if (verdict.consensus.dissent) {
+        consensus.textContent += ' (dissent: ' + (modelNames[verdict.consensus.dissent] || verdict.consensus.dissent) + ')';
+      }
+    } else {
+      consensus.className = 'verdict-consensus no-consensus';
+      consensus.textContent = 'No clear consensus reached';
+    }
+    body.appendChild(consensus);
+
+    // Footer
+    var footer = document.createElement('div');
+    footer.className = 'verdict-footer';
+    footer.textContent = 'Chat ended \u2014 ' + new Date().toLocaleTimeString();
+    body.appendChild(footer);
+
+    card.appendChild(body);
+    $msgArea.appendChild(card);
+    scrollToBottom();
+  }
+
+  /* ------------------------------------------------
+     TOKEN STREAMING
+  ------------------------------------------------ */
+  function appendToken(model, delta) {
+    if (!state.streamBuffers[model]) {
+      // Create a new streaming message element
+      const screenname = getScreenname(model);
+      const cls = modelClass(model);
+      const timeStr = formatTime(null);
+
+      const line = document.createElement('div');
+      line.className = 'msg-line msg-streaming';
+      line.innerHTML =
+        '<span class="msg-header">' +
+          '<span class="msg-screenname ' + cls + '">' + escapeHtml(screenname) + '</span>' +
+          '<span class="msg-timestamp">(' + escapeHtml(timeStr) + ')</span>' +
+          ':&nbsp;' +
+        '</span>' +
+        '<span class="msg-body"></span>';
+
+      $msgArea.appendChild(line);
+      state.streamBuffers[model] = {
+        el: line,
+        bodyEl: line.querySelector('.msg-body'),
+        text: ''
+      };
+    }
+
+    const buf = state.streamBuffers[model];
+    buf.text += delta;
+    buf.bodyEl.textContent = buf.text;
+    scrollToBottom();
+  }
+
+  function finishStream(model) {
+    const buf = state.streamBuffers[model];
+    if (buf) {
+      // Remove the streaming class — it becomes a permanent message
+      buf.el.classList.remove('msg-streaming');
+      delete state.streamBuffers[model];
+    }
+  }
+
+  /* ------------------------------------------------
+     SEND MESSAGE
+  ------------------------------------------------ */
+  function sendMessage() {
+    const text = $msgInput.value.trim();
+    if (!text || !state.socket) return;
+
+    const mentionMatch = text.match(/^@(\S+)/);
+    if (mentionMatch) {
+      const targetName = mentionMatch[1];
+      // Find model key by screenname
+      let targetModel = null;
+      Object.entries(state.screennames).forEach(function(kv) {
+        if (kv[1].toLowerCase() === targetName.toLowerCase()) {
+          targetModel = kv[0];
+        }
+      });
+
+      if (targetModel && targetModel !== 'user') {
+        state.socket.emit(EV.USER_MENTION, { target_model: targetModel, text: text });
+      } else {
+        state.socket.emit(EV.USER_MESSAGE, { text: text });
+      }
+    } else {
+      state.socket.emit(EV.USER_MESSAGE, { text: text });
+    }
+
+    // Show own message immediately
+    const myName = getScreenname('user') || 'Me';
+    appendMessage('user', myName, text, null);
+    playSound('imsend');
+
+    $msgInput.value = '';
+    hideMentionDropdown();
+  }
+
+  $sendBtn.addEventListener('click', sendMessage);
+
+  $msgInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+
+      // If dropdown visible, insert selected option
+      const visible = $mentionDD.querySelector('.mention-option.highlighted');
+      if ($mentionDD.classList.contains('visible') && visible) {
+        insertMention(visible.dataset.name);
+        return;
+      }
+
+      sendMessage();
+    }
+
+    if (e.key === 'Escape') {
+      hideMentionDropdown();
+    }
+
+    if (e.key === 'ArrowDown' && $mentionDD.classList.contains('visible')) {
+      e.preventDefault();
+      moveMentionHighlight(1);
+    }
+    if (e.key === 'ArrowUp' && $mentionDD.classList.contains('visible')) {
+      e.preventDefault();
+      moveMentionHighlight(-1);
+    }
+  });
+
+  /* ------------------------------------------------
+     @ MENTION AUTOCOMPLETE
+  ------------------------------------------------ */
+  $msgInput.addEventListener('input', function() {
+    const val = $msgInput.value;
+    const cursor = $msgInput.selectionStart;
+    const before = val.slice(0, cursor);
+
+    // Find last @ before cursor
+    const atIdx = before.lastIndexOf('@');
+    if (atIdx === -1) {
+      hideMentionDropdown();
+      return;
+    }
+
+    const query = before.slice(atIdx + 1).toLowerCase();
+    // Only show if no space in the fragment
+    if (query.includes(' ')) {
+      hideMentionDropdown();
+      return;
+    }
+
+    const matches = state.mentionModels.filter(function(m) {
+      return m.name.toLowerCase().startsWith(query) ||
+             m.model.toLowerCase().startsWith(query);
+    });
+
+    if (matches.length === 0) {
+      hideMentionDropdown();
+      return;
+    }
+
+    showMentionDropdown(matches);
+  });
+
+  function showMentionDropdown(matches) {
+    $mentionDD.innerHTML = '';
+    matches.forEach(function(m) {
+      const opt = document.createElement('div');
+      opt.className = 'mention-option';
+      opt.dataset.name = m.name;
+      opt.dataset.model = m.model;
+      opt.textContent = '@' + m.name + ' (' + m.model + ')';
+      opt.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        insertMention(m.name);
+      });
+      $mentionDD.appendChild(opt);
+    });
+    $mentionDD.classList.add('visible');
+
+    // Highlight first
+    const first = $mentionDD.querySelector('.mention-option');
+    if (first) first.classList.add('highlighted');
+  }
+
+  function hideMentionDropdown() {
+    $mentionDD.classList.remove('visible');
+    $mentionDD.innerHTML = '';
+  }
+
+  function insertMention(screenname) {
+    const val = $msgInput.value;
+    const cursor = $msgInput.selectionStart;
+    const before = val.slice(0, cursor);
+    const after = val.slice(cursor);
+    const atIdx = before.lastIndexOf('@');
+    const newVal = before.slice(0, atIdx) + '@' + screenname + ' ' + after;
+    $msgInput.value = newVal;
+    $msgInput.selectionStart = $msgInput.selectionEnd = atIdx + screenname.length + 2;
+    hideMentionDropdown();
+    $msgInput.focus();
+  }
+
+  function moveMentionHighlight(dir) {
+    const options = Array.from($mentionDD.querySelectorAll('.mention-option'));
+    if (options.length === 0) return;
+    const currentIdx = options.findIndex(function(o) { return o.classList.contains('highlighted'); });
+    options.forEach(function(o) { o.classList.remove('highlighted'); });
+    let next = currentIdx + dir;
+    if (next < 0) next = options.length - 1;
+    if (next >= options.length) next = 0;
+    options[next].classList.add('highlighted');
+  }
+
+  // Hide dropdown when clicking outside
+  document.addEventListener('mousedown', function(e) {
+    if (!$mentionDD.contains(e.target) && e.target !== $msgInput) {
+      hideMentionDropdown();
+    }
+  });
+
+  /* ------------------------------------------------
+     INITIAL BUDDY LIST (empty state before session)
+  ------------------------------------------------ */
+  (function initBuddyList() {
+    const models = ['claude', 'codex', 'gemini'];
+    models.forEach(function(model) {
+      const row = document.createElement('div');
+      row.className = 'buddy-list-entry';
+      row.id = 'buddy-' + model;
+
+      const dot = document.createElement('span');
+      dot.className = 'buddy-status-dot dot-offline';
+      dot.id = 'dot-' + model;
+
+      const label = document.createElement('span');
+      label.className = 'buddy-name ' + modelClass(model);
+      label.textContent = model;  // placeholder until session_start
+
+      row.appendChild(dot);
+      row.appendChild(label);
+      $buddyEntries.appendChild(row);
+
+      const awayRow = document.createElement('div');
+      awayRow.className = 'buddy-away-msg';
+      awayRow.id = 'buddy-away-' + model;
+      awayRow.style.display = 'none';
+      $buddyEntries.appendChild(awayRow);
+    });
+
+    $buddyHeader.textContent = 'Online (0/3)';
+  })();
+</script>
+
+</body>
+</html>
