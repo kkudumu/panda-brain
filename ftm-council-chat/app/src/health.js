@@ -58,7 +58,7 @@ async function checkHealth() {
     }),
     checkCli({
       name: 'gemini',
-      notFoundMsg: 'Gemini CLI not found. Install: npm install -g @anthropic-ai/gemini-cli',
+      notFoundMsg: 'Gemini CLI not found. Install: npm install -g @google/gemini-cli',
       notRespondingMsg: 'Gemini CLI not responding. Try: gemini auth',
       skipVersionCheck: false,
     }),
