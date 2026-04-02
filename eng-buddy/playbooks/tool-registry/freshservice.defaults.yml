@@ -1,9 +1,0 @@
-create_ticket:
-  requester: "kioja.kudumu@klaviyo.com"
-  workspace: "IT"
-
-send_ticket_reply:
-  tone: "professional"
-
-update_ticket:
-  notify_requester: true

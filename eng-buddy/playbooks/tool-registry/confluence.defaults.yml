@@ -1,5 +1,0 @@
-create_page:
-  space: "IT"
-
-update_page:
-  notify_watchers: false

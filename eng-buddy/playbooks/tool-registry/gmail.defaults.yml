@@ -1,6 +1,0 @@
-send_email:
-  from: "kioja.kudumu@klaviyo.com"
-  signature: true
-
-draft_email:
-  from: "kioja.kudumu@klaviyo.com"

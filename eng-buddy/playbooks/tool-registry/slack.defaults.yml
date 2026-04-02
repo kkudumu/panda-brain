@@ -1,5 +1,0 @@
-post_message:
-  as_user: true
-
-reply_to_thread:
-  as_user: true
