@@ -142,8 +142,11 @@ Read `references/stakeholder-comms.md` for full protocol.
 
 **Critical rule**: Write the draft file FIRST before showing content in chat.
 - Filename: `[recipient]-[topic]-[YYYY-MM-DD].md`
-- Write to: `~/.claude/ftm-ops/drafts/` (configurable via `paths.drafts_dir` in `ftm-config.yml`)
-- Return file path in chat, then show content
+- Write to BOTH locations (same file, two copies):
+  1. `~/.claude/ftm-ops/drafts/` (configurable via `paths.drafts_dir` in `ftm-config.yml`) — global archive
+  2. `./drafts/` (current working directory) — project-local copy
+- Create the `drafts/` directory in cwd if it doesn't exist
+- Return both file paths in chat, then show content
 
 ### 4. Meeting Intelligence
 Read `references/meeting-intelligence.md` for full protocol.
@@ -186,13 +189,15 @@ Quick reference:
 **Always follow this exact order when writing any comms draft:**
 
 1. Determine filename: `[recipient]-[topic]-[YYYY-MM-DD].md`
-2. **Write the file FIRST** using Write tool — before showing any draft content
+2. **Write the file to BOTH locations FIRST** using Write tool — before showing any draft content:
+   - `~/.claude/ftm-ops/drafts/[filename]` (global archive)
+   - `./drafts/[filename]` (current working directory — create `drafts/` if it doesn't exist)
 3. Include metadata at top: Date, Channel, To
-4. Return full file path in chat, then show the draft content
-5. Update in place on revisions — never create new files for the same draft
+4. Return both file paths in chat, then show the draft content
+5. Update in place on revisions in BOTH locations — never create new files for the same draft
 
 Wrong order: Draft in chat → maybe save later  
-Right order: Write file → return path → show content
+Right order: Write file (both locations) → return paths → show content
 
 ---
 
