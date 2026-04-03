@@ -223,7 +223,7 @@ Append a row to the root INTENT.md module map table:
 |---------|----------|---------------|
 | `BROKEN_PATH` — path in .md file doesn't resolve from installed location | HARD FAIL | No — requires human decision on correct path |
 | `BROKEN_CLI` — CLI command path doesn't exist or errors on execution | HARD FAIL | No — requires fixing the path or creating a symlink |
-| `HARDCODED_USER_PATH` — absolute path contains a specific username (e.g., `/Users/kioja.kudumu/`) | WARN | Yes — replace with `~/` or `$HOME/` equivalent |
+| `HARDCODED_USER_PATH` — absolute path contains a specific username (e.g., `/Users/jdoe/`) | WARN | Yes — replace with `~/` or `$HOME/` equivalent |
 | `STALE_PATH_REFERENCE` — path references a directory/file that was moved or renamed in this diff | HARD FAIL | Yes — update to new path |
 
 **Output format:**
@@ -231,7 +231,7 @@ Append a row to the root INTENT.md module map table:
 Layer 1.75 findings:
 - [BROKEN_PATH] ftm-ops/SKILL.md:53 — `~/.claude/skills/ftm/bin/brain.py` does not exist (ftm/ points to router subdirectory, not repo root)
 - [BROKEN_CLI] ftm-mind/references/orient-protocol.md:210 — `python3 ~/.claude/skills/eng-buddy/bin/brain.py` → file not found
-- [HARDCODED_USER_PATH] ftm-mind/references/ops-routing.md:44 — `/Users/kioja.kudumu/.claude/eng-buddy/drafts/` contains hardcoded username
+- [HARDCODED_USER_PATH] ftm-mind/references/ops-routing.md:44 — `/Users/jdoe/.claude/eng-buddy/drafts/` contains hardcoded username
 - [STALE_PATH_REFERENCE] ftm-ops/references/task-management.md:15 — `~/.claude/eng-buddy/active-tasks.md` was moved to `~/.claude/ftm-ops/active-tasks.md`
 ```
 

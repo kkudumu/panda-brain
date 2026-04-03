@@ -57,7 +57,7 @@ Orient must know the available MCPs and their contextual triggers.
 Use the smallest relevant MCP set.
 
 - Jira issue key or Atlassian URL -> `mcp-atlassian-personal` (or the configured personal account name)
-- "internal docs", "runbook", "Klaviyo", "Glean" -> `glean_default`
+- "internal docs", "runbook", "company wiki", "Glean" -> `glean_default`
 - "how do I use X library" -> `context7`
 - "calendar", "meeting", "free time" -> `google-calendar`
 - "Slack", "channel", "thread", "notify" -> `slack`
@@ -197,7 +197,7 @@ When asking, ask one focused question with concrete choices.
    - **Just do the thing.** If the credentials don't work, you'll find out when the API call fails — and that's a better signal than a speculative question.
 4. If no matching experience exists, proceed with asking.
 
-This rule exists because users set up repo-level context once (e.g., "ragnarok has full Okta/Freshservice/Jira API access") and expect Claude to remember it across every session. Asking "do you have admin access?" when the blackboard already says "yes, full access" is the #1 frustration signal.
+This rule exists because users set up repo-level context once (e.g., "my-tools repo has full API access to our admin systems") and expect Claude to remember it across every session. Asking "do you have admin access?" when the blackboard already says "yes, full access" is the #1 frustration signal.
 
 ### Access Declaration Detection (MANDATORY)
 

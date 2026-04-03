@@ -1,26 +1,13 @@
 {
   "current_task": {
-    "id": "hackathon-github-pages-site",
-    "description": "Built and published GitHub Pages site for hackathon team — homepage, playbook, flow map, all interlinked",
-    "type": "hackathon-prep",
-    "started_at": "2026-03-23T00:00:00Z",
-    "status": "completed",
-    "next_action": "none — site is live at klaviyokio.github.io/onboard-the-hackathon"
+    "id": null,
+    "description": null,
+    "type": null,
+    "started_at": null,
+    "status": "none",
+    "next_action": null
   },
-  "recent_decisions": [
-    {
-      "decision": "Used GitHub Pages with static HTML instead of a framework",
-      "reason": "Simple, fast deployment for hackathon team reference pages"
-    },
-    {
-      "decision": "Restored full docx content into playbook.html while keeping coffee-shop design",
-      "reason": "HTML version had trimmed role descriptions — docx had the complete detail"
-    },
-    {
-      "decision": "Fixed flow.html by porting missing elements from agent-flow-map.html",
-      "reason": "Node overlap, missing transcript node, chat bubbles, and annotations"
-    }
-  ],
+  "recent_decisions": [],
   "active_constraints": [],
   "user_preferences": {
     "communication_style": "concise, technical",
@@ -28,10 +15,10 @@
     "default_model_profile": null
   },
   "session_metadata": {
-    "started_at": "2026-03-23T00:00:00Z",
-    "last_updated": "2026-03-23T00:00:00Z",
+    "started_at": null,
+    "last_updated": null,
     "conversation_id": null,
-    "messages_count": 20,
+    "messages_count": 0,
     "skills_invoked": []
   }
 }
