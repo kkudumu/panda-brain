@@ -108,3 +108,22 @@ If `experiences/index.json` has no usable matches:
 - continue normally
 - lean harder on current repo state and direct inspection
 - record the resulting experience aggressively after completion
+
+## Recording Code Patterns and API Gotchas
+
+When writing an experience after task completion, actively check for these:
+
+**code_patterns** — If during the task you wrote code that interacts with an API, library, or module, save the **final working version** (not the failed attempts). Include imports, setup, and the actual call. This is the copy-pasteable snippet future sessions will use.
+
+**api_gotchas** — If you hit errors because an API behaved differently than expected (wrong return type, unexpected method name, None instead of Response, objects instead of dicts), record each one. Format: what the module is, what's surprising, and what you'd wrongly assume.
+
+**playbook_ref** — If a brain.py playbook was created (via ftm-capture or auto-playbook trigger), record the path so the experience and playbook cross-reference each other.
+
+**When to populate these fields:**
+- You hit 2+ errors on the same module before getting it right → record code_patterns + api_gotchas
+- You used an API/library for the first time in this project → record code_patterns
+- The auto-playbook hook fired → record all three fields
+
+**When to skip:**
+- Pure file editing, config changes, or git operations — no API interaction worth capturing
+- The code pattern is already in an existing experience (check by module name before duplicating)

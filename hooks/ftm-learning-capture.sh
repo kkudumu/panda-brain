@@ -157,11 +157,59 @@ print(count)
 " 2>/dev/null)
 
         if [ "$ERROR_COUNT" -ge 3 ]; then
+          # Write a blackboard experience with the module and error count
+          SLUG=$(echo "$MODULE" | tr '.' '-' | tr '[:upper:]' '[:lower:]')
+          DATE_STAMP=$(date +%Y-%m-%d)
+          EXP_FILE="$FTM_STATE/blackboard/experiences/${DATE_STAMP}_auto-playbook-${SLUG}.json"
+          python3 -c "
+import json, os, datetime
+exp = {
+    'task_type': 'api-discovery',
+    'task_description': 'Auto-captured: $ERROR_COUNT errors on $MODULE before finding the working pattern',
+    'lessons_learned': [
+        '$MODULE required $ERROR_COUNT attempts to get right — working pattern saved as playbook',
+        'Check experience code_patterns before using this module in future sessions'
+    ],
+    'code_patterns': [],
+    'api_gotchas': [],
+    'playbook_ref': None,
+    'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+    'confidence': 0.7,
+    'tags': ['auto-playbook', '$(echo "$MODULE" | tr "." " ")']
+}
+os.makedirs(os.path.dirname('$EXP_FILE'), exist_ok=True)
+with open('$EXP_FILE', 'w') as f:
+    json.dump(exp, f, indent=2)
+
+# Update index
+idx_path = '$FTM_STATE/blackboard/experiences/index.json'
+try:
+    with open(idx_path) as f:
+        idx = json.load(f)
+except:
+    idx = {'entries': [], 'metadata': {'total_count': 0, 'last_updated': None, 'max_entries': 200, 'pruning_strategy': 'remove_oldest_low_confidence'}}
+
+idx['entries'].append({
+    'id': 'auto-playbook-${SLUG}-${DATE_STAMP}',
+    'file': os.path.basename('$EXP_FILE'),
+    'task_type': 'api-discovery',
+    'tags': ['auto-playbook', '$(echo "$MODULE" | tr "." " ")'],
+    'timestamp': exp['timestamp'],
+    'confidence': 0.7
+})
+idx['metadata']['total_count'] = len(idx['entries'])
+idx['metadata']['last_updated'] = exp['timestamp']
+with open(idx_path, 'w') as f:
+    json.dump(idx, f, indent=2)
+" 2>/dev/null
+
           echo ""
           echo "[Auto-Playbook] Detected $ERROR_COUNT errors on '$MODULE' followed by a success in this session."
-          echo "You should save the working code pattern as a playbook so you don't repeat these mistakes."
-          echo "Run: /ftm-capture or tell the user: \"That was rough — I'm saving the working pattern so next time it's one clean shot.\""
-          echo "Then proactively invoke ftm-capture with the working code and the gotchas you hit."
+          echo "A skeleton experience has been saved to the blackboard at: $EXP_FILE"
+          echo "NOW you MUST do two things:"
+          echo "1. Proactively invoke ftm-capture to save the working code pattern as a playbook"
+          echo "2. Update the experience file at $EXP_FILE — fill in the code_patterns array with the working snippet and api_gotchas with every wrong assumption you hit"
+          echo "Tell the user: \"That was rough — I'm saving the working pattern so next time it's one clean shot.\""
           echo ""
 
           # Clear tracked errors for this module so we don't re-trigger

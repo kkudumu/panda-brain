@@ -73,6 +73,56 @@
       "items": {
         "type": "string"
       }
+    },
+    "code_patterns": {
+      "type": "array",
+      "description": "Working code snippets discovered during this task — the final correct version, not the failed attempts. Include imports, setup, and the actual call pattern.",
+      "items": {
+        "type": "object",
+        "required": ["module", "code"],
+        "additionalProperties": false,
+        "properties": {
+          "module": {
+            "type": "string",
+            "description": "The primary module/library this pattern uses (e.g. shared_services.okta.groups)"
+          },
+          "code": {
+            "type": "string",
+            "description": "The working code snippet — complete and copy-pasteable"
+          },
+          "description": {
+            "type": "string",
+            "description": "One-line description of what this pattern does"
+          }
+        }
+      }
+    },
+    "api_gotchas": {
+      "type": "array",
+      "description": "Surprising API behaviors, wrong assumptions, and type mismatches discovered during this task. Things that caused errors and would cause them again without this note.",
+      "items": {
+        "type": "object",
+        "required": ["module", "gotcha"],
+        "additionalProperties": false,
+        "properties": {
+          "module": {
+            "type": "string",
+            "description": "The module/API where the gotcha was discovered"
+          },
+          "gotcha": {
+            "type": "string",
+            "description": "What's surprising or wrong — e.g. 'list_members() returns OktaUser objects, not dicts'"
+          },
+          "wrong_assumption": {
+            "type": "string",
+            "description": "What you'd naturally assume that turns out to be wrong"
+          }
+        }
+      }
+    },
+    "playbook_ref": {
+      "type": "string",
+      "description": "Path to the brain.py playbook entry if one was created from this experience, for cross-referencing"
     }
   }
 }
