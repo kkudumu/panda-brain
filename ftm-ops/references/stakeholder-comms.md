@@ -11,7 +11,9 @@ Handles communication drafts, follow-up tracking, and stakeholder relationship i
 ### Steps
 
 1. Determine filename: `[recipient]-[topic]-[YYYY-MM-DD].md`
-2. **Write the file** to `~/.claude/ftm-ops/drafts/` using Write tool
+2. **Write the file to BOTH locations** using Write tool:
+   - `~/.claude/ftm-ops/drafts/[filename]` (global archive)
+   - `./drafts/[filename]` (current working directory — create `drafts/` if needed)
 3. Include metadata header in file:
    ```
    Date: YYYY-MM-DD
