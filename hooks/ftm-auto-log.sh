@@ -70,6 +70,55 @@ if echo "$USER_MESSAGE" | grep -qE "(I|i) .* (what|should|next|now)\?"; then
     SHOULD_LOG=true
 fi
 
+# --- Tool activity check ---
+# If mutating tool calls happened since the last auto-log check,
+# inject a log reminder regardless of what the user's message says.
+# This catches the case where Claude executes work (API calls, scripts, etc.)
+# and the user's next message is just "what else?" or a new task.
+LAST_AUTOLOG_TS="$FTM_STATE/.last-autolog-check"
+EVENTS_LOG="$HOME/.claude/events.log"
+
+if [ -f "$EVENTS_LOG" ]; then
+    LAST_CHECK=0
+    if [ -f "$LAST_AUTOLOG_TS" ]; then
+        LAST_CHECK=$(cat "$LAST_AUTOLOG_TS" 2>/dev/null || echo "0")
+    fi
+    NOW=$(date +%s)
+
+    # Count mutating tool calls since last check
+    MUTATING_CALLS=$(python3 -c "
+import json, sys
+count = 0
+cutoff = $LAST_CHECK
+mutating = {'Write', 'Edit', 'MultiEdit', 'Bash'}
+mutating_prefixes = ('mcp__freshservice', 'mcp__mcp-atlassian', 'mcp__slack__slack_post', 'mcp__gmail__send')
+try:
+    with open('$EVENTS_LOG') as f:
+        for line in f:
+            line = line.strip()
+            if not line: continue
+            try:
+                ev = json.loads(line)
+                ts = ev.get('timestamp', 0)
+                if isinstance(ts, str):
+                    from datetime import datetime
+                    ts = int(datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp())
+                if ts <= cutoff: continue
+                tool = ev.get('tool_name', '')
+                if tool in mutating or any(tool.startswith(p) for p in mutating_prefixes):
+                    count += 1
+            except: pass
+except: pass
+print(count)
+" 2>/dev/null)
+
+    echo "$NOW" > "$LAST_AUTOLOG_TS"
+
+    if [ "$MUTATING_CALLS" -gt 0 ] && [ "$SHOULD_LOG" != "true" ]; then
+        SHOULD_LOG=true
+    fi
+fi
+
 # If action detected, output logging reminder with exact instructions
 TODAY=$(date +%Y-%m-%d)
 DAILY_DIR="$HOME/.claude/ftm-ops/daily"
