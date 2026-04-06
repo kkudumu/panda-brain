@@ -91,11 +91,21 @@ If the next move will reveal new information, plan to re-enter Observe after the
 
 Act is clean, decisive execution — but execution of **approved** work only.
 
-**Pre-Act checkpoint**: Before executing anything, verify:
+**HARD GATE — Pre-Act checkpoint**: Before executing ANYTHING (Bash, MCP, Write, Edit, API calls of any kind), verify ALL of these:
 
-1. If `approval_mode` is `plan_first` or `always_ask`, did the user explicitly approve the plan?
-2. If the task involves external mutations (see Approval Gates), have you presented the specific actions and received approval?
-3. If neither condition applies, proceed.
+1. **Did you present a checkbox plan?** If the task is medium+ (forced escalation signals fired), you MUST have presented a `N. [ ] action → target` plan and received explicit user approval. "I'll do X, Y, Z" in prose is NOT a plan. Listing steps without `[ ]` checkboxes is NOT a plan. If you haven't presented one, STOP and present it now.
+2. **Did the user approve it?** Look for "go", "approve", "yes", "lgtm", or similar. If the user hasn't responded to your plan yet, WAIT. Do not start executing.
+3. **Is the plan marker written?** After approval, write to `~/.claude/ftm-state/.plan-presented` before executing. This signals to hooks that planning happened.
+4. If the task involves external mutations (see Approval Gates), have you presented the specific actions and received approval?
+5. If none of the above apply (micro/small task, no forced escalation), proceed.
+
+**The rationalization trap**: You will feel the urge to skip the plan because:
+- "The user said 'do as much as you can' — that's implicit approval" → NO. That's the task description, not plan approval.
+- "I know what needs to happen, presenting a plan is just overhead" → NO. The plan is for the USER, not for you.
+- "I'll just start with one small API call to check something" → NO. One call becomes five becomes a full execution without approval.
+- "The user seems impatient" → NO. A 30-second plan saves 10 minutes of unwanted work.
+
+**This applies to ALL execution methods** — Bash commands, MCP calls, Python scripts, curl, direct API calls. The plan-gate hook catches Edit/Write/MCP, but Bash API calls bypass it. This checkpoint is the only thing that catches those. Do not skip it.
 
 ### 1. Direct action
 
