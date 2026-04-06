@@ -18,22 +18,9 @@
 FTM_STATE="$HOME/.claude/ftm-state"
 CONTEXT_JSON="$FTM_STATE/blackboard/context.json"
 
-# Check if an ftm session is active by reading context.json
-FTM_ACTIVE=$(python3 -c "
-import json, sys
-try:
-    with open('$CONTEXT_JSON') as f:
-        d = json.load(f)
-    task = d.get('current_task', {})
-    status = task.get('status', '')
-    print('1' if status not in ('', 'completed', 'none') else '0')
-except Exception:
-    print('0')
-" 2>/dev/null)
-
-if [ "$FTM_ACTIVE" != "1" ]; then
-    exit 0  # Not in active ftm session, skip
-fi
+# NOTE: Session gate removed in v1.7.9. Daily logging should happen for ALL work,
+# not just formal ftm sessions. Most productive work happens outside /ftm invocations
+# and was going untracked because context.json status was "none" or "completed".
 
 # Read payload from stdin (JSON) — extract prompt for action pattern matching
 STDIN_DATA=$(cat)
@@ -83,10 +70,20 @@ if echo "$USER_MESSAGE" | grep -qE "(I|i) .* (what|should|next|now)\?"; then
     SHOULD_LOG=true
 fi
 
-# If action detected, output logging reminder for Claude to see
+# If action detected, output logging reminder with exact instructions
+TODAY=$(date +%Y-%m-%d)
+DAILY_DIR="$HOME/.claude/ftm-ops/daily"
+DAILY_FILE="$DAILY_DIR/$TODAY.md"
+
 if [ "$SHOULD_LOG" = true ]; then
     echo ""
-    echo "[Auto-log] Detected progress update. Please log this to the ftm daily log."
+    echo "[Auto-log] Detected progress update. Append to daily log NOW:"
+    echo "  File: $DAILY_FILE"
+    if [ ! -f "$DAILY_FILE" ]; then
+        echo "  File doesn't exist yet — create it with header: # Daily Log — $TODAY"
+    fi
+    echo "  Format: - HH:MM — [what was done] (ticket/PR/system if applicable)"
+    echo "  Do this silently — don't announce it to the user."
     echo ""
 fi
 

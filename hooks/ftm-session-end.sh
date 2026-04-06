@@ -1,52 +1,58 @@
 #!/bin/bash
 # ftm-session-end.sh
-# Hook: Deactivate ftm session tracking when conversation ends
-# Trigger: SessionEnd
+# Hook: Deactivate ftm session tracking and ensure daily log exists when conversation ends
+# Trigger: Stop
 #
-# IMPORTANT: Must be listed AFTER ftm-session-snapshot.sh in settings.json
-# (in a separate matcher entry). The snapshot hook reads context.json status
-# to gate itself — this hook marks the session completed.
+# Always runs — not gated on ftm session state. Every session that ends should:
+# 1. Mark context.json as completed (if active)
+# 2. Ensure today's daily log file exists (create if missing)
+# 3. Remind Claude to append a session summary before exiting
 
 FTM_STATE="$HOME/.claude/ftm-state"
 CONTEXT_JSON="$FTM_STATE/blackboard/context.json"
+TODAY=$(date +%Y-%m-%d)
+DAILY_DIR="$HOME/.claude/ftm-ops/daily"
+DAILY_FILE="$DAILY_DIR/$TODAY.md"
 
-# Check if an active session exists
-IS_ACTIVE=$(python3 -c "
-import json, sys
-try:
-    with open('$CONTEXT_JSON') as f:
-        d = json.load(f)
-    task = d.get('current_task', {})
-    status = task.get('status', '')
-    print('1' if status not in ('', 'completed', 'none') else '0')
-except Exception:
-    print('0')
-" 2>/dev/null)
-
-if [ "$IS_ACTIVE" != "1" ]; then
-    exit 0
-fi
-
-# Mark session as completed in context.json
+# Mark session as completed in context.json (if it has an active task)
 python3 -c "
-import json, sys
+import json, sys, os
 from datetime import datetime
 
+ctx_path = '$CONTEXT_JSON'
+if not os.path.exists(ctx_path):
+    sys.exit(0)
+
 try:
-    with open('$CONTEXT_JSON') as f:
+    with open(ctx_path) as f:
         d = json.load(f)
 
     if 'current_task' in d and isinstance(d['current_task'], dict):
-        d['current_task']['status'] = 'completed'
+        status = d['current_task'].get('status', '')
+        if status not in ('', 'completed', 'none'):
+            d['current_task']['status'] = 'completed'
 
     if 'session_metadata' in d and isinstance(d['session_metadata'], dict):
         d['session_metadata']['last_updated'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    with open('$CONTEXT_JSON', 'w') as f:
+    with open(ctx_path, 'w') as f:
         json.dump(d, f, indent=2)
-except Exception as e:
-    sys.stderr.write(f'ftm-session-end: failed to update context.json: {e}\n')
-    sys.exit(1)
+except Exception:
+    pass
 " 2>/dev/null
 
-echo "ftm session tracking deactivated (session ended)"
+# Ensure daily log directory and file exist
+mkdir -p "$DAILY_DIR"
+if [ ! -f "$DAILY_FILE" ]; then
+    echo "# Daily Log — $TODAY" > "$DAILY_FILE"
+    echo "" >> "$DAILY_FILE"
+fi
+
+# Remind Claude to write session summary to daily log
+echo ""
+echo "[Session ending] Before you finish, append a summary of this session to the daily log:"
+echo "  File: $DAILY_FILE"
+echo "  Format: ## Session — HH:MM"
+echo "  Then bullet points of what was accomplished, decisions made, and next steps."
+echo "  Do this silently — just write the file."
+echo ""
