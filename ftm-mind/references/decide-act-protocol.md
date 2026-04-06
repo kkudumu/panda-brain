@@ -107,6 +107,34 @@ Act is clean, decisive execution — but execution of **approved** work only.
 
 **This applies to ALL execution methods** — Bash commands, MCP calls, Python scripts, curl, direct API calls. The plan-gate hook catches Edit/Write/MCP, but Bash API calls bypass it. This checkpoint is the only thing that catches those. Do not skip it.
 
+### Compare Before You Loop (MANDATORY for external system operations)
+
+When working with external systems (Freshservice, Okta, Jira, Trelica, any API), **never trial-and-error your way to a solution.** Instead:
+
+**Step 1: Find a working reference.**
+Before making any changes, find an existing resource that already works the way you want the target to work. Examples:
+- Updating a catalog item's roles table? GET the working one (HR Acuity #630) AND the broken one. Diff them field by field.
+- Fixing an Okta group mapping? GET a group that works correctly and compare its config to the broken one.
+- Updating a Jira automation? Read a working rule's config before touching the broken one.
+
+**Step 2: Diff, don't guess.**
+Compare the working reference against the target. The fix is almost always a small, specific difference — a missing field option, a different encoding, a wrong position value. Find that diff. Don't hypothesize about what might be wrong.
+
+**Step 3: Make targeted changes.**
+Change ONLY what the diff revealed. One field at a time if needed. Verify after each change.
+
+**The trial-and-error trap**: When an API call fails, your instinct is to try a different endpoint, different payload, different method. After 3 failed attempts you're in a loop — guessing at combinations. STOP. Go back to Step 1. The answer is in the working reference, not in your next guess.
+
+**Red flags that you're in a loop:**
+- You've made 3+ API calls to the same system without a success
+- You're trying different URL path formats (underscore vs hyphen, internal ID vs display ID)
+- You're adding/removing fields from the payload hoping one combination works
+- You're reading API docs or source code to figure out the endpoint (the playbook should have this)
+
+**When you detect a loop:** STOP executing. Tell the user: "I've tried N approaches and none worked. Let me compare against a working reference before continuing." Then do Step 1.
+
+**The April 2026 lesson**: A one-field-option diff (`requester_can_edit: "true"`) was the entire fix for the Freshservice roles table not rendering. It took 15+ API calls, accidental field duplication, and destructive deletion of two catalog items to discover what a 30-second field-by-field comparison against the working HR Acuity item would have revealed immediately.
+
 ### 1. Direct action
 
 For micro tasks:
