@@ -290,6 +290,47 @@ Skip this step if:
 - The session context already contains recently loaded task state (within 15 minutes)
 - The request is purely local with no operational relevance (e.g., pure code edits)
 
+## Playbook Lookup (MANDATORY before any external system operation)
+
+**Before executing any operation on an external system (Freshservice, Okta, Jira, Trelica, S3, etc.), check for an existing playbook.** This is not optional. Playbooks encode hard-won lessons — API quirks, encoding requirements, field types that can't be updated, correct endpoint paths. Skipping this step means repeating every mistake the playbook was written to prevent.
+
+**Step 1: Check brain.py playbooks.**
+
+```
+python3 ~/.claude/skills/ftm/bin/brain.py --playbook-match "[describe the operation]" --playbook-match-source freshservice
+```
+
+If a match returns with confidence > 0.2, read the full playbook before proceeding.
+
+```
+python3 ~/.claude/skills/ftm/bin/brain.py --playbook-list
+```
+
+Also list all playbooks and scan names — sometimes the match query misses a relevant one.
+
+**Step 2: Check repo-local playbooks.**
+
+```
+ls docs/playbooks/ 2>/dev/null
+```
+
+If the current repo has a `docs/playbooks/` directory, scan it for files matching the target system. Read any relevant playbook before writing a single line of code.
+
+**Step 3: Check blackboard experiences.**
+
+Read `experiences/index.json` and filter by tags matching the target system. Load matching experience files and check for `code_patterns` and `api_gotchas` fields.
+
+**What playbooks prevent:**
+- Using raw HTML when Freshservice requires entity-encoded HTML (`html.escape()`)
+- Trying to PUT on `service_catalog/items/{internal_id}` when the correct path is `service-catalog/items/{display_id}`
+- Including `custom_lookup_bigint` fields in API updates (they're admin-UI-only)
+- Deleting and recreating resources when an in-place update works
+- Repeating 10+ failed API calls to discover what the playbook already documents
+
+**The April 2026 Braintrust incident**: A playbook existed (`docs/playbooks/freshservice-service-catalog-item.md`), the blackboard had the lesson ("FS rich text tables require html.escape()"), and a brain.py playbook (`fs-hide-catalog-el`) was available. None were consulted. The result: 15+ failed API attempts, accidental creation of duplicate fields, then destructive deletion of two catalog items breaking S3 workflow automation.
+
+**If no playbook exists** and the operation succeeds after trial-and-error, the auto-playbook hook should trigger. If it doesn't, proactively invoke ftm-capture to save the working pattern.
+
 ## Orient Synthesis
 
 Before leaving Orient, silently synthesize all signals into one internal picture:
