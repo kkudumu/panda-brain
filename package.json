@@ -1,6 +1,6 @@
 {
   "name": "feed-the-machine",
-  "version": "1.7.13",
+  "version": "1.7.14",
   "description": "A brain upgrade for Claude Code — 26 skills that teach it how to think before acting, remember across conversations, debug like a war room, run plans on autopilot with agent teams, and get second opinions from GPT & Gemini. Plus 15 hooks that automate the boring stuff.",
   "license": "MIT",
   "author": "kkudumu",
