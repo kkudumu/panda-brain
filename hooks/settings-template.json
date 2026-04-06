@@ -22,6 +22,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__freshservice-mcp|mcp__mcp-atlassian|mcp__slack|mcp__gmail|mcp__git",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ftm-guard.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

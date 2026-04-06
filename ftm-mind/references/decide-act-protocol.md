@@ -51,42 +51,16 @@ If next move reveals new information → plan to re-enter Observe after.
 
 ## Act
 
-### Pre-Act Checkpoint (HARD GATE)
+### Pre-Act Checkpoint
 
-Before executing ANYTHING — Bash, MCP, Write, Edit, API calls:
+Before executing, verify:
 
-1. **Checkbox plan presented?** Medium+ tasks require `N. [ ] action → target` format, approved by user. Prose is NOT a plan.
+1. **Checkbox plan presented?** Medium+ tasks require `N. [ ] action → target` format, approved by user.
 2. **User approved?** Wait for explicit go/approve/yes.
 3. **Plan marker written?** Write to `~/.claude/ftm-state/.plan-presented` after approval.
-4. **External mutations approved?** Per Approval Gates in orient-protocol.
-5. None apply (micro/small, no forced escalation) → proceed.
+4. None apply (micro/small, no forced escalation) → proceed.
 
-| Rationalization | Reality |
-|---|---|
-| "Do as much as you can" = implicit approval | That's the task description, not plan approval |
-| "I know what to do, plan is overhead" | Plan is for the USER |
-| "Just one small API call first" | One becomes five becomes a full unplanned execution |
-| "User seems impatient" | 30-second plan saves 10 minutes of wrong work |
-
-Applies to ALL execution methods including Bash/curl/python. The plan-gate hook catches Edit/Write/MCP; this checkpoint catches everything else.
-
-### Compare Before You Loop (MANDATORY for external systems)
-
-**Never trial-and-error. Always compare first.**
-
-1. **Find working reference** — GET a resource that already works the way you want
-2. **Diff** — compare field-by-field against the broken one. Fix is almost always a small, specific difference
-3. **Targeted change** — change ONLY what the diff revealed. Verify after each change
-
-**Loop detection red flags:**
-- 3+ API calls to same system without success
-- Trying different URL formats (underscore vs hyphen, internal vs display ID)
-- Shuffling payload fields hoping one works
-- Reading API docs for endpoint paths (playbook should have this)
-
-**On detection:** STOP. Tell user: "Tried N approaches, none worked. Comparing against working reference." Do step 1.
-
-See `references/incidents.md` → Braintrust Incident for the cost of skipping this.
+**Note**: The `ftm-guard` hook enforces approval gates, destructive action prevention, playbook checks, and loop detection at the tool-call level. You don't need to self-check these — the hook will stop you. But you should still present plans and get approval before acting.
 
 ### 1. Direct action
 
@@ -98,11 +72,11 @@ Show one routing line, then invoke: `Routing to ftm-debug: flaky failure with di
 
 ### 3. MCP execution
 
-Parallel reads, sequential writes, approval gates for external-facing actions.
+Parallel reads, sequential writes. The ftm-guard hook handles approval gates for external-facing actions.
 
 ### 3.5 Draft-before-send
 
-Slack/email/outbound comms → save to `.ftm-drafts/` first. Filename: `YYYY-MM-DD_HH-MM_<type>_<recipient>.md`. Present for approval, update status on send/cancel.
+Slack/email/outbound comms → save to `.ftm-drafts/` AND `~/.claude/ftm-ops/drafts/` first. Filename: `YYYY-MM-DD_HH-MM_<type>_<recipient>.md`. Present for approval, update status on send/cancel.
 
 ### 4. Blackboard updates (mandatory)
 
