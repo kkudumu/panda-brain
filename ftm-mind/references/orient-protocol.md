@@ -152,6 +152,24 @@ Every individual external mutation needs its own approval. "The user approved th
 
 When multiple mutations are part of one plan, batch the approval request by phase — not one API call at a time, but not "approve the whole plan" either. Group related mutations and present per-phase.
 
+### Destructive Actions (EXTRA HARD GATE — NEVER WITHOUT EXPLICIT CONFIRMATION)
+
+Deleting, replacing, or recreating external resources is a **separate, higher gate** than creating or updating them. These actions are often irreversible and break downstream dependencies you can't see.
+
+**NEVER do any of these without explicit user confirmation for each specific resource being destroyed:**
+- **DELETE any external resource** (catalog items, custom objects, Okta groups/apps, Jira issues, S3 objects)
+- **Recreate (delete + create)** to "fix" something — the new resource gets a different ID, breaking every automation that references the old one
+- **Overwrite S3 objects** that other systems read from
+- **Remove users from groups** or deactivate accounts
+- **Close/resolve tickets** that others may be watching
+
+**The "delete and recreate" trap**: When you can't update a resource cleanly via API, your instinct will be to delete it and create a fresh one. THIS IS ALMOST ALWAYS WRONG. External resources have IDs that other systems depend on — workflow configs, Lambda triggers, approval chains, custom object lookups, S3 references. Deleting breaks all of them silently. Instead:
+1. Tell the user what you can't update via API
+2. Suggest the minimal manual fix (admin UI link + exact steps)
+3. Only delete if the user explicitly says "yes, delete it, I understand the dependencies"
+
+**The April 2026 Braintrust incident**: ftm-mind deleted Freshservice catalog items #626 and #621 to "fix" duplicate fields, recreating them as #631 and #632. This broke the S3 workflow config (assign_after_app_owner_approval), required emergency patching, and the custom_lookup_bigint fields had to be re-added manually. The correct fix was: update only the roles field via API, and tell the user to delete the duplicate fields manually in the admin UI.
+
 ### What auto-proceeds (no approval needed)
 
 - local code edits, documentation updates
