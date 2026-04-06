@@ -34,3 +34,4 @@ evals/results/
 # Never commit — contains user credentials and auth tokens
 ftm-browse/user-data/
 ~/.ftm-browse/user-data/
+.personal-patterns
