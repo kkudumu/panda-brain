@@ -56,54 +56,6 @@ Look for the arc, not just the last message:
 
 Check: dirty worktree, recent commits, active branch, in-progress changes, conflicts with request. Clean tree = lower cost of direct action. Uncommitted changes = continuity and risk.
 
-## Approval Gates (HARD STOP)
-
-**Circuit breaker. External mutations require explicit user approval. No exceptions.**
-
-See `references/incidents.md` → Hindsight Incident for why this exists.
-
-### Requires approval (STOP before each)
-
-Every individual external mutation. "User approved the plan" ≠ "user approved every API call."
-
-- **Okta**: create apps/groups, assign users, modify policies
-- **Freshservice**: create tickets/records/catalog items/custom objects
-- **Jira/Confluence**: create/update issues, pages, comments
-- **Slack/Email**: send messages (draft-before-send applies)
-- **Calendar**: create/modify events
-- **S3/cloud**: write/modify objects
-- **Browser forms**: submit data
-- **Deploys**: any production-affecting operation
-- **Git remote**: push, PR creation
-
-Batch by phase — not per-call, not whole-plan.
-
-### Destructive Actions (EXTRA HARD GATE)
-
-**NEVER delete/recreate external resources without per-resource user confirmation.**
-
-- DELETE any external resource
-- Recreate (delete + create) — new ID breaks all automation referencing the old one
-- Overwrite S3 objects other systems read
-- Remove users from groups, deactivate accounts
-- Close/resolve tickets others watch
-
-When you can't update via API: tell the user, suggest manual fix (admin UI link + steps). Only delete if user explicitly confirms with dependency awareness. See `references/incidents.md` → Braintrust Incident.
-
-### Auto-proceeds (no approval)
-
-Local edits, tests, lint, builds, audits, local git, GET requests, blackboard reads/writes, saving drafts.
-
-### Rationalization traps
-
-| Thought | Reality |
-|---|---|
-| "The user clearly wants this" | Present the action, wait for approval |
-| "It's part of the approved plan" | Each mutation needs its own gate |
-| "I already started" | Sunk cost. Stop and ask |
-| "Just one more API call" | That's how incidents start |
-| "User will appreciate proactivity" | User will appreciate not breaking things |
-
 ## Blackboard-First Rule (before any access/auth questions)
 
 Before asking about credentials, API access, or authorization:
@@ -148,8 +100,19 @@ Load active tasks, surface high-priority via TaskCreate. Skip if brain.py absent
 2. `ls docs/playbooks/` in current repo
 3. Blackboard experiences filtered by target system tags — check `code_patterns` and `api_gotchas`
 
-If any source has relevant content, read it before writing code. See `references/incidents.md` → Braintrust Incident for what happens when you skip this.
+If any source has relevant content, read it before writing code. After checking, write a marker: `~/.claude/ftm-state/.playbook-checked-{system}` so the ftm-guard hook knows you checked.
 
 ## Orient Synthesis
 
 Before leaving Orient, have one clear internal picture: what the user wants, task type, session continuity, codebase constraints, relevant lessons/patterns, capability mix, correct task size, whether approval or clarification is needed. Orient is complete when the next move feels obvious.
+
+## Safety Protocols
+
+**Approval gates, destructive action prevention, compare-before-you-loop, and loop detection are enforced by the `ftm-guard` hook**, which fires on every mutating tool call automatically. You do not need to self-enforce these — the hook will inject warnings if you're about to do something dangerous. But you should still be aware of them:
+
+- External mutations need user approval per-phase (not per-call, not whole-plan)
+- Destructive actions (delete, recreate) need per-resource confirmation
+- 3+ failed API calls = stop and compare against a working reference
+- Never trial-and-error; always diff a working resource first
+
+See `references/incidents.md` for the full incident history behind these rules.
