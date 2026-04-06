@@ -2,205 +2,116 @@
 
 ## Decide
 
-Decide turns the orientation model into one concrete next move.
+### 1. Choose execution mode
 
-### 1. Choose the smallest correct execution mode
+- `micro` → direct action
+- `small` → pre-flight summary + action + verify
+- `medium` → checkbox plan, wait for approval, execute
+- `large` → `ftm-brainstorm` (no plan) or `ftm-executor` (plan exists)
 
-- `micro` -> direct action
-- `small` -> pre-flight summary, then direct action plus verification
-- `medium` -> numbered plan, wait for approval, then execute
-- `large` -> `ftm-brainstorm` if no plan exists, or `ftm-executor` if a plan exists
+Double-check forced escalation signals from Complexity Sizing reference. If any fired → medium minimum.
 
-**Double-check before committing to a size**: Re-read the forced escalation signals from the Complexity Sizing reference. If any forced-medium signals fired, the task is medium regardless of how it feels.
+### 1.5 Plan Approval
 
-### 1.5 Interactive Plan Approval
+Read `ftm-config.yml` → `execution.approval_mode`.
 
-Read `~/.claude/ftm-config.yml` field `execution.approval_mode`. This controls whether the user sees and approves the plan before execution begins.
+**`auto`**: micro/small just go, medium outlines + executes, large routes to brainstorm/executor.
 
-#### Mode: `auto` (default legacy behavior)
-Skip this section entirely. Execute as before — micro/small just go, medium outlines steps and executes, large routes to brainstorm/executor.
+**`plan_first`** (recommended):
+- Small: pre-flight summary, proceed unless user objects
+- Medium/large: present checkbox plan, wait for explicit approval
 
-#### Mode: `plan_first` (recommended for collaborative work)
-
-**For small tasks**: Show a brief pre-flight summary before executing. Not a formal gate — just visibility:
-
-```
-Quick summary before I start:
-- Read [file] to understand current behavior
-- Change [X] to [Y] in [file]
-- Verify: [test/lint/manual check]
-
-Going ahead unless you say otherwise.
-```
-
-**For medium and large tasks**: Present a numbered task list and wait for the user to approve.
-
-**Step 0: Discovery Interview (if applicable).** Before generating the plan, check whether a Discovery Interview is needed (see Orient reference). If the task involves external systems, stakeholder coordination, or unfamiliar code, run the interview FIRST.
-
-**Step 1: Generate the plan.** Build a numbered checkbox list. This format is **mandatory** — no narrative steps, no prose paragraphs. Every plan MUST use: `N. [ ] One-line action → target`. See `references/protocols/PLAN-APPROVAL.md` for the full format spec, examples for code/ops/comms/infra tasks, and the list of NEVER-produce anti-patterns.
-
-**Step 2: Parse the user's response.**
+Plan format is **mandatory**: `N. [ ] One-line action → target`. See `protocols/PLAN-APPROVAL.md` for spec + examples.
 
 | User says | Action |
-|-----------|--------|
-| `approve`, `go`, `yes`, `lgtm`, `ship it` | Execute all steps in order |
-| `skip N` or `skip N,M` | Remove those steps, execute the rest |
-| `only N,M,P` | Execute only the listed steps in order |
-| `for step N, [instruction]` | Replace step N's approach, then execute all |
-| `add: [description] after N` | Insert a new step, renumber, then execute all |
-| `deny`, `stop`, `cancel`, `no` | Cancel. Do not execute anything. |
-| A longer message with mixed feedback | Parse each instruction. Apply all modifications. Present revised plan and ask for final approval. |
+|---|---|
+| approve/go/yes/lgtm | Execute all |
+| skip N | Remove step, execute rest |
+| only N,M | Execute only listed |
+| for step N, [change] | Modify + execute all |
+| add: [desc] after N | Insert, renumber, execute |
+| deny/stop/cancel | Cancel entirely |
 
-**Step 3: Execute the approved plan.** Work through steps sequentially. After each step show: `Step 2/5 done: [summary].` If a step fails, stop and report.
+Execute sequentially. Show `Step 2/5 done: [summary]` after each. If step fails → stop and report.
 
-**Step 4: Post-execution update.** Update blackboard with decisions and experience.
+**`always_ask`**: Same as plan_first but also gates small tasks. Only micro skips.
 
-#### Mode: `always_ask`
-Same as `plan_first` but applies to **small** tasks too. Only micro tasks skip the approval gate.
+### 2. Direct vs routed
 
-#### Combining with explicit skill routing
-When routing to a skill, plan approval still applies if mode is `plan_first` or `always_ask`. Present the strategy for user control.
+Direct when: micro/small, routing overhead adds no value, faster to just do it.
+Skill when: specialized workflow improves result, user invoked it, medium/large.
 
-### 2. Choose direct vs routed execution
+### 3. Supporting MCP reads
 
-Use direct execution when:
-- the work is micro or small
-- routing overhead adds no value
-- the answer can be delivered faster than a delegated workflow
+Fetch minimum required external context first (ticket, calendar, docs, browser state).
 
-Use a ftm skill when:
-- its specialized workflow will materially improve the result
-- the user explicitly invoked it
-- the task is medium/large and the skill is the right vehicle
+### 4. Loop decision
 
-### 3. Choose any supporting MCP reads
-
-If the request depends on external context, fetch the minimum required state first.
-
-Examples:
-- Jira URL -> read the ticket first
-- meeting request -> read calendar first
-- internal policy question -> search Glean first
-- UI bug -> snapshot or inspect browser first
-
-### 4. Decide whether to loop
-
-If the next move will reveal new information, plan to re-enter Observe after the action.
+If next move reveals new information → plan to re-enter Observe after.
 
 ## Act
 
-Act is clean, decisive execution — but execution of **approved** work only.
+### Pre-Act Checkpoint (HARD GATE)
 
-**HARD GATE — Pre-Act checkpoint**: Before executing ANYTHING (Bash, MCP, Write, Edit, API calls of any kind), verify ALL of these:
+Before executing ANYTHING — Bash, MCP, Write, Edit, API calls:
 
-1. **Did you present a checkbox plan?** If the task is medium+ (forced escalation signals fired), you MUST have presented a `N. [ ] action → target` plan and received explicit user approval. "I'll do X, Y, Z" in prose is NOT a plan. Listing steps without `[ ]` checkboxes is NOT a plan. If you haven't presented one, STOP and present it now.
-2. **Did the user approve it?** Look for "go", "approve", "yes", "lgtm", or similar. If the user hasn't responded to your plan yet, WAIT. Do not start executing.
-3. **Is the plan marker written?** After approval, write to `~/.claude/ftm-state/.plan-presented` before executing. This signals to hooks that planning happened.
-4. If the task involves external mutations (see Approval Gates), have you presented the specific actions and received approval?
-5. If none of the above apply (micro/small task, no forced escalation), proceed.
+1. **Checkbox plan presented?** Medium+ tasks require `N. [ ] action → target` format, approved by user. Prose is NOT a plan.
+2. **User approved?** Wait for explicit go/approve/yes.
+3. **Plan marker written?** Write to `~/.claude/ftm-state/.plan-presented` after approval.
+4. **External mutations approved?** Per Approval Gates in orient-protocol.
+5. None apply (micro/small, no forced escalation) → proceed.
 
-**The rationalization trap**: You will feel the urge to skip the plan because:
-- "The user said 'do as much as you can' — that's implicit approval" → NO. That's the task description, not plan approval.
-- "I know what needs to happen, presenting a plan is just overhead" → NO. The plan is for the USER, not for you.
-- "I'll just start with one small API call to check something" → NO. One call becomes five becomes a full execution without approval.
-- "The user seems impatient" → NO. A 30-second plan saves 10 minutes of unwanted work.
+| Rationalization | Reality |
+|---|---|
+| "Do as much as you can" = implicit approval | That's the task description, not plan approval |
+| "I know what to do, plan is overhead" | Plan is for the USER |
+| "Just one small API call first" | One becomes five becomes a full unplanned execution |
+| "User seems impatient" | 30-second plan saves 10 minutes of wrong work |
 
-**This applies to ALL execution methods** — Bash commands, MCP calls, Python scripts, curl, direct API calls. The plan-gate hook catches Edit/Write/MCP, but Bash API calls bypass it. This checkpoint is the only thing that catches those. Do not skip it.
+Applies to ALL execution methods including Bash/curl/python. The plan-gate hook catches Edit/Write/MCP; this checkpoint catches everything else.
 
-### Compare Before You Loop (MANDATORY for external system operations)
+### Compare Before You Loop (MANDATORY for external systems)
 
-When working with external systems (Freshservice, Okta, Jira, Trelica, any API), **never trial-and-error your way to a solution.** Instead:
+**Never trial-and-error. Always compare first.**
 
-**Step 1: Find a working reference.**
-Before making any changes, find an existing resource that already works the way you want the target to work. Examples:
-- Updating a catalog item's roles table? GET the working one (HR Acuity #630) AND the broken one. Diff them field by field.
-- Fixing an Okta group mapping? GET a group that works correctly and compare its config to the broken one.
-- Updating a Jira automation? Read a working rule's config before touching the broken one.
+1. **Find working reference** — GET a resource that already works the way you want
+2. **Diff** — compare field-by-field against the broken one. Fix is almost always a small, specific difference
+3. **Targeted change** — change ONLY what the diff revealed. Verify after each change
 
-**Step 2: Diff, don't guess.**
-Compare the working reference against the target. The fix is almost always a small, specific difference — a missing field option, a different encoding, a wrong position value. Find that diff. Don't hypothesize about what might be wrong.
+**Loop detection red flags:**
+- 3+ API calls to same system without success
+- Trying different URL formats (underscore vs hyphen, internal vs display ID)
+- Shuffling payload fields hoping one works
+- Reading API docs for endpoint paths (playbook should have this)
 
-**Step 3: Make targeted changes.**
-Change ONLY what the diff revealed. One field at a time if needed. Verify after each change.
+**On detection:** STOP. Tell user: "Tried N approaches, none worked. Comparing against working reference." Do step 1.
 
-**The trial-and-error trap**: When an API call fails, your instinct is to try a different endpoint, different payload, different method. After 3 failed attempts you're in a loop — guessing at combinations. STOP. Go back to Step 1. The answer is in the working reference, not in your next guess.
-
-**Red flags that you're in a loop:**
-- You've made 3+ API calls to the same system without a success
-- You're trying different URL path formats (underscore vs hyphen, internal ID vs display ID)
-- You're adding/removing fields from the payload hoping one combination works
-- You're reading API docs or source code to figure out the endpoint (the playbook should have this)
-
-**When you detect a loop:** STOP executing. Tell the user: "I've tried N approaches and none worked. Let me compare against a working reference before continuing." Then do Step 1.
-
-**The April 2026 lesson**: A one-field-option diff (`requester_can_edit: "true"`) was the entire fix for the Freshservice roles table not rendering. It took 15+ API calls, accidental field duplication, and destructive deletion of two catalog items to discover what a 30-second field-by-field comparison against the working HR Acuity item would have revealed immediately.
+See `references/incidents.md` → Braintrust Incident for the cost of skipping this.
 
 ### 1. Direct action
 
-For micro tasks:
-- do the work
-- summarize what changed
-
-For small tasks (when `approval_mode` is `plan_first` or `always_ask`):
-- show the pre-flight summary first
-- then do the work
-- verify
-- summarize what changed
+Micro: do + summarize. Small (plan_first/always_ask): pre-flight → do → verify → summarize.
 
 ### 2. Skill routing
 
-Before invoking a skill, show one short routing line.
-
-Examples:
-- `Routing to ftm-debug: this is a flaky failure with real diagnostic uncertainty.`
-- `Routing to ftm-brainstorm: this is still design-stage and benefits from research-backed planning.`
-
-Then invoke the target skill with the full user input.
+Show one routing line, then invoke: `Routing to ftm-debug: flaky failure with diagnostic uncertainty.`
 
 ### 3. MCP execution
 
-Use:
-- parallel reads when safe
-- sequential writes
-- approval gates only for external-facing actions
+Parallel reads, sequential writes, approval gates for external-facing actions.
 
-### 3.5. Draft-before-send protocol
+### 3.5 Draft-before-send
 
-When composing Slack messages, emails, or any outbound communication, always save the draft locally before sending.
-
-**Drafts folder**: `.ftm-drafts/` in the project root (or `~/.claude/ftm-drafts/` if no project context).
-
-**Ensure the folder exists and is gitignored.** Save every draft before presenting or sending:
-
-- Filename: `YYYY-MM-DD_HH-MM_<type>_<recipient-or-channel>.md`
-- Content includes frontmatter: type, to, subject (email only), drafted timestamp, status (draft/sent/cancelled)
-
-**Workflow:**
-1. Compose the message
-2. Save to `.ftm-drafts/`
-3. Present to user for approval
-4. If approved and sent, update `status: sent`
-5. If cancelled or modified, update accordingly
+Slack/email/outbound comms → save to `.ftm-drafts/` first. Filename: `YYYY-MM-DD_HH-MM_<type>_<recipient>.md`. Present for approval, update status on send/cancel.
 
 ### 4. Blackboard updates (mandatory)
 
-After every completed task, update the blackboard:
-
-1. Update `context.json` — set `current_task` to reflect what was done, append to `recent_decisions`
-2. Update `session_metadata.skills_invoked` if a skill was used
-3. Write an experience file to `~/.claude/ftm-state/blackboard/experiences/YYYY-MM-DD_task-slug.json`
-4. Update `~/.claude/ftm-state/blackboard/experiences/index.json` with the new entry
-
-The experience file should capture:
-- `task_type`, `tags`, `outcome`, `lessons`, `files_touched`, `stakeholders`, `decisions_made`
-
-Follow the schema and full-file write rules from `blackboard-schema.md`.
+After every completed task:
+1. Update `context.json` — current_task, recent_decisions, session_metadata
+2. Write experience file to `experiences/YYYY-MM-DD_task-slug.json`
+3. Update `experiences/index.json`
+4. Include: task_type, tags, outcome, lessons, files_touched, stakeholders, decisions_made, code_patterns, api_gotchas
 
 ### 5. Loop
 
-After acting:
-
-- if complete, answer and stop
-- if new information appeared, return to Observe
-- if blocked by approval or missing info, ask the user
-- if the simple approach failed, re-orient and escalate one level
+Complete → answer and stop. New info → re-observe. Blocked → ask user. Failed → re-orient, escalate one level.
