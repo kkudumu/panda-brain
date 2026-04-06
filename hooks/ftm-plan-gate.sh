@@ -1,24 +1,43 @@
 #!/usr/bin/env bash
 # ftm-plan-gate.sh
-# PreToolUse hook for Edit/Write tools.
+# PreToolUse hook for Edit/Write tools AND mutating MCP calls.
 #
-# Checks if a plan has been presented this session before allowing code edits.
-# If no plan marker exists and the edit count is climbing, injects warnings
-# telling Claude to stop and present a plan first.
+# Checks if a plan has been presented this session before allowing code edits
+# or external API mutations. If no plan marker exists and the action count is
+# climbing, injects warnings telling Claude to stop and present a plan first.
+#
+# Gates: Edit, Write, and MCP tools that create/update/delete external resources
+# (Freshservice, Okta, Jira, Slack sends, Gmail sends, etc.)
 #
 # The marker file (~/.claude/ftm-state/.plan-presented) is created by Claude
 # when it presents a plan. Any non-empty content counts as "plan presented".
 # The file is cleaned up by the blackboard enforcer at session end.
 #
-# Hook: PreToolUse (matcher: Edit|Write)
+# Hook: PreToolUse (matcher: Edit|Write|mcp__*)
 
 set -euo pipefail
 
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
 
-# Only gate Edit and Write tools
-if [[ "$TOOL_NAME" != "Edit" && "$TOOL_NAME" != "Write" ]]; then
+# Determine if this is a gated tool
+IS_GATED=false
+
+# Gate Edit and Write
+if [[ "$TOOL_NAME" == "Edit" || "$TOOL_NAME" == "Write" ]]; then
+  IS_GATED=true
+fi
+
+# Gate mutating MCP calls (create, update, delete, send, add, remove, apply, transition)
+if [[ "$TOOL_NAME" == mcp__* ]]; then
+  case "$TOOL_NAME" in
+    *create*|*update*|*delete*|*send*|*add*|*remove*|*apply*|*transition*|*commit*|*push*|*post_message*|*reply*|*modify*|*batch*|*convert*)
+      IS_GATED=true
+      ;;
+  esac
+fi
+
+if [[ "$IS_GATED" != "true" ]]; then
   exit 0
 fi
 

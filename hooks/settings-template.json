@@ -4,7 +4,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|mcp__freshservice-mcp|mcp__mcp-atlassian|mcp__slack__slack_post|mcp__gmail__send|mcp__gmail__draft|mcp__git__git_commit|mcp__git__git_push",
         "hooks": [
           {
             "type": "command",
