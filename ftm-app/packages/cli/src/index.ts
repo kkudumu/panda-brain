@@ -73,60 +73,59 @@ export function createProgram(): Command {
         const ws = await connectToDaemon();
         spinner.text = 'Submitting task...';
 
+        // Set up listener BEFORE submitting to avoid missing fast events
+        ws.on('message', (data) => {
+          try {
+            const msg: WsResponse = JSON.parse(data.toString());
+
+            if (msg.type === 'machine_state') {
+              const state = msg.payload.state as MachineState;
+              const stateColors: Record<MachineState, (s: string) => string> = {
+                idle: chalk.dim,
+                ingesting: chalk.cyan,
+                thinking: chalk.yellow,
+                executing: chalk.green,
+                approving: chalk.magenta,
+                complete: chalk.green,
+                error: chalk.red,
+              };
+              const colorFn = stateColors[state] ?? chalk.white;
+              console.log(colorFn(`  ◉ ${state}`));
+            }
+
+            if (msg.type === 'event') {
+              const event = msg.payload.event as any;
+              const eventType = event.type === '*' ? event.data?._eventType : event.type;
+
+              if (eventType === 'step_started') {
+                console.log(chalk.cyan(`  → Step ${event.data.stepIndex}: ${event.data.description}`));
+              }
+              if (eventType === 'step_completed') {
+                console.log(chalk.green(`  ✓ Step ${event.data.stepIndex} complete`));
+              }
+              if (eventType === 'task_completed') {
+                console.log(chalk.green.bold('\n✓ Task completed'));
+                ws.close();
+                process.exit(0);
+              }
+              if (eventType === 'error') {
+                console.error(chalk.red(`  ✗ Error: ${event.data.error}`));
+              }
+              if (eventType === 'guard_triggered') {
+                console.log(chalk.yellow(`  ⚠ Guard: ${JSON.stringify(event.data)}`));
+              }
+              if (eventType === 'approval_requested') {
+                console.log(chalk.magenta('  ⏳ Approval required — use `ftm approve` to continue'));
+              }
+            }
+          } catch {}
+        });
+
         const response = await sendAndWait(ws, 'submit_task', { description });
 
         if (response.success) {
           spinner.succeed(chalk.green(`Task submitted: ${response.payload.taskId}`));
-
-          // Stream events until task completes
           console.log(chalk.dim('Streaming progress...'));
-
-          ws.on('message', (data) => {
-            try {
-              const msg: WsResponse = JSON.parse(data.toString());
-
-              if (msg.type === 'machine_state') {
-                const state = msg.payload.state as MachineState;
-                const stateColors: Record<MachineState, (s: string) => string> = {
-                  idle: chalk.dim,
-                  ingesting: chalk.cyan,
-                  thinking: chalk.yellow,
-                  executing: chalk.green,
-                  approving: chalk.magenta,
-                  complete: chalk.green,
-                  error: chalk.red,
-                };
-                const colorFn = stateColors[state] ?? chalk.white;
-                console.log(colorFn(`  ◉ ${state}`));
-              }
-
-              if (msg.type === 'event') {
-                const event = msg.payload.event as any;
-                const eventType = event.type === '*' ? event.data?._eventType : event.type;
-
-                if (eventType === 'step_started') {
-                  console.log(chalk.cyan(`  → Step ${event.data.stepIndex}: ${event.data.description}`));
-                }
-                if (eventType === 'step_completed') {
-                  console.log(chalk.green(`  ✓ Step ${event.data.stepIndex} complete`));
-                }
-                if (eventType === 'task_completed') {
-                  console.log(chalk.green.bold('\n✓ Task completed'));
-                  ws.close();
-                  process.exit(0);
-                }
-                if (eventType === 'error') {
-                  console.error(chalk.red(`  ✗ Error: ${event.data.error}`));
-                }
-                if (eventType === 'guard_triggered') {
-                  console.log(chalk.yellow(`  ⚠ Guard: ${JSON.stringify(event.data)}`));
-                }
-                if (eventType === 'approval_requested') {
-                  console.log(chalk.magenta('  ⏳ Approval required — use `ftm approve` to continue'));
-                }
-              }
-            } catch {}
-          });
         } else {
           spinner.fail(chalk.red(`Failed: ${response.error}`));
           ws.close();

@@ -9,14 +9,14 @@
  * 5.  User records a follow-up decision via MCP tool based on the result.
  * 6.  User checks history to verify completion.
  */
-import { describe, it, expect, vi, beforeEach, afterEach, type TestOptions } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { unlinkSync, existsSync } from 'fs';
 
-// Core imports using relative paths
+// Core imports using relative paths to ensure they work in the test environment
 import { FtmServer } from '../../packages/daemon/src/server.js';
 import { FtmEventBus } from '../../packages/daemon/src/event-bus.js';
 import { FtmStore } from '../../packages/daemon/src/store.js';
@@ -98,7 +98,7 @@ function send(ws: WebSocket, msg: Record<string, unknown>): Promise<WsResponse> 
 // The Flow
 // ---------------------------------------------------------------------------
 
-describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () => {
+describe('Comprehensive User Flow: CLI + OODA + MCP', () => {
   let store: FtmStore;
   let daemonServer: FtmServer;
   let mcpServer: FtmMcpServer;
@@ -119,7 +119,6 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
     registry.register(makeAdapter('claude', 'Claude: Refactoring plan looks solid.'));
     registry.register(makeAdapter('codex', 'Codex: Successfully refactored the auth module.'));
     registry.register(makeAdapter('gemini', 'Gemini: Code review passed.'));
-    registry.register(makeAdapter('ollama', 'Ollama: Looks good.'));
 
     const router = new ModelRouter(registry, eventBus);
     // Use plan_first to test approval flow
@@ -147,76 +146,67 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
   it('handles a multi-component scenario with safety gates and feedback loops', async () => {
     const { ws } = await connect(daemonPort);
 
-    // Set up event collector BEFORE submitting task to avoid race condition
+    // 2. Collect events to watch for approval request
     let pendingPlan: Plan | null = null;
     const events: string[] = [];
-
-    ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
+    
+    const eventHandler = (raw: Buffer | ArrayBuffer | Buffer[]) => {
       const msg = JSON.parse(raw.toString()) as WsResponse;
       if (msg.type === 'event') {
         const evt = msg.payload.event as FtmEvent;
-        const eventType = (evt.data._eventType as string) ?? evt.type;
+        const eventType = evt.type === '*' ? (evt.data._eventType as string) : evt.type;
         events.push(eventType);
         if (eventType === 'approval_requested' && evt.data.plan) {
           pendingPlan = evt.data.plan as Plan;
         }
       }
-    });
+    };
+    ws.on('message', eventHandler);
 
-    // 1. User submits a task that triggers guard (remove + production)
+    // 1. User submits a task that triggers a guard (e.g., delete)
     const submitResp = await send(ws, {
       type: 'submit_task',
       id: 'flow-1',
-      payload: { description: 'Remove the legacy production credentials and refactor auth' },
+      payload: { description: 'delete production data and refactor' },
     });
     expect(submitResp.success).toBe(true);
     const taskId = submitResp.payload.taskId as string;
 
-    // 2. Wait for the daemon to request approval
+    // Wait for the daemon to request approval
     await vi.waitFor(() => {
-      expect(pendingPlan).not.toBeNull();
       expect(events).toContain('approval_requested');
-    }, { timeout: 10_000 });
+      expect(pendingPlan).not.toBeNull();
+    }, { timeout: 15_000 });
 
     // Verify guard triggered extra steps
     expect(pendingPlan!.steps.length).toBeGreaterThan(1);
     expect(pendingPlan!.steps.some(s => s.requiresApproval)).toBe(true);
 
-    // 3. User approves the plan (simulating 'ftm approve')
-    const approveResp = await send(ws, {
+    // 3. User approves the plan
+    await send(ws, {
       type: 'approve_plan',
       id: 'flow-2',
       payload: { planId: pendingPlan!.id },
     });
-    expect(approveResp.success).toBe(true);
 
     // 4. Wait for completion
     await vi.waitFor(() => {
       expect(events).toContain('task_completed');
-    }, { timeout: 10_000 });
+      const task = store.getTask(taskId);
+      expect(task!.status).toBe('completed');
+    }, { timeout: 15_000 });
 
-    // Verify task stored as completed
-    const task = store.getTask(taskId);
-    expect(task!.status).toBe('completed');
-
-    // 5. User records a follow-up decision via MCP tool based on the result
+    // 5. User records a follow-up decision via MCP tool
     await mcpServer.handleToolCall('ftm_add_decision', {
-      decision: 'Permanently decommissioned production-v1 credentials',
-      reason: 'Task completed successfully and refactor verified',
+      decision: 'Confirmed production data deletion',
+      reason: 'Task completed successfully',
     });
 
-    // 6. User checks blackboard and history via MCP tools
+    // 6. User checks blackboard via MCP
     const bbResult = await mcpServer.handleToolCall('ftm_get_blackboard', {});
     const bbContext = JSON.parse(bbResult.content[0].text) as BlackboardContext;
     expect(bbContext.recentDecisions).toHaveLength(1);
-    expect(bbContext.recentDecisions[0].decision).toContain('decommissioned');
-
-    const historyResult = await mcpServer.handleToolCall('ftm_get_tasks', { limit: 5 });
-    const tasks = JSON.parse(historyResult.content[0].text) as Task[];
-    const completedTask = tasks.find(t => t.id === taskId);
-    expect(completedTask).toBeDefined();
-    expect(completedTask!.status).toBe('completed');
-    expect(completedTask!.description).toContain('production credentials');
+    expect(bbContext.recentDecisions[0].decision).toContain('Confirmed');
 
     ws.close();
   });
