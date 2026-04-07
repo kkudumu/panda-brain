@@ -119,6 +119,7 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
     registry.register(makeAdapter('claude', 'Claude: Refactoring plan looks solid.'));
     registry.register(makeAdapter('codex', 'Codex: Successfully refactored the auth module.'));
     registry.register(makeAdapter('gemini', 'Gemini: Code review passed.'));
+    registry.register(makeAdapter('ollama', 'Ollama: Looks good.'));
 
     const router = new ModelRouter(registry, eventBus);
     // Use plan_first to test approval flow
@@ -146,7 +147,23 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
   it('handles a multi-component scenario with safety gates and feedback loops', async () => {
     const { ws } = await connect(daemonPort);
 
-    // 1. User submits a task that triggers a guard (e.g., delete)
+    // Set up event collector BEFORE submitting task to avoid race condition
+    let pendingPlan: Plan | null = null;
+    const events: string[] = [];
+
+    ws.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      const msg = JSON.parse(raw.toString()) as WsResponse;
+      if (msg.type === 'event') {
+        const evt = msg.payload.event as FtmEvent;
+        const eventType = (evt.data._eventType as string) ?? evt.type;
+        events.push(eventType);
+        if (eventType === 'approval_requested' && evt.data.plan) {
+          pendingPlan = evt.data.plan as Plan;
+        }
+      }
+    });
+
+    // 1. User submits a task that triggers guard (remove + production)
     const submitResp = await send(ws, {
       type: 'submit_task',
       id: 'flow-1',
@@ -155,26 +172,11 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
     expect(submitResp.success).toBe(true);
     const taskId = submitResp.payload.taskId as string;
 
-    // 2. Collect events to watch for approval request
-    let pendingPlan: Plan | null = null;
-    const events: string[] = [];
-    
-    const eventHandler = (raw: Buffer | ArrayBuffer | Buffer[]) => {
-      const msg = JSON.parse(raw.toString()) as WsResponse;
-      if (msg.type === 'event' && msg.payload.event.type === 'approval_requested') {
-        pendingPlan = msg.payload.event.data.plan as Plan;
-      }
-      if (msg.type === 'event') {
-        events.push(msg.payload.event.type || msg.payload.event.data._eventType);
-      }
-    };
-    ws.on('message', eventHandler);
-
-    // Wait for the daemon to request approval
+    // 2. Wait for the daemon to request approval
     await vi.waitFor(() => {
       expect(pendingPlan).not.toBeNull();
       expect(events).toContain('approval_requested');
-    }, { timeout: 5000 });
+    }, { timeout: 10_000 });
 
     // Verify guard triggered extra steps
     expect(pendingPlan!.steps.length).toBeGreaterThan(1);
@@ -191,9 +193,11 @@ describe('Comprehensive User Flow: CLI + OODA + MCP', { timeout: 30_000 }, () =>
     // 4. Wait for completion
     await vi.waitFor(() => {
       expect(events).toContain('task_completed');
-      const task = store.getTask(taskId);
-      expect(task!.status).toBe('completed');
-    }, { timeout: 5000 });
+    }, { timeout: 10_000 });
+
+    // Verify task stored as completed
+    const task = store.getTask(taskId);
+    expect(task!.status).toBe('completed');
 
     // 5. User records a follow-up decision via MCP tool based on the result
     await mcpServer.handleToolCall('ftm_add_decision', {

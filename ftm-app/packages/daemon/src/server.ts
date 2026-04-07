@@ -14,6 +14,7 @@ export class FtmServer {
   private blackboard: Blackboard;
   private machineState: MachineState = 'idle';
   private sessionId: string;
+  private taskCounter = 0;
 
   constructor(opts: {
     eventBus: FtmEventBus;
@@ -77,7 +78,7 @@ export class FtmServer {
       case 'submit_task': {
         const now = Date.now();
         const task: Task = {
-          id: `task-${now}`,
+          id: `task-${now}-${++this.taskCounter}`,
           description: msg.payload.description as string,
           status: 'pending',
           createdAt: now,

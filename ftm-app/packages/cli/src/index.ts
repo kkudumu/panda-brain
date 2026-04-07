@@ -102,24 +102,26 @@ export function createProgram(): Command {
 
               if (msg.type === 'event') {
                 const event = msg.payload.event as any;
-                if (event.type === 'step_started') {
+                const eventType = event.type === '*' ? event.data?._eventType : event.type;
+
+                if (eventType === 'step_started') {
                   console.log(chalk.cyan(`  → Step ${event.data.stepIndex}: ${event.data.description}`));
                 }
-                if (event.type === 'step_completed') {
+                if (eventType === 'step_completed') {
                   console.log(chalk.green(`  ✓ Step ${event.data.stepIndex} complete`));
                 }
-                if (event.type === 'task_completed') {
+                if (eventType === 'task_completed') {
                   console.log(chalk.green.bold('\n✓ Task completed'));
                   ws.close();
                   process.exit(0);
                 }
-                if (event.type === 'error') {
+                if (eventType === 'error') {
                   console.error(chalk.red(`  ✗ Error: ${event.data.error}`));
                 }
-                if (event.type === 'guard_triggered') {
+                if (eventType === 'guard_triggered') {
                   console.log(chalk.yellow(`  ⚠ Guard: ${JSON.stringify(event.data)}`));
                 }
-                if (event.type === 'approval_requested') {
+                if (eventType === 'approval_requested') {
                   console.log(chalk.magenta('  ⏳ Approval required — use `ftm approve` to continue'));
                 }
               }
