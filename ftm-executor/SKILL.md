@@ -370,12 +370,12 @@ For EACH task, follow this cycle:
    - Review again
    - Repeat until clean
 
-5. **Continue** — Move to the next task. Do not stop to ask questions. If something is ambiguous, make the best technical decision and document it in your commit message.
+5. **Continue** — HARD GATE: Before moving to the next task, verify a commit was made for this task. Run `git log --oneline -1` and confirm the most recent commit message matches what you just did. If there is no commit, STOP — you skipped step 2. Go back and commit now. You CANNOT proceed to the next task without a commit. This is not optional.
 
 ## Rules
 
+- NEVER move to the next task without committing the current one. Run `git log --oneline -1` to verify. No exceptions.
 - NEVER stop to ask for input. Make decisions and keep going.
-- ALWAYS commit after each task (not one big commit at the end).
 - ALWAYS review after each commit. The review-fix loop is not optional.
 - Follow the plan's steps exactly — don't improvise unless the plan is clearly wrong.
 - Stay in your worktree. Don't touch files outside your assigned scope.
