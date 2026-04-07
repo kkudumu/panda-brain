@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BaseAdapter } from '@ftm/daemon/adapters/base';
-import { ClaudeAdapter } from '@ftm/daemon/adapters/claude';
-import { CodexAdapter } from '@ftm/daemon/adapters/codex';
-import { GeminiAdapter } from '@ftm/daemon/adapters/gemini';
-import { OllamaAdapter } from '@ftm/daemon/adapters/ollama';
-import { AdapterRegistry } from '@ftm/daemon/adapters';
-import type { NormalizedResponse, SessionOpts } from '@ftm/daemon';
+import { BaseAdapter } from '../../packages/daemon/src/adapters/base.js';
+import { ClaudeAdapter } from '../../packages/daemon/src/adapters/claude.js';
+import { CodexAdapter } from '../../packages/daemon/src/adapters/codex.js';
+import { GeminiAdapter } from '../../packages/daemon/src/adapters/gemini.js';
+import { OllamaAdapter } from '../../packages/daemon/src/adapters/ollama.js';
+import { AdapterRegistry } from '../../packages/daemon/src/adapters/registry.js';
+import type { NormalizedResponse, SessionOpts, ModelAdapter } from '../../packages/daemon/src/index.js';
 
 // ---------------------------------------------------------------------------
 // Concrete implementation of BaseAdapter for testing abstract methods

@@ -2,7 +2,7 @@
   "name": "ftm-workspace",
   "version": "0.1.0",
   "private": true,
-  "description": "Feed The Machine — monorepo workspace",
+  "description": "Feed The Machine \u2014 monorepo workspace",
   "scripts": {
     "dev": "pnpm -r run dev",
     "build": "pnpm -r run build",
@@ -18,5 +18,12 @@
     "typescript": "^5.7.0",
     "tsx": "^4.19.0",
     "vitest": "^2.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "electron"
+    ]
   }
 }

@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
-import { FtmServer } from '@ftm/daemon/server';
-import { FtmEventBus } from '@ftm/daemon/event-bus';
-import { FtmStore } from '@ftm/daemon/store';
-import { Blackboard } from '@ftm/daemon/blackboard';
-import { OodaLoop } from '@ftm/daemon/ooda';
-import { ModelRouter } from '@ftm/daemon/router';
-import { AdapterRegistry } from '@ftm/daemon/adapters';
+import { FtmServer } from '../../packages/daemon/src/server.js';
+import { FtmEventBus } from '../../packages/daemon/src/event-bus.js';
+import { FtmStore } from '../../packages/daemon/src/store.js';
+import { Blackboard } from '../../packages/daemon/src/blackboard.js';
+import { OodaLoop } from '../../packages/daemon/src/ooda.js';
+import { ModelRouter } from '../../packages/daemon/src/router.js';
+import { AdapterRegistry } from '../../packages/daemon/src/adapters/registry.js';
 import type {
   Task,
   ModelAdapter,
   NormalizedResponse,
   WsResponse,
   FtmEvent,
-} from '@ftm/daemon';
+} from '../../packages/daemon/src/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,7 +44,7 @@ interface TestHarness {
   sessionId: string;
 }
 
-function buildServer(overrides: {
+async function buildServer(overrides: {
   approvalMode?: 'auto' | 'plan_first' | 'always_ask';
   adapters?: ModelAdapter[];
   oodaOverride?: Partial<OodaLoop>;
@@ -84,7 +84,7 @@ function buildServer(overrides: {
 
   const server = new FtmServer({ eventBus, ooda, store, blackboard, sessionId });
   // Use port 0 so the OS assigns a random free port
-  server.start(0, '127.0.0.1');
+  await server.start(0, '127.0.0.1');
   const port = server.getPort()!;
 
   return { server, eventBus, store, blackboard, ooda, port, sessionId };
@@ -102,12 +102,18 @@ function connectClient(port: number): Promise<{ ws: WebSocket; firstMsg: WsRespo
   });
 }
 
-// Send a message and collect the next response from the server
-function sendAndReceive(ws: WebSocket, msg: object): Promise<WsResponse> {
+// Send a message and wait for the response with matching id
+function sendAndReceive(ws: WebSocket, msg: Record<string, unknown>): Promise<WsResponse> {
   return new Promise((resolve) => {
-    ws.once('message', (raw) => {
-      resolve(JSON.parse(raw.toString()) as WsResponse);
-    });
+    const id = msg.id as string;
+    const handler = (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      const parsed = JSON.parse(raw.toString()) as WsResponse;
+      if (parsed.id === id) {
+        ws.off('message', handler);
+        resolve(parsed);
+      }
+    };
+    ws.on('message', handler);
     ws.send(JSON.stringify(msg));
   });
 }
@@ -134,8 +140,8 @@ function collectMessages(ws: WebSocket, count: number): Promise<WsResponse[]> {
 describe('FtmServer — startup and connection', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -176,8 +182,8 @@ describe('FtmServer — startup and connection', () => {
 describe('FtmServer — submit_task', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -237,8 +243,8 @@ describe('FtmServer — submit_task', () => {
 describe('FtmServer — approve_plan', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -284,8 +290,8 @@ describe('FtmServer — approve_plan', () => {
 describe('FtmServer — cancel_task', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -342,8 +348,8 @@ describe('FtmServer — cancel_task', () => {
 describe('FtmServer — get_state', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -388,8 +394,8 @@ describe('FtmServer — get_state', () => {
 describe('FtmServer — get_history', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -439,8 +445,8 @@ describe('FtmServer — get_history', () => {
 describe('FtmServer — modify_plan', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -468,8 +474,8 @@ describe('FtmServer — modify_plan', () => {
 describe('FtmServer — invalid message handling', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -512,8 +518,8 @@ describe('FtmServer — invalid message handling', () => {
 describe('FtmServer — event forwarding', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -562,8 +568,8 @@ describe('FtmServer — event forwarding', () => {
 describe('FtmServer — machine state tracking', () => {
   let harness: TestHarness;
 
-  beforeEach(() => {
-    harness = buildServer({ approvalMode: 'auto' });
+  beforeEach(async () => {
+    harness = await buildServer({ approvalMode: 'auto' });
   });
 
   afterEach(() => {
@@ -664,7 +670,7 @@ describe('FtmServer — machine state tracking', () => {
 
 describe('FtmServer — stop', () => {
   it('closes all connections on stop()', async () => {
-    const harness = buildServer({ approvalMode: 'auto' });
+    const harness = await buildServer({ approvalMode: 'auto' });
     const { ws } = await connectClient(harness.port);
 
     const closedPromise = new Promise<void>((resolve) => {
@@ -677,8 +683,8 @@ describe('FtmServer — stop', () => {
     expect(ws.readyState).toBe(WebSocket.CLOSED);
   });
 
-  it('getPort() returns null after stop', () => {
-    const harness = buildServer({ approvalMode: 'auto' });
+  it('getPort() returns null after stop', async () => {
+    const harness = await buildServer({ approvalMode: 'auto' });
     harness.server.stop();
     expect(harness.server.getPort()).toBeNull();
   });

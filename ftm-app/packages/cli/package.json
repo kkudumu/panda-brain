@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "postinstall": "tsx ../scripts/postinstall.ts || true"
+    "postinstall": "tsx ../../scripts/postinstall.ts || true"
   },
   "dependencies": {
     "@ftm/daemon": "workspace:*",

@@ -303,7 +303,7 @@ export class OodaLoop {
     const flags: string[] = [];
     const desc = context.task.description.toLowerCase();
 
-    if (desc.includes('delete') || desc.includes('remove') || desc.includes('drop')) {
+    if (desc.includes('delete') || desc.includes('remove') || desc.includes('drop') || desc.includes('rm -rf') || desc.includes('reset --hard')) {
       flags.push('destructive_operation');
     }
     if (desc.includes('production') || desc.includes('prod')) {

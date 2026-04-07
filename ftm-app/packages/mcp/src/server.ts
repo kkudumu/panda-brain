@@ -1,6 +1,6 @@
-import { FtmStore } from '@ftm/daemon/store';
-import { Blackboard } from '@ftm/daemon/blackboard';
-import type { BlackboardContext, Experience, Task } from '@ftm/daemon';
+import { FtmStore } from '../../daemon/src/store.js';
+import { Blackboard } from '../../daemon/src/blackboard.js';
+import type { BlackboardContext, Experience, Task } from '../../daemon/src/shared/types.js';
 
 export interface McpToolDefinition {
   name: string;

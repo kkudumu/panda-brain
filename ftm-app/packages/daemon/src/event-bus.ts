@@ -9,6 +9,8 @@ export class FtmEventBus extends EventEmitter {
     super();
     this.sessionId = sessionId;
     this.setMaxListeners(50);
+    // Prevent Node's default throw on 'error' events with no listener
+    this.on('error', () => {});
   }
 
   emit(type: string, data?: Record<string, unknown>): boolean {

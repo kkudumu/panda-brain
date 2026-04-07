@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GuardModule, type GuardRule, type GuardCheckResult } from '@ftm/daemon';
-import type { TaskContext, Task, FtmEvent } from '@ftm/daemon';
+import { GuardModule, type GuardRule, type GuardCheckResult } from '../../../packages/daemon/src/index.js';
+import type { TaskContext, Task, FtmEvent } from '../../../packages/daemon/src/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -314,7 +314,7 @@ describe('GuardModule — custom rule registration', () => {
       check(context): GuardCheckResult {
         if (context.task.description.toLowerCase().includes('migration')) {
           return {
-            allowed: true,
+            allowed: false,
             reason: 'Large migration detected — ensure backup exists',
             severity: 'warning',
           };

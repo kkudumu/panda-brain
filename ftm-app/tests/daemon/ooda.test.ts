@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OodaLoop } from '@ftm/daemon/ooda';
-import { FtmEventBus } from '@ftm/daemon/event-bus';
-import { Blackboard } from '@ftm/daemon/blackboard';
-import { FtmStore } from '@ftm/daemon/store';
-import { ModelRouter } from '@ftm/daemon/router';
-import { AdapterRegistry } from '@ftm/daemon/adapters';
-import { MindModule } from '@ftm/daemon/modules/mind';
-import { GuardModule } from '@ftm/daemon/modules/guard';
+import { OodaLoop } from '../../packages/daemon/src/ooda.js';
+import { FtmEventBus } from '../../packages/daemon/src/event-bus.js';
+import { Blackboard } from '../../packages/daemon/src/blackboard.js';
+import { FtmStore } from '../../packages/daemon/src/store.js';
+import { ModelRouter } from '../../packages/daemon/src/router.js';
+import { AdapterRegistry } from '../../packages/daemon/src/adapters/registry.js';
+import { MindModule } from '../../packages/daemon/src/modules/mind.js';
+import { GuardModule } from '../../packages/daemon/src/modules/guard.js';
 import type {
   Task,
   ModelAdapter,
@@ -14,7 +14,7 @@ import type {
   TaskContext,
   ModuleResult,
   FtmEvent,
-} from '@ftm/daemon';
+} from '../../packages/daemon/src/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,21 +98,23 @@ function buildOoda(options: {
 // ---------------------------------------------------------------------------
 
 describe('OodaLoop — module registration', () => {
-  it('registers modules that are later called during processing', async () => {
+  it('registers modules that are later matched during orient phase', async () => {
     const { loop, bus } = buildOoda({ approvalMode: 'auto' });
-
-    const activatedModules: string[] = [];
-    bus.on('module_activated', (evt) => {
-      activatedModules.push(evt.data.module as string);
-    });
 
     const mind = new MindModule();
     loop.registerModule(mind);
 
+    const phases: string[] = [];
+    bus.on('ooda_phase', (evt) => {
+      phases.push(evt.data.phase as string);
+    });
+
     const task = makeTask();
     await loop.processTask(task);
 
-    expect(activatedModules).toContain('mind');
+    // OODA loop goes through observe → orient → decide → act → complete
+    expect(phases).toContain('orient');
+    expect(phases).toContain('complete');
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { FtmStore } from '@ftm/daemon/store';
-import { FtmMcpServer } from '@ftm/mcp/server';
-import type { Task, Playbook } from '@ftm/daemon';
+import { FtmStore } from '../../packages/daemon/src/store.js';
+import { FtmMcpServer } from '../../packages/mcp/src/server.js';
+import type { Task, Playbook } from '../../packages/daemon/src/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

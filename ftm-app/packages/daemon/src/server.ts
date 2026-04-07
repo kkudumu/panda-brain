@@ -32,8 +32,9 @@ export class FtmServer {
   }
 
   // Start the WebSocket server
-  start(port: number = 4040, host: string = 'localhost'): void {
-    this.wss = new WebSocketServer({ port, host });
+  start(port: number = 4040, host: string = 'localhost'): Promise<void> {
+    return new Promise((resolve) => {
+    this.wss = new WebSocketServer({ port, host }, () => resolve());
 
     this.wss.on('connection', (ws) => {
       this.clients.add(ws);
@@ -67,6 +68,7 @@ export class FtmServer {
     });
 
     console.log(`[FTM Server] WebSocket listening on ${host}:${port}`);
+    });
   }
 
   // Handle incoming WebSocket messages
@@ -269,9 +271,8 @@ export class FtmServer {
   getPort(): number | null {
     if (!this.wss) return null;
     const addr = this.wss.address();
-    if (addr && typeof addr === 'object') {
-      return (addr as { port: number }).port;
-    }
+    if (typeof addr === 'string') return null;
+    if (addr && 'port' in addr) return addr.port;
     return null;
   }
 

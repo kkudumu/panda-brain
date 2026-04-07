@@ -45,7 +45,7 @@ export async function startDaemon(): Promise<{
   // Create and start server
   const config = router.getConfig();
   const server = new FtmServer({ eventBus, ooda, store, blackboard, sessionId });
-  server.start(config.daemon.port, config.daemon.host);
+  await server.start(config.daemon.port, config.daemon.host);
 
   // Create session record
   store.createSession(sessionId);

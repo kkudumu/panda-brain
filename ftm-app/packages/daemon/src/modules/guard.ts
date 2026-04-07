@@ -149,7 +149,7 @@ export class GuardModule implements FtmModule {
           desc.includes('prod.')
         ) {
           return {
-            allowed: true,
+            allowed: false,
             reason: 'Task targets production',
             severity: 'warning',
           };

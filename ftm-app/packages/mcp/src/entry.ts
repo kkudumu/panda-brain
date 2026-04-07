@@ -3,7 +3,7 @@
 // It reads JSON-RPC messages from stdin and writes responses to stdout
 
 import { FtmMcpServer } from './server.js';
-import { getDbPath, ensureDataDir } from '@ftm/daemon/config';
+import { getDbPath, ensureDataDir } from '../../daemon/src/config.js';
 import * as readline from 'readline';
 
 // Parse --db flag from args, or use default

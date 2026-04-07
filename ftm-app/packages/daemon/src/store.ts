@@ -328,7 +328,7 @@ export class FtmStore {
   }
 
   updateSession(id: string, updates: Partial<Session>): void {
-    this.buildUpdate(id, id, updates as Record<string, unknown>, {
+    this.buildUpdate('sessions', id, updates as Record<string, unknown>, {
       startedAt: 'started_at',
       lastUpdated: 'last_updated',
       status: 'status',
@@ -368,7 +368,7 @@ export class FtmStore {
   }
 
   updateTask(id: string, updates: Partial<Task>): void {
-    this.buildUpdate(id, id, updates as Record<string, unknown>, {
+    this.buildUpdate('tasks', id, updates as Record<string, unknown>, {
       description: 'description',
       status: 'status',
       updatedAt: 'updated_at',
@@ -436,7 +436,7 @@ export class FtmStore {
         .run(JSON.stringify(steps), id);
     }
 
-    this.buildUpdate(id, id, rest as Record<string, unknown>, {
+    this.buildUpdate('plans', id, rest as Record<string, unknown>, {
       taskId: 'task_id',
       status: 'status',
       currentStep: 'current_step',
