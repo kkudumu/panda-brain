@@ -28,6 +28,16 @@ if [[ "$TOOL_NAME" == "Edit" || "$TOOL_NAME" == "Write" ]]; then
   IS_GATED=true
 fi
 
+# Gate Bash commands that execute scripts or run Python/curl (not simple reads)
+if [[ "$TOOL_NAME" == "Bash" ]]; then
+  COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)
+  case "$COMMAND" in
+    *python3*|*python*|*node*|*curl*|*"./scripts/"*|*"bash "*|*"sh "*)
+      IS_GATED=true
+      ;;
+  esac
+fi
+
 # Gate mutating MCP calls (create, update, delete, send, add, remove, apply, transition)
 if [[ "$TOOL_NAME" == mcp__* ]]; then
   case "$TOOL_NAME" in

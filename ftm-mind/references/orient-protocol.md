@@ -92,6 +92,8 @@ python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json
 
 Load active tasks, surface high-priority via TaskCreate. Skip if brain.py absent, tasks loaded recently (15min), or request is purely local.
 
+**NEVER use TaskCreate for execution substeps.** TaskCreate is ONLY for surfacing existing ops tasks from brain.py (the user's real task board). If you're breaking a task into steps, those go in a checkbox plan — not as TaskCreate items that pollute the sidebar. The sidebar shows the user's workload, not your execution state.
+
 ## Playbook Lookup (MANDATORY before external system ops)
 
 **Before any external system operation, check all three knowledge sources:**
