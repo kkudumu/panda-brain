@@ -39,6 +39,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/ftm-repo-context.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "~/.claude/hooks/ftm-discovery-reminder.sh",
             "timeout": 5
           },

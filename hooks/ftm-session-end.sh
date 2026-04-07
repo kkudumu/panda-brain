@@ -41,6 +41,13 @@ except Exception:
     pass
 " 2>/dev/null
 
+# Clean up session markers
+rm -f "$FTM_STATE/.repo-context-injected" 2>/dev/null
+rm -f "$FTM_STATE/.plan-presented" 2>/dev/null
+rm -f "$FTM_STATE/.last-autolog-check" 2>/dev/null
+rm -f "$FTM_STATE/.last-heartbeat" 2>/dev/null
+rm -f "$FTM_STATE/.playbook-checked-"* 2>/dev/null
+
 # Ensure daily log directory and file exist
 mkdir -p "$DAILY_DIR"
 if [ ! -f "$DAILY_FILE" ]; then
