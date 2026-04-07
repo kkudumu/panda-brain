@@ -44,6 +44,82 @@ Works with any existing Claude Code setup. After install, restart Claude Code or
 
 ---
 
+## FTM Standalone App (NEW)
+
+FTM is also available as a standalone daemon + desktop app that orchestrates Claude, Codex, Gemini, and Ollama as interchangeable backends — with an animated machine UI, persistent SQLite memory, and a WebSocket API.
+
+### Install Matrix
+
+| You want | You run |
+|----------|---------|
+| Skill pack only | `npx feed-the-machine` (unchanged, current behavior) |
+| CLI only | `npm i -g @ftm/cli` |
+| MCP only | Add `@ftm/mcp` to your claude/codex MCP config |
+| Electron app | Download from releases / `brew install ftm` |
+| CLI + MCP | `npm i -g @ftm/cli @ftm/mcp` |
+| Everything | `brew install ftm` (bundles daemon + cli + electron + mcp) |
+
+### Quick Start (from source)
+
+```bash
+cd ftm-app
+pnpm install
+
+# Start the daemon
+npx tsx packages/daemon/src/start.ts
+
+# In another terminal — submit a task
+npx tsx packages/cli/src/index.ts "analyze this codebase"
+
+# Check status
+npx tsx packages/cli/src/index.ts status
+
+# View history
+npx tsx packages/cli/src/index.ts history
+
+# Run health check
+npx tsx packages/cli/src/index.ts doctor
+```
+
+### Architecture
+
+```
+Electron App (Svelte 5)          CLI (@ftm/cli)
+      |                                |
+      +--- WebSocket (port 4040) ------+
+      |
+FTM Daemon (@ftm/daemon)
+  - OODA Loop (observe/orient/decide/act)
+  - Model Adapters (Claude, Codex, Gemini, Ollama)
+  - SQLite Store + Blackboard
+  - Guard System + Plan Approval
+  - Event Bus → WebSocket streaming
+      |
+MCP Server (@ftm/mcp)
+  - 7 tools for AI CLI integration
+  - Shared SQLite store with daemon
+```
+
+### Packages
+
+| Package | Description |
+|---------|------------|
+| `@ftm/daemon` | Core engine — store, adapters, OODA loop, event bus, modules, hooks |
+| `@ftm/cli` | Terminal interface — `ftm` command with submit, status, history, approve, doctor |
+| `@ftm/mcp` | MCP server — 7 tools for blackboard, guard, playbook, tasks, experiences |
+| `ftm-desktop` | Electron app — Svelte 5 UI with animated ASCII machine |
+
+### Running Tests
+
+```bash
+cd ftm-app
+pnpm install
+pnpm test          # 368 tests across 18 suites
+pnpm test:watch    # watch mode
+```
+
+---
+
 ## Try It Right Now
 
 **Just talk to it:**
