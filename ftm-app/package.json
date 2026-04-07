@@ -16,7 +16,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "tsx scripts/postinstall.ts",
+    "setup:launchd": "tsx scripts/launchd-plist.ts",
+    "setup:systemd": "tsx scripts/systemd-service.ts",
+    "legacy-install": "tsx scripts/legacy-install.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
