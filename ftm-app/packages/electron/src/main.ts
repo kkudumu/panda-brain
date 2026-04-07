@@ -1,6 +1,10 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
 import path from 'path';
-import { startDaemon } from '@ftm/daemon';
+import { fileURLToPath } from 'url';
+import { startDaemon } from '../../daemon/src/start.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -15,18 +19,18 @@ async function createWindow(): Promise<void> {
     backgroundColor: '#0a0a0a',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
-  // In development, load from Vite dev server
-  if (process.env.NODE_ENV === 'development') {
-    await mainWindow.loadURL('http://localhost:5173');
+  // electron-vite sets ELECTRON_RENDERER_URL in dev mode
+  if (process.env.ELECTRON_RENDERER_URL) {
+    await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    // In production, load built files
+    // Production — load built files
     await mainWindow.loadFile(path.join(__dirname, '../ui/index.html'));
   }
 
@@ -36,7 +40,7 @@ async function createWindow(): Promise<void> {
 }
 
 function createTray(): void {
-  // Create a simple tray icon
+  // Create a simple tray icon (empty for now — will be replaced with real icon)
   const icon = nativeImage.createEmpty();
   tray = new Tray(icon);
 
@@ -61,7 +65,13 @@ app.whenReady().then(async () => {
   }
 
   await createWindow();
-  createTray();
+
+  // Tray icons can cause issues in dev — skip if no icon available
+  try {
+    createTray();
+  } catch {
+    console.log('[Electron] Tray icon skipped (dev mode)');
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -71,7 +81,6 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // On macOS, keep running in tray
   if (process.platform !== 'darwin') {
     app.quit();
   }

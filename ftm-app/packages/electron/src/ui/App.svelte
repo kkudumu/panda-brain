@@ -61,6 +61,9 @@
 </script>
 
 <main class="app">
+  <!-- Drag region for window movement (hiddenInset title bar) -->
+  <div class="titlebar-drag"></div>
+
   <!-- Machine header -->
   <header class="machine-area">
     <Machine />
@@ -169,10 +172,21 @@
     box-sizing: border-box;
   }
 
+  .titlebar-drag {
+    -webkit-app-region: drag;
+    height: 32px;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+  }
+
   .app {
     display: grid;
     grid-template-rows: auto auto 1fr auto;
     height: 100vh;
+    padding-top: 32px;
     padding: 12px 14px;
     gap: 10px;
     min-height: 0;

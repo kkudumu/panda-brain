@@ -5,6 +5,8 @@
   "description": "Feed The Machine \u2014 monorepo workspace",
   "scripts": {
     "dev": "pnpm -r run dev",
+    "dev:electron": "pnpm --filter ftm-desktop run dev",
+    "dev:daemon": "tsx packages/daemon/src/start.ts",
     "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",

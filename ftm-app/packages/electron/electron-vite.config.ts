@@ -2,33 +2,37 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
 
+const root = '/Users/kioja.kudumu/.superset/worktrees/feed-the-machine/kkudumu/ten-party/ftm-app/packages/electron';
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
-      outDir: 'dist/electron',
       lib: {
-        entry: 'src/main.ts',
+        entry: path.join(root, 'src/main.ts'),
       },
     },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
-      outDir: 'dist/preload',
       lib: {
-        entry: 'src/preload.ts',
+        entry: path.join(root, 'src/preload.ts'),
       },
     },
   },
   renderer: {
-    root: 'src/ui',
+    root: path.join(root, 'src/ui'),
     build: {
-      outDir: 'dist/ui',
       rollupOptions: {
-        input: 'src/ui/index.html',
+        input: path.join(root, 'src/ui/index.html'),
       },
     },
     plugins: [svelte()],
+    resolve: {
+      alias: {
+        '@ftm/daemon': path.join(root, '../daemon/src/shared/types.ts'),
+      },
+    },
   },
 });

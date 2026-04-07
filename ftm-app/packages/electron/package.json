@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "description": "Feed The Machine — desktop app",
   "type": "module",
-  "main": "dist/electron/main.js",
+  "main": "out/main/main.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview"
+    "dev": "electron-vite dev --config electron-vite.config.ts",
+    "build": "electron-vite build --config electron-vite.config.ts",
+    "preview": "electron-vite preview --config electron-vite.config.ts"
   },
   "dependencies": {
-    "@ftm/daemon": "workspace:*"
+    "@ftm/daemon": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "electron": "^33.0.0",
