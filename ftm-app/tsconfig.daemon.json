@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "outDir": "./dist/daemon",
+    "rootDir": "./src"
+  },
+  "include": ["src/daemon/**/*", "src/shared/**/*"]
+}
