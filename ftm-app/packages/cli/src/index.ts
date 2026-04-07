@@ -6,7 +6,7 @@ import ora from 'ora';
 import WebSocket from 'ws';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import type { WsMessage, WsResponse, MachineState } from '@ftm/daemon';
+import type { WsMessage, WsResponse, MachineState } from '../../daemon/src/shared/types.js';
 
 // Helper: connect to daemon
 export async function connectToDaemon(port?: number): Promise<WebSocket> {
@@ -301,7 +301,7 @@ export function createProgram(): Command {
 
       // Check data directory
       const { existsSync } = await import('fs');
-      const { getDataDir, getDbPath } = await import('@ftm/daemon/config');
+      const { getDataDir, getDbPath } = await import('../../daemon/src/config.js');
 
       const dataSpinner = ora('Checking data directory...').start();
       if (existsSync(getDataDir())) {
@@ -329,7 +329,7 @@ export function createProgram(): Command {
       // Run doctor checks
       const { execSync } = await import('child_process');
       const { existsSync, mkdirSync, writeFileSync } = await import('fs');
-      const { getConfigPath, ensureDataDir } = await import('@ftm/daemon/config');
+      const { getConfigPath, ensureDataDir } = await import('../../daemon/src/config.js');
 
       // Ensure data directory
       ensureDataDir();
@@ -406,7 +406,7 @@ export function createProgram(): Command {
       console.log(chalk.bold.green('Starting FTM Daemon...\n'));
 
       try {
-        const { startDaemon } = await import('@ftm/daemon');
+        const { startDaemon } = await import('../../daemon/src/start.js');
         await startDaemon();
 
         // Keep process running
