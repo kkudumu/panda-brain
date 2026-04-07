@@ -9,6 +9,7 @@ import { MindModule } from './modules/mind.js';
 import { GuardModule } from './modules/guard.js';
 import { PlannerModule } from './modules/planner.js';
 import { ensureDataDir, getDbPath, getConfigPath } from './config.js';
+import { registerAllHooks } from './hooks/index.js';
 
 export async function startDaemon(): Promise<{
   server: FtmServer;
@@ -31,6 +32,9 @@ export async function startDaemon(): Promise<{
   // Check available adapters
   const health = await registry.checkHealth();
   console.log('[FTM Daemon] Adapter health:', Object.fromEntries(health));
+
+  // Register event-driven hooks (pre-execution gates, logging, learning)
+  registerAllHooks(eventBus, store, blackboard);
 
   // Initialize OODA loop with modules
   const ooda = new OodaLoop(eventBus, blackboard, router);
