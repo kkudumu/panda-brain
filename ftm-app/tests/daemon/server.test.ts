@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
-import { FtmServer } from '../../src/daemon/server.js';
-import { FtmEventBus } from '../../src/daemon/event-bus.js';
-import { FtmStore } from '../../src/daemon/store.js';
-import { Blackboard } from '../../src/daemon/blackboard.js';
-import { OodaLoop } from '../../src/daemon/ooda.js';
-import { ModelRouter } from '../../src/daemon/router.js';
-import { AdapterRegistry } from '../../src/daemon/adapters/registry.js';
+import { FtmServer } from '@ftm/daemon/server';
+import { FtmEventBus } from '@ftm/daemon/event-bus';
+import { FtmStore } from '@ftm/daemon/store';
+import { Blackboard } from '@ftm/daemon/blackboard';
+import { OodaLoop } from '@ftm/daemon/ooda';
+import { ModelRouter } from '@ftm/daemon/router';
+import { AdapterRegistry } from '@ftm/daemon/adapters';
 import type {
   Task,
   ModelAdapter,
   NormalizedResponse,
   WsResponse,
   FtmEvent,
-} from '../../src/shared/types.js';
+} from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Helpers

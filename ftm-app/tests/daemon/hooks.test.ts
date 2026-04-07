@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { FtmEventBus } from '../../src/daemon/event-bus.js';
-import { FtmStore } from '../../src/daemon/store.js';
-import { Blackboard } from '../../src/daemon/blackboard.js';
+import { FtmEventBus } from '@ftm/daemon/event-bus';
+import { FtmStore } from '@ftm/daemon/store';
+import { Blackboard } from '@ftm/daemon/blackboard';
 import {
   registerAllHooks,
   registerGuardHook,
@@ -10,8 +10,8 @@ import {
   registerPlanGateHook,
   registerSessionEndHook,
   executeSessionEnd,
-} from '../../src/daemon/hooks/index.js';
-import type { Plan, Task } from '../../src/shared/types.js';
+} from '@ftm/daemon/hooks';
+import type { Plan, Task } from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

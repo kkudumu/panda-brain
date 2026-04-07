@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GuardModule, type GuardRule, type GuardCheckResult } from '../../../src/daemon/modules/guard.js';
-import type { TaskContext, Task, FtmEvent } from '../../../src/shared/types.js';
+import { GuardModule, type GuardRule, type GuardCheckResult } from '@ftm/daemon';
+import type { TaskContext, Task, FtmEvent } from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Helpers

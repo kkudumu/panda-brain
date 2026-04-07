@@ -1,0 +1,25 @@
+{
+  "name": "@ftm/cli",
+  "version": "0.1.0",
+  "description": "FTM command-line interface",
+  "type": "module",
+  "bin": { "ftm": "dist/index.js" },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "postinstall": "tsx ../scripts/postinstall.ts || true"
+  },
+  "dependencies": {
+    "@ftm/daemon": "workspace:*",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

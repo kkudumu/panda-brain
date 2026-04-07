@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { ModelRouter } from '../../src/daemon/router.js';
-import { AdapterRegistry } from '../../src/daemon/adapters/registry.js';
-import { FtmEventBus } from '../../src/daemon/event-bus.js';
-import type { ModelAdapter, NormalizedResponse } from '../../src/shared/types.js';
+import { ModelRouter } from '@ftm/daemon/router';
+import { AdapterRegistry } from '@ftm/daemon/adapters';
+import { FtmEventBus } from '@ftm/daemon/event-bus';
+import type { ModelAdapter, NormalizedResponse } from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Helpers

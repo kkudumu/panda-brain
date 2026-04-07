@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { FtmStore } from '../../src/daemon/store.js';
-import type { Task, Plan, PlanStep, FtmEvent, Experience, Playbook, Pattern } from '../../src/shared/types.js';
+import { FtmStore } from '@ftm/daemon/store';
+import type { Task, Plan, PlanStep, FtmEvent, Experience, Playbook, Pattern } from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Helpers

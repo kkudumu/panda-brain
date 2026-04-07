@@ -1,47 +1,22 @@
 {
-  "name": "ftm-app",
+  "name": "ftm-workspace",
   "version": "0.1.0",
-  "description": "Feed The Machine — Standalone AI orchestrator with animated machine UI",
-  "main": "dist/daemon/index.js",
-  "bin": {
-    "ftm": "dist/cli/index.js"
-  },
-  "type": "module",
+  "private": true,
+  "description": "Feed The Machine — monorepo workspace",
   "scripts": {
-    "dev:daemon": "tsx watch src/daemon/index.ts",
-    "dev:electron": "electron-vite dev",
-    "build": "tsc && electron-vite build",
-    "build:daemon": "tsc -p tsconfig.daemon.json",
-    "build:electron": "electron-vite build",
+    "dev": "pnpm -r run dev",
+    "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "tsx scripts/postinstall.ts",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
     "setup:launchd": "tsx scripts/launchd-plist.ts",
     "setup:systemd": "tsx scripts/systemd-service.ts",
     "legacy-install": "tsx scripts/legacy-install.ts"
   },
-  "dependencies": {
-    "better-sqlite3": "^11.7.0",
-    "ws": "^8.18.0",
-    "yaml": "^2.6.0",
-    "commander": "^12.1.0",
-    "chalk": "^5.3.0",
-    "ora": "^8.1.0"
-  },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/ws": "^8.5.13",
-    "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "tsx": "^4.19.0",
-    "vitest": "^2.1.0",
-    "electron": "^33.0.0",
-    "electron-vite": "^2.3.0",
-    "@sveltejs/vite-plugin-svelte": "^4.0.0",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
-    "eslint": "^9.0.0"
+    "vitest": "^2.1.0"
   }
 }

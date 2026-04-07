@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { FtmEventBus } from '../../src/daemon/event-bus.js';
+import { FtmEventBus } from '@ftm/daemon/event-bus';
 
 describe('FtmEventBus', () => {
   it('creates an event bus with a session ID', () => {

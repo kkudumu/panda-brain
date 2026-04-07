@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OodaLoop } from '../../src/daemon/ooda.js';
-import { FtmEventBus } from '../../src/daemon/event-bus.js';
-import { Blackboard } from '../../src/daemon/blackboard.js';
-import { FtmStore } from '../../src/daemon/store.js';
-import { ModelRouter } from '../../src/daemon/router.js';
-import { AdapterRegistry } from '../../src/daemon/adapters/registry.js';
-import { MindModule } from '../../src/daemon/modules/mind.js';
-import { GuardModule } from '../../src/daemon/modules/guard.js';
+import { OodaLoop } from '@ftm/daemon/ooda';
+import { FtmEventBus } from '@ftm/daemon/event-bus';
+import { Blackboard } from '@ftm/daemon/blackboard';
+import { FtmStore } from '@ftm/daemon/store';
+import { ModelRouter } from '@ftm/daemon/router';
+import { AdapterRegistry } from '@ftm/daemon/adapters';
+import { MindModule } from '@ftm/daemon/modules/mind';
+import { GuardModule } from '@ftm/daemon/modules/guard';
 import type {
   Task,
   ModelAdapter,
@@ -14,7 +14,7 @@ import type {
   TaskContext,
   ModuleResult,
   FtmEvent,
-} from '../../src/shared/types.js';
+} from '@ftm/daemon';
 
 // ---------------------------------------------------------------------------
 // Helpers
