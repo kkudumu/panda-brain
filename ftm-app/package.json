@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Feed The Machine — Standalone AI orchestrator with animated machine UI",
   "main": "dist/daemon/index.js",
+  "bin": {
+    "ftm": "dist/cli/index.js"
+  },
   "type": "module",
   "scripts": {
     "dev:daemon": "tsx watch src/daemon/index.ts",
