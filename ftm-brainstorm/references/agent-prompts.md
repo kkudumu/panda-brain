@@ -2,6 +2,16 @@
 
 Load this file when dispatching research sprints. Each turn, spawn all 7 agents in parallel with the accumulated context injected, then dispatch the Synthesizer with all 7 results.
 
+## MANDATORY EVIDENCE RULES (applies to ALL agents below)
+
+Every agent prompt below includes these rules in its RETURN FORMAT. They are non-negotiable:
+
+1. **Every finding MUST include a source URL.** No URL = not a finding, it's a guess. If you cannot find a source URL, you MUST state "No source found — this claim is based on training data and may be outdated." NEVER present a training-data claim as a verified finding.
+
+2. **Negative claims require proof of search.** If you claim "X does NOT support Y" or "X does NOT exist", you MUST document: (a) what search queries you ran, (b) what sources you checked, (c) what you found (or didn't find). "I don't know about it" is NOT evidence that it doesn't exist. State: "Searched [query] on [source] — found no evidence of X" rather than "X doesn't exist."
+
+3. **Surprising claims get flagged.** If your finding would be surprising (a major platform lacking a basic feature, a widely-used library having a critical flaw, a well-known company doing something unusual), mark it as: "⚠️ SURPRISING — requires independent verification" and explain why it's surprising. The synthesizer will flag these for double-checking.
+
 ## Cumulative Context Injection
 
 Every agent prompt MUST include these blocks at the top. Copy them verbatim from your running context register.
@@ -84,11 +94,14 @@ For each claim, categorize:
 
 RETURN FORMAT:
 - 3-5 findings (fewer if results are thin — don't pad with weak results)
-- Each finding: source URL, 2-3 sentence summary, key takeaway for this project
+- Each finding MUST include: source URL, 2-3 sentence summary, key takeaway for this project
+- NO URL = NOT A FINDING. If you cannot find a URL, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("X doesn't support Y", "X doesn't exist"): document what you searched and where. "I don't know about it" ≠ "it doesn't exist"
+- Mark surprising findings with ⚠️ SURPRISING — especially if claiming a major platform lacks a basic feature
 - Flag if a finding requires technology NOT in the project's current stack
 - Flag if a finding contradicts something from ACCUMULATED KNOWLEDGE
 - Note what you DIDN'T find — gaps are signal too
-- Confidence: high/medium/low per finding based on source credibility
+- Confidence: high/medium/low per finding based on source credibility (no URL = low by default)
 ```
 
 ---
@@ -145,11 +158,14 @@ Map each repo to which claims it covers. A single repo might cover multiple clai
 
 RETURN FORMAT:
 - 3-5 repos (fewer if search is thin)
-- Each: URL, star count, last commit date, 2-3 sentence description
+- Each MUST include: repo URL, star count, last commit date, 2-3 sentence description
+- NO URL = NOT A FINDING. Do not describe repos you cannot link to.
+- For NEGATIVE claims ("no repos exist for X", "nobody has built Y"): document what search queries you ran and on what platforms. "I didn't find it" ≠ "it doesn't exist"
+- Mark surprising findings with ⚠️ SURPRISING — especially if claiming no open-source implementation exists for a common problem
 - Note architectural decisions visible from README/structure
 - Note compatibility with this project's existing patterns
 - Flag repos that are unmaintained (>1yr since last commit) or have critical open issues
-- Confidence: high/medium/low per repo based on maintenance and relevance
+- Confidence: high/medium/low per repo based on maintenance and relevance (no URL = low by default)
 ```
 
 ---
@@ -208,10 +224,13 @@ fork the approach, or build differently? Be specific about why.
 
 RETURN FORMAT:
 - 3-5 products/tools (fewer if space is thin)
-- Each: URL/name, what they do well, what they do poorly, relevance to this project
+- Each MUST include: URL/name, what they do well, what they do poorly, relevance to this project
+- NO URL = NOT A FINDING. If you cannot link to the product, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("no competitor exists", "nobody does X"): document what you searched and where
+- Mark surprising findings with ⚠️ SURPRISING — especially if claiming no product exists in a well-established market
 - Identify the gap — what would the user's project do that these don't?
 - Flag if "just use [existing tool]" is the honest recommendation for any sub-problem
-- Confidence: high/medium/low per finding
+- Confidence: high/medium/low per finding (no URL = low by default)
 ```
 
 ---
@@ -273,11 +292,14 @@ with this specific version/combination?
 
 RETURN FORMAT:
 - 3-5 findings (library evaluations, framework comparisons, version recommendations)
-- Each: what it is, why it matters, risk level, recommendation
+- Each MUST include: source URL (npm page, docs, GitHub repo, or benchmark), what it is, why it matters, risk level, recommendation
+- NO URL = NOT A FINDING. If you cannot link to the library/tool, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("library X doesn't support Y", "no package exists for Z"): document what you searched (npm, GitHub, docs) and what you found
+- Mark surprising findings with ⚠️ SURPRISING — especially if claiming a popular library lacks a commonly-expected feature
 - Flag version conflicts or deprecated packages
 - Flag if the project's existing patterns would conflict with a recommendation
 - Note ecosystem health indicators: last release date, open issues, contributors
-- Confidence: high/medium/low per recommendation
+- Confidence: high/medium/low per recommendation (no URL = low by default)
 ```
 
 ---
@@ -339,10 +361,13 @@ Any better patterns for their specific constraints?
 
 RETURN FORMAT:
 - 3-5 findings (patterns, scaling strategies, structural recommendations)
-- Each: pattern name, where it works, where it breaks, applicability to this project
+- Each MUST include: source URL (article, docs, or case study), pattern name, where it works, where it breaks, applicability to this project
+- NO URL = NOT A FINDING. If you cannot link to the source, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("pattern X doesn't scale", "approach Y has no implementations"): document what you searched and where
+- Mark surprising findings with ⚠️ SURPRISING
 - Include scaling breakpoints: "This works until X users/Y requests, then you need Z"
 - Flag over-engineering: "You probably don't need X until Y scale"
-- Confidence: high/medium/low per finding
+- Confidence: high/medium/low per finding (no URL = low by default)
 ```
 
 ---
@@ -405,10 +430,13 @@ failure mode? What would a senior engineer warn about?
 
 RETURN FORMAT:
 - 3-5 pitfalls (fewer if the space is genuinely safe — don't invent problems)
-- Each: what goes wrong, why, how common, severity (project-killer / painful / annoying)
+- Each MUST include: source URL (post-mortem, blog post, issue thread), what goes wrong, why, how common, severity (project-killer / painful / annoying)
+- NO URL = NOT A FINDING. If you cannot link to the source, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("nobody has hit this problem", "this approach has no known issues"): document what you searched. Absence of evidence is not evidence of absence.
+- Mark surprising findings with ⚠️ SURPRISING
 - Include specific mitigation for each pitfall
 - Flag "silent killers" — pitfalls that don't show up until production/scale
-- Confidence: high/medium/low per pitfall
+- Confidence: high/medium/low per pitfall (no URL = low by default)
 ```
 
 ---
@@ -471,11 +499,14 @@ What accessibility concerns does this raise?
 
 RETURN FORMAT:
 - 3-5 findings (UX patterns, accessibility requirements, domain conventions)
-- Each: what the pattern is, where it's proven, how it applies to this project
+- Each MUST include: source URL (case study, pattern library, research paper), what the pattern is, where it's proven, how it applies to this project
+- NO URL = NOT A FINDING. If you cannot link to the source, state "No source found — based on training data, may be outdated"
+- For NEGATIVE claims ("no UX pattern exists for X", "no accessibility standard covers Y"): document what you searched and where
+- Mark surprising findings with ⚠️ SURPRISING
 - Flag accessibility gaps — "This approach would fail WCAG 2.1 AA because..."
 - Flag convention violations — "Users of [domain] tools expect X, not Y"
 - Include visual references where possible (link to pattern libraries, design systems)
-- Confidence: high/medium/low per finding
+- Confidence: high/medium/low per finding (no URL = low by default)
 ```
 
 ---
@@ -501,34 +532,57 @@ AGENT OUTPUTS:
 
 ---
 
+BEFORE PRODUCING OUTPUT, RUN THIS VERIFICATION PASS:
+
+For every claim from every agent, check:
+- Does it have a source URL? If NO → mark as "⚠️ UNVERIFIED — no source URL provided, based on training data"
+- Is it a NEGATIVE claim ("X doesn't exist", "X doesn't support Y")? If YES → did the agent document what they searched? If NO → mark as "🚨 UNVERIFIED NEGATIVE — agent did not document search, claim may be false"
+- Is it SURPRISING (major platform lacking basic feature, well-known tool having critical flaw)? If YES → mark as "⚠️ SURPRISING — requires independent verification before presenting to user"
+
+DO NOT pass unverified or surprising negative claims through to your output as facts. Flag them explicitly so the orchestrator can either verify or discard them.
+
+---
+
 PRODUCE THE FOLLOWING:
 
+0. EVIDENCE AUDIT (NEW — run first):
+   - Total claims received: [N]
+   - Claims with source URLs: [N] ([%])
+   - Claims without source URLs (UNVERIFIED): [N] — list them
+   - Negative claims without proof of search: [N] — list them
+   - Surprising claims flagged: [N] — list them
+
 1. CONSENSUS CLAIMS (things 2+ agents agree on):
-   - [claim] — agreed by: [agent list] — confidence: high/medium
+   - [claim] — agreed by: [agent list] — confidence: high/medium — source: [URL]
    For each: one sentence on why this matters for the project
+   EXCLUDE claims that have no source URLs from consensus — they cannot be "agreed on" without evidence
 
 2. CONTESTED CLAIMS (things agents disagree on):
-   - [topic]: [Agent A] says [X], [Agent B] says [Y]
+   - [topic]: [Agent A] says [X] (source: [URL]), [Agent B] says [Y] (source: [URL])
    - Your assessment: which is more credible and why
    For each: flag whether this disagreement matters for the current decision
 
 3. UNIQUE INSIGHTS (noteworthy things only one agent found):
-   - [insight] — from: [agent] — why it matters: [brief]
+   - [insight] — from: [agent] — source: [URL] — why it matters: [brief]
    For each: flag if it's strong enough to influence the recommendation
+   EXCLUDE insights without source URLs — single-agent claims without evidence are the highest confabulation risk
 
 4. RESEARCH GAPS (what nobody found):
    - [gap] — this matters because [brief]
    - Suggested search vector for next turn: [query idea]
+   NOTE: A "gap" where agents claimed something doesn't exist WITHOUT searching is NOT a gap — it's a failed search. Flag these separately.
 
 5. OVERALL CONFIDENCE ASSESSMENT:
    - How well-covered is this research question? (well-covered / partially-covered / thin)
    - What's the biggest remaining unknown?
    - Should the next turn's research go deeper here or pivot to a new angle?
+   - Evidence quality: [%] of claims have source URLs
 
 6. TOP 3-5 ACTIONABLE SUGGESTIONS (for the orchestrator to present):
    - Each with: the suggestion, supporting evidence (URLs from agents), trade-off, confidence
    - Rank by (confidence x relevance to project)
    - Flag #1 as the recommendation with rationale
+   - NEVER include a suggestion backed only by unverified claims
 ```
 
 ---
