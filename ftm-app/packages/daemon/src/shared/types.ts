@@ -52,6 +52,7 @@ export type FtmEventType =
   | 'plan_generated'
   | 'approval_requested'
   | 'plan_approved'
+  | 'plan_modified'
   | 'step_started'
   | 'model_selected'
   | 'tool_invoked'
@@ -127,6 +128,31 @@ export interface Plan {
 }
 
 // Blackboard
+export interface LearnedPattern {
+  label: string;
+  count: number;
+  lastSeen: number;
+}
+
+export interface UserProfile {
+  lastUpdated: number;
+  preferredName: string | null;
+  responseStyle: 'direct' | 'collaborative';
+  preferredOutputFormats: LearnedPattern[];
+  activeProjects: LearnedPattern[];
+  approvalPreference: 'streamlined' | 'hands_on' | 'mixed';
+  approvalHistory: {
+    requestedCount: number;
+    approvedCount: number;
+    modifiedCount: number;
+    autoApprovedCount: number;
+  };
+  commonTaskTypes: LearnedPattern[];
+  workflowPatterns: LearnedPattern[];
+  topicInterests: LearnedPattern[];
+  modelPreferences: LearnedPattern[];
+}
+
 export interface BlackboardContext {
   currentTask: Task | null;
   recentDecisions: Array<{ decision: string; reason: string; timestamp: number }>;
@@ -136,6 +162,7 @@ export interface BlackboardContext {
     lastUpdated: number;
     skillsInvoked: string[];
   };
+  userProfile: UserProfile;
 }
 
 export interface Experience {

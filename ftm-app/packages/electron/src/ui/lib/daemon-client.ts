@@ -44,6 +44,120 @@ export const recentEvents: Readable<FtmEvent[]> = derived(
   daemonState, $s => $s.events.slice(-50) // Keep last 50 events
 );
 
+function normalizeEvent(event: FtmEvent): FtmEvent {
+  const typedEvent = event.data._eventType;
+  if (typeof typedEvent !== 'string' || typedEvent.length === 0) {
+    return event;
+  }
+
+  const { _eventType: _ignored, ...data } = event.data;
+  return {
+    ...event,
+    type: typedEvent,
+    data,
+  };
+}
+
+function updatePlanStep(plan: Plan | null, stepIndex: number, status: Task['status']): Plan | null {
+  if (!plan) return plan;
+
+  const steps = plan.steps.map((step) =>
+    step.index === stepIndex ? { ...step, status } : step
+  );
+
+  return {
+    ...plan,
+    steps,
+    currentStep: status === 'completed' ? Math.max(plan.currentStep, stepIndex + 1) : stepIndex,
+  };
+}
+
+export function reduceEvent(state: DaemonState, rawEvent: FtmEvent): DaemonState {
+  const event = normalizeEvent(rawEvent);
+  const next: DaemonState = {
+    ...state,
+    events: [...state.events.slice(-99), event],
+  };
+
+  switch (event.type) {
+    case 'task_submitted':
+      if (event.data.task) {
+        next.currentTask = event.data.task as Task;
+      }
+      break;
+
+    case 'plan_generated':
+      if (event.data.plan) {
+        next.currentPlan = event.data.plan as Plan;
+      }
+      break;
+
+    case 'approval_requested':
+      next.machineState = 'approving';
+      if (event.data.plan) {
+        next.currentPlan = event.data.plan as Plan;
+      }
+      break;
+
+    case 'plan_approved':
+      if (next.currentPlan && next.currentPlan.id === event.data.planId) {
+        next.currentPlan = { ...next.currentPlan, status: 'approved' };
+      }
+      break;
+
+    case 'step_started':
+      if (typeof event.data.stepIndex === 'number') {
+        next.currentPlan = updatePlanStep(next.currentPlan, event.data.stepIndex, 'in_progress');
+      }
+      next.machineState = 'executing';
+      break;
+
+    case 'step_completed':
+      if (typeof event.data.stepIndex === 'number') {
+        next.currentPlan = updatePlanStep(next.currentPlan, event.data.stepIndex, 'completed');
+      }
+      break;
+
+    case 'task_completed':
+      next.machineState = 'complete';
+      next.currentPlan = next.currentPlan
+        ? {
+            ...next.currentPlan,
+            status: 'completed',
+            currentStep: next.currentPlan.steps.length,
+            steps: next.currentPlan.steps.map((step) => ({ ...step, status: 'completed' })),
+          }
+        : next.currentPlan;
+      if (next.currentTask) {
+        const resultPayload = event.data.result as { output?: string } | string | undefined;
+        next.currentTask = {
+          ...next.currentTask,
+          status: 'completed',
+          result:
+            typeof resultPayload === 'string'
+              ? resultPayload
+              : typeof resultPayload?.output === 'string'
+                ? resultPayload.output
+                : next.currentTask.result,
+        };
+      }
+      break;
+
+    case 'error':
+      next.machineState = 'error';
+      if (next.currentTask) {
+        next.currentTask = {
+          ...next.currentTask,
+          status: 'failed',
+          error: typeof event.data.error === 'string' ? event.data.error : next.currentTask.error,
+        };
+      }
+      break;
+  }
+
+  return next;
+}
+
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let messageId = 0;
@@ -205,10 +319,7 @@ function handleMessage(msg: WsResponse): void {
 
     case 'event': {
       const event = msg.payload.event as FtmEvent;
-      daemonState.update(s => ({
-        ...s,
-        events: [...s.events.slice(-99), event], // Cap at 100
-      }));
+      daemonState.update((s) => reduceEvent(s, event));
       break;
     }
   }

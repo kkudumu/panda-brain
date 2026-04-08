@@ -300,6 +300,21 @@ describe('CodexAdapter.parseResponse', () => {
     const response = adapter.parseResponse(output);
     expect(response.tokenUsage).toEqual({ input: 0, output: 0, cached: 0 });
   });
+
+  it('parses newline-delimited Codex event output into readable text', () => {
+    const output = [
+      '{"type":"thread.started","thread_id":"abc"}',
+      '{"type":"response.output_text.delta","delta":"Hello"}',
+      '{"type":"response.output_text.delta","delta":" user."}',
+      '{"type":"response.completed","usage":{"prompt_tokens":11,"completion_tokens":2}}',
+    ].join('\n');
+
+    const response = adapter.parseResponse(output);
+
+    expect(response.text).toBe('Hello\nuser.');
+    expect(response.tokenUsage.input).toBe(11);
+    expect(response.tokenUsage.output).toBe(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ async function createWindow(): Promise<void> {
       preload: path.join(__dirname, '../preload/preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false,
     },
   });
 

@@ -106,9 +106,12 @@
     $currentPlan?.steps.find(s => s.index === currentStep) ?? null
   );
   let isIdle = $derived($machineState === 'idle');
+  let isComplete = $derived($machineState === 'complete' || $currentTask?.status === 'completed');
   let isError = $derived($machineState === 'error' || $currentTask?.status === 'failed');
   let errorMsg = $derived($currentTask?.error ?? 'An error occurred');
   let elapsedForCurrent = $derived(stepElapsed[currentStep] ?? 0);
+  let resultText = $derived(($currentTask?.result ?? '').trim());
+  let displayStep = $derived(totalSteps > 0 ? Math.min(currentStep + 1, totalSteps) : 0);
 </script>
 
 <div class="execution-view" class:idle={isIdle} class:error={isError}>
@@ -129,11 +132,28 @@
         <button class="err-btn cancel" onclick={handleCancel}>Cancel</button>
       </div>
     </div>
+  {:else if isComplete}
+    <div class="progress-section">
+      <div class="progress-meta">
+        <span class="step-counter">Completed {totalSteps} step{totalSteps === 1 ? '' : 's'}</span>
+      </div>
+      <div class="progress-track">
+        <div
+          class="progress-fill complete"
+          style="width: 100%"
+        ></div>
+      </div>
+    </div>
+
+    <div class="current-step complete-state">
+      <span class="current-label">RESULT</span>
+      <p class="current-desc">{resultText || 'Task completed.'}</p>
+    </div>
   {:else}
     <!-- Progress bar -->
     <div class="progress-section">
       <div class="progress-meta">
-        <span class="step-counter">Step {currentStep + 1} of {totalSteps}</span>
+        <span class="step-counter">Step {displayStep} of {totalSteps}</span>
         {#if elapsedForCurrent > 0}
           <span class="elapsed">{formatElapsed(elapsedForCurrent)}</span>
         {/if}
@@ -189,6 +209,11 @@
 
   .execution-view.error {
     border-color: #ff444444;
+  }
+
+  .complete-state {
+    border-top: 1px solid #1a1a1a;
+    background: #00ff8808;
   }
 
   /* Idle */

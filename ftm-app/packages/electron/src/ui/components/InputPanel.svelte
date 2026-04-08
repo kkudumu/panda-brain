@@ -6,6 +6,7 @@
   let history: string[] = $state([]);
   let historyIndex = $state(-1);
   let isDragging = $state(false);
+  let isSubmitting = $state(false);
   let statusMsg = $state('');
   let statusTimer: ReturnType<typeof setTimeout> | null = null;
   let textarea: HTMLTextAreaElement | null = $state(null);
@@ -30,17 +31,23 @@
 
   async function handleSubmit() {
     const text = value.trim();
-    if (!text || !$isConnected) return;
+    if (!text || !$isConnected || isSubmitting) return;
 
-    history = [text, ...history.slice(0, 49)];
-    historyIndex = -1;
-    value = '';
-    resize();
+    isSubmitting = true;
 
     try {
       await submitTask(text);
+      history = [text, ...history.slice(0, 49)];
+      historyIndex = -1;
+      value = '';
+      resize();
+      showStatus('Task submitted.', 1200);
     } catch (err) {
       console.error('[InputPanel] submit error:', err);
+      const message = err instanceof Error ? err.message : 'Submit failed';
+      showStatus(message, 3000);
+    } finally {
+      isSubmitting = false;
     }
   }
 
@@ -152,7 +159,7 @@
       bind:value
       class="task-textarea"
       placeholder="Feed the machine..."
-      disabled={!$isConnected}
+      disabled={!$isConnected || isSubmitting}
       rows={1}
       spellcheck={false}
       onkeydown={handleKeydown}
@@ -163,7 +170,7 @@
 
     <button
       class="submit-btn"
-      disabled={!$isConnected || !value.trim()}
+      disabled={!$isConnected || !value.trim() || isSubmitting}
       onclick={handleSubmit}
       aria-label="Submit task"
       title="Submit (Enter)"

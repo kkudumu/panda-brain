@@ -4,6 +4,7 @@ import { FtmEventBus } from './event-bus.js';
 import { OodaLoop } from './ooda.js';
 import { FtmStore } from './store.js';
 import { Blackboard } from './blackboard.js';
+import { synthesizeUserContext } from './profile-context.js';
 
 export class FtmServer {
   private wss: WebSocketServer | null = null;
@@ -120,6 +121,7 @@ export class FtmServer {
         if (plan) {
           this.store.updatePlan(planId, modifications as Parameters<typeof this.store.updatePlan>[1]);
         }
+        this.eventBus.emitTyped('plan_modified', { planId, modifications });
         this.sendTo(ws, {
           type: 'plan_modified',
           id: msg.id,
@@ -248,12 +250,15 @@ export class FtmServer {
 
   // Get current daemon state snapshot
   private getStateSnapshot(): Record<string, unknown> {
+    const profileContext = synthesizeUserContext(this.blackboard.getUserProfileSnapshot());
+
     return {
       machineState: this.machineState,
       currentTask: this.ooda.getCurrentTask(),
       currentPlan: this.ooda.getCurrentPlan(),
       phase: this.ooda.getPhase(),
       blackboard: this.blackboard.getContext(),
+      profileContext,
       connectedClients: this.clients.size,
     };
   }

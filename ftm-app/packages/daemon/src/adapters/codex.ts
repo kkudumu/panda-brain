@@ -2,9 +2,16 @@ import type { NormalizedResponse, SessionOpts, ToolCall } from '../shared/types.
 import { BaseAdapter } from './base.js';
 
 interface CodexJsonOutput {
+  type?: string;
   response?: string;
   output?: string;
   content?: string;
+  text?: string;
+  message?: {
+    content?: string;
+  };
+  delta?: string;
+  final?: string;
   tool_calls?: Array<{
     name?: string;
     function?: {
@@ -70,8 +77,8 @@ export class CodexAdapter extends BaseAdapter {
       return this.emptyResponse();
     }
 
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const parsedObjects = this.parseJsonObjects(trimmed);
+    if (parsedObjects.length === 0) {
       return {
         text: trimmed,
         toolCalls: [],
@@ -80,74 +87,100 @@ export class CodexAdapter extends BaseAdapter {
       };
     }
 
-    let parsed: CodexJsonOutput;
-    try {
-      parsed = JSON.parse(jsonMatch[0]) as CodexJsonOutput;
-    } catch {
-      return {
-        text: trimmed,
-        toolCalls: [],
-        sessionId: '',
-        tokenUsage: { input: 0, output: 0, cached: 0 },
-      };
-    }
-
-    // Extract text from various possible fields
-    let text = '';
-    if (parsed.response) {
-      text = parsed.response;
-    } else if (parsed.output) {
-      text = parsed.output;
-    } else if (parsed.content) {
-      text = parsed.content;
-    } else if (parsed.choices && parsed.choices.length > 0) {
-      text = parsed.choices[0].message?.content ?? '';
-    }
-
-    // Extract tool calls
     const toolCalls: ToolCall[] = [];
+    const textParts: string[] = [];
+    let lastParsed: CodexJsonOutput | null = null;
 
-    if (parsed.tool_calls) {
-      for (const tc of parsed.tool_calls) {
-        const name = tc.name ?? tc.function?.name ?? '';
-        let args: Record<string, unknown> = tc.arguments ?? {};
-        if (tc.function?.arguments && typeof tc.function.arguments === 'string') {
+    for (const parsed of parsedObjects) {
+      lastParsed = parsed;
+      const text = this.extractText(parsed);
+      if (text) {
+        textParts.push(text);
+      }
+
+      if (parsed.tool_calls) {
+        for (const tc of parsed.tool_calls) {
+          const name = tc.name ?? tc.function?.name ?? '';
+          let args: Record<string, unknown> = tc.arguments ?? {};
+          if (tc.function?.arguments && typeof tc.function.arguments === 'string') {
+            try {
+              args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+            } catch {
+              args = { raw: tc.function.arguments };
+            }
+          } else if (tc.function?.arguments && typeof tc.function.arguments === 'object') {
+            args = tc.function.arguments as Record<string, unknown>;
+          }
+          toolCalls.push({ name, arguments: args, result: tc.result });
+        }
+      }
+
+      if (parsed.choices && parsed.choices.length > 0) {
+        const choiceToolCalls = parsed.choices[0].message?.tool_calls ?? [];
+        for (const tc of choiceToolCalls) {
+          let args: Record<string, unknown> = {};
           try {
             args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
           } catch {
             args = { raw: tc.function.arguments };
           }
-        } else if (tc.function?.arguments && typeof tc.function.arguments === 'object') {
-          args = tc.function.arguments as Record<string, unknown>;
+          toolCalls.push({ name: tc.function.name, arguments: args });
         }
-        toolCalls.push({ name, arguments: args, result: tc.result });
       }
     }
 
-    // Check choices for tool calls too
-    if (parsed.choices && parsed.choices.length > 0) {
-      const choiceToolCalls = parsed.choices[0].message?.tool_calls ?? [];
-      for (const tc of choiceToolCalls) {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-        } catch {
-          args = { raw: tc.function.arguments };
-        }
-        toolCalls.push({ name: tc.function.name, arguments: args });
-      }
-    }
+    const dedupedText = Array.from(
+      new Set(textParts.map((part) => part.trim()).filter(Boolean)),
+    ).join('\n');
 
     return {
-      text,
+      text: dedupedText || trimmed,
       toolCalls,
       sessionId: '',
-      // Codex may not provide token usage — return zeros
       tokenUsage: {
-        input: parsed.usage?.prompt_tokens ?? 0,
-        output: parsed.usage?.completion_tokens ?? 0,
+        input: lastParsed?.usage?.prompt_tokens ?? 0,
+        output: lastParsed?.usage?.completion_tokens ?? 0,
         cached: 0,
       },
     };
+  }
+
+  private parseJsonObjects(raw: string): CodexJsonOutput[] {
+    const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean);
+    const parsed: CodexJsonOutput[] = [];
+
+    for (const line of lines) {
+      try {
+        parsed.push(JSON.parse(line) as CodexJsonOutput);
+      } catch {
+        // Ignore non-JSON lines from the CLI.
+      }
+    }
+
+    if (parsed.length > 0) {
+      return parsed;
+    }
+
+    try {
+      return [JSON.parse(raw) as CodexJsonOutput];
+    } catch {
+      return [];
+    }
+  }
+
+  private extractText(parsed: CodexJsonOutput): string {
+    if (parsed.response) return parsed.response;
+    if (parsed.output) return parsed.output;
+    if (parsed.content) return parsed.content;
+    if (parsed.text) return parsed.text;
+    if (parsed.final) return parsed.final;
+    if (parsed.message?.content) return parsed.message.content;
+    if (parsed.choices && parsed.choices.length > 0) {
+      return parsed.choices[0].message?.content ?? '';
+    }
+    if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+      return parsed.delta;
+    }
+    return '';
   }
 }

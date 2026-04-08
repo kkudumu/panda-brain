@@ -10,6 +10,7 @@ import type {
 import { FtmEventBus } from './event-bus.js';
 import { Blackboard } from './blackboard.js';
 import { ModelRouter } from './router.js';
+import { synthesizeUserContext } from './profile-context.js';
 
 type OodaPhase = 'idle' | 'observe' | 'orient' | 'decide' | 'act' | 'complete' | 'error';
 
@@ -69,6 +70,14 @@ export class OodaLoop {
     this.blackboard.setCurrentTask(task);
 
     try {
+      if (this.isDirectReplyTask(task.description)) {
+        return this.completeDirectReply(task);
+      }
+
+      if (this.isQuickReplyTask(task.description)) {
+        return await this.completeQuickReply(task);
+      }
+
       // ── OBSERVE ────────────────────────────────────────────────────────────
       this.setPhase('observe');
       const context = await this.observe(task);
@@ -84,8 +93,12 @@ export class OodaLoop {
 
       // Wait for approval when required by the config
       if (this.router.getConfig().execution.approvalMode !== 'auto') {
-        this.eventBus.emitTyped('approval_requested', { taskId: task.id, plan });
-        await this.waitForApproval(plan);
+        if (this.hasApprovalEvent(plan.id)) {
+          plan.status = 'approved';
+        } else {
+          this.eventBus.emitTyped('approval_requested', { taskId: task.id, plan });
+          await this.waitForApproval(plan);
+        }
       }
 
       // ── ACT ────────────────────────────────────────────────────────────────
@@ -277,6 +290,123 @@ export class OodaLoop {
     };
   }
 
+  private isDirectReplyTask(description: string): boolean {
+    const normalized = description.trim().toLowerCase();
+    if (!normalized) return false;
+
+    return [
+      'hello',
+      'hello machine',
+      'hi',
+      'hi machine',
+      'hey',
+      'hey machine',
+      'good morning',
+      'good afternoon',
+      'good evening',
+      'thanks',
+      'thank you',
+      'help',
+      'what can you do',
+      'who are you',
+    ].includes(normalized);
+  }
+
+  private isQuickReplyTask(description: string): boolean {
+    const normalized = description.trim().toLowerCase();
+    if (!normalized || this.isDirectReplyTask(description)) return false;
+
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+    if (wordCount > 12) return false;
+
+    const blockerSignals = [
+      'write',
+      'implement',
+      'build',
+      'create',
+      'refactor',
+      'fix',
+      'debug',
+      'run',
+      'execute',
+      'install',
+      'deploy',
+      'delete',
+      'remove',
+      'production',
+      'file',
+      'code',
+      'function',
+      'script',
+    ];
+
+    return !blockerSignals.some((signal) => normalized.includes(signal));
+  }
+
+  private completeDirectReply(task: Task): ModuleResult {
+    this.setPhase('observe');
+    const profile = synthesizeUserContext(this.blackboard.getUserProfileSnapshot()).profile;
+    const result: ModuleResult = {
+      success: true,
+      output: this.buildDirectReply(task.description, profile.preferredName),
+    };
+
+    this.setPhase('complete');
+    this.eventBus.emitTyped('task_completed', { taskId: task.id, result });
+    return result;
+  }
+
+  private buildDirectReply(description: string, preferredName: string | null): string {
+    const normalized = description.trim().toLowerCase();
+
+    if (normalized.includes('thank')) {
+      return "You're welcome.";
+    }
+    if (normalized === 'help' || normalized === 'what can you do') {
+      return 'I can answer quick questions, plan work, and run longer coding tasks.';
+    }
+    if (normalized === 'who are you') {
+      return 'I am Feed The Machine, your terminal-first helper.';
+    }
+    return `Hello ${preferredName ?? 'user'}.`;
+  }
+
+  private async completeQuickReply(task: Task): Promise<ModuleResult> {
+    this.setPhase('observe');
+    this.eventBus.emitTyped('memory_retrieved', { taskId: task.id });
+
+    this.setPhase('orient');
+    this.setPhase('act');
+
+    const synthesized = synthesizeUserContext(this.blackboard.getUserProfileSnapshot());
+    const profile = synthesized.profile;
+    const outputFormats = profile.preferredOutputFormats.slice(0, 3).map((item) => item.label);
+
+    const adapter = await this.router.route('execution');
+    const response = await adapter.startSession(
+      [
+        'Reply directly to the user in one or two short sentences.',
+        'Do not make a plan.',
+        'Do not describe internal execution.',
+        ...(profile.preferredName ? [`Address the user as ${profile.preferredName}.`] : []),
+        `Prefer a ${profile.responseStyle} tone.`,
+        ...(outputFormats.length > 0 ? [`Honor these output format preferences when they make sense: ${outputFormats.join(', ')}.`] : []),
+        ...synthesized.promptContext.map((line) => `Profile context: ${line}`),
+        `User message: ${task.description}`,
+      ].join('\n'),
+      { workingDir: process.cwd() },
+    );
+
+    const result: ModuleResult = {
+      success: true,
+      output: response.text.trim() || 'Task completed.',
+    };
+
+    this.setPhase('complete');
+    this.eventBus.emitTyped('task_completed', { taskId: task.id, result });
+    return result;
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -322,6 +452,12 @@ export class OodaLoop {
    */
   private waitForApproval(plan: Plan): Promise<void> {
     return new Promise<void>((resolve) => {
+      if (this.hasApprovalEvent(plan.id)) {
+        plan.status = 'approved';
+        resolve();
+        return;
+      }
+
       const handler = (event: FtmEvent) => {
         if (event.data?.planId === plan.id) {
           plan.status = 'approved';
@@ -331,6 +467,12 @@ export class OodaLoop {
       };
       this.eventBus.on('plan_approved', handler);
     });
+  }
+
+  private hasApprovalEvent(planId: string): boolean {
+    return this.eventBus.getEventLog().some(
+      (event) => event.type === 'plan_approved' && event.data?.planId === planId,
+    );
   }
 
   /**

@@ -7,6 +7,7 @@ import type {
   NormalizedResponse,
 } from '../shared/types.js';
 import type { ModelRouter } from '../router.js';
+import { synthesizeUserContext } from '../profile-context.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -292,6 +293,53 @@ export class ExecutorModule implements FtmModule {
       '',
       `Current step: ${step.description}`,
     ];
+
+    const synthesized = synthesizeUserContext(context.blackboard.userProfile);
+    const profile = synthesized.profile;
+    if (profile) {
+      const preferredName = profile.preferredName;
+      const commonTaskTypes = profile.commonTaskTypes.slice(0, 3).map((item) => item.label);
+      const workflowPatterns = profile.workflowPatterns.slice(0, 3).map((item) => item.label);
+      const topics = profile.topicInterests.slice(0, 3).map((item) => item.label);
+      const outputFormats = profile.preferredOutputFormats.slice(0, 3).map((item) => item.label);
+      const activeProjects = profile.activeProjects.slice(0, 3).map((item) => item.label);
+
+      if (
+        preferredName ||
+        profile.responseStyle === 'direct' ||
+        commonTaskTypes.length > 0 ||
+        workflowPatterns.length > 0 ||
+        topics.length > 0 ||
+        outputFormats.length > 0 ||
+        activeProjects.length > 0
+      ) {
+        lines.push('');
+        lines.push('Learned user workflow profile:');
+        if (preferredName) {
+          lines.push(`  - Preferred name: ${preferredName}`);
+        }
+        lines.push(`  - Preferred response style: ${profile.responseStyle}`);
+        lines.push(`  - Approval preference: ${profile.approvalPreference}`);
+        if (outputFormats.length > 0) {
+          lines.push(`  - Preferred output formats: ${outputFormats.join(', ')}`);
+        }
+        if (activeProjects.length > 0) {
+          lines.push(`  - Active projects: ${activeProjects.join(', ')}`);
+        }
+        if (commonTaskTypes.length > 0) {
+          lines.push(`  - Common task types: ${commonTaskTypes.join(', ')}`);
+        }
+        if (workflowPatterns.length > 0) {
+          lines.push(`  - Recurring workflow steps: ${workflowPatterns.join(', ')}`);
+        }
+        if (topics.length > 0) {
+          lines.push(`  - Current focus areas: ${topics.join(', ')}`);
+        }
+        for (const note of synthesized.promptContext.slice(3, 7)) {
+          lines.push(`  - ${note}`);
+        }
+      }
+    }
 
     if (context.blackboard.recentDecisions.length > 0) {
       lines.push('');

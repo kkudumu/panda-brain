@@ -65,6 +65,12 @@ describe('Blackboard', () => {
       expect(typeof ctx.sessionMetadata.startedAt).toBe('number');
       expect(typeof ctx.sessionMetadata.lastUpdated).toBe('number');
       expect(Array.isArray(ctx.sessionMetadata.skillsInvoked)).toBe(true);
+      expect(Array.isArray(ctx.userProfile.preferredOutputFormats)).toBe(true);
+      expect(Array.isArray(ctx.userProfile.activeProjects)).toBe(true);
+      expect(ctx.userProfile.approvalPreference).toBe('mixed');
+      expect(ctx.userProfile.responseStyle).toBe('collaborative');
+      expect(ctx.userProfile.commonTaskTypes).toEqual([]);
+      expect(ctx.userProfile.workflowPatterns).toEqual([]);
     });
 
     it('reflects current task after setCurrentTask', () => {
@@ -314,6 +320,43 @@ describe('Blackboard', () => {
       const bb2 = new Blackboard(store);
       const ctx = bb2.getContext();
       expect(ctx.sessionMetadata.skillsInvoked).toContain('ftm-executor');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // User profile
+  // -------------------------------------------------------------------------
+
+  describe('user profile', () => {
+    it('updates learned profile fields', () => {
+      bb.updateUserProfile((profile) => {
+        profile.preferredName = 'Avery';
+        profile.responseStyle = 'direct';
+        profile.commonTaskTypes.push({
+          label: 'hello_machine',
+          count: 2,
+          lastSeen: Date.now(),
+        });
+      });
+
+      const ctx = bb.getContext();
+      expect(ctx.userProfile.preferredName).toBe('Avery');
+      expect(ctx.userProfile.responseStyle).toBe('direct');
+      expect(ctx.userProfile.commonTaskTypes[0].label).toBe('hello_machine');
+    });
+
+    it('persists user profile across instances', () => {
+      bb.updateUserProfile((profile) => {
+        profile.topicInterests.push({
+          label: 'testing',
+          count: 1,
+          lastSeen: Date.now(),
+        });
+      });
+
+      const bb2 = new Blackboard(store);
+      const ctx = bb2.getContext();
+      expect(ctx.userProfile.topicInterests[0].label).toBe('testing');
     });
   });
 });

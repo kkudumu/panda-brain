@@ -149,6 +149,18 @@ export function createProgram(): Command {
         if (response.success) {
           const state = response.payload;
           const machineState = state.machineState as MachineState;
+          const profileContext = state.profileContext as {
+            profile?: {
+              preferredName?: string | null;
+              responseStyle?: string;
+              approvalPreference?: string;
+              activeProjects?: Array<{ label: string }>;
+            };
+            externalSignals?: {
+              modelProfile?: string | null;
+              approvalMode?: string | null;
+            };
+          } | undefined;
 
           const stateEmoji: Record<MachineState, string> = {
             idle: '○',
@@ -173,6 +185,20 @@ export function createProgram(): Command {
           if (state.currentPlan) {
             const plan = state.currentPlan as any;
             console.log(`  Plan:    Step ${plan.currentStep}/${plan.steps?.length ?? '?'}`);
+          }
+
+          if (profileContext?.profile) {
+            const profile = profileContext.profile;
+            const activeProjects = (profile.activeProjects ?? []).slice(0, 3).map((item) => item.label);
+            console.log(`  User:    ${profile.preferredName ?? 'unknown'} · ${profile.responseStyle ?? 'unknown'} · ${profile.approvalPreference ?? 'unknown'}`);
+
+            if (activeProjects.length > 0) {
+              console.log(`  Focus:   ${activeProjects.join(', ')}`);
+            }
+
+            if (profileContext.externalSignals?.modelProfile || profileContext.externalSignals?.approvalMode) {
+              console.log(`  Context: profile=${profileContext.externalSignals?.modelProfile ?? 'n/a'} approval=${profileContext.externalSignals?.approvalMode ?? 'n/a'}`);
+            }
           }
         }
 

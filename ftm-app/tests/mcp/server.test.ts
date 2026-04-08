@@ -87,12 +87,14 @@ describe('FtmMcpServer', () => {
   // -------------------------------------------------------------------------
 
   describe('getToolDefinitions', () => {
-    it('returns all 7 tools', () => {
+    it('returns all 9 tools', () => {
       const tools = mcpServer.getToolDefinitions();
-      expect(tools).toHaveLength(7);
+      expect(tools).toHaveLength(9);
 
       const names = tools.map(t => t.name);
       expect(names).toContain('ftm_get_blackboard');
+      expect(names).toContain('ftm_get_user_profile');
+      expect(names).toContain('ftm_update_user_profile');
       expect(names).toContain('ftm_check_playbook');
       expect(names).toContain('ftm_guard_check');
       expect(names).toContain('ftm_log_daily');
@@ -158,6 +160,41 @@ describe('FtmMcpServer', () => {
       const context = JSON.parse(result.content[0].text);
       expect(context.recentDecisions).toHaveLength(1);
       expect(context.recentDecisions[0].decision).toBe('use TypeScript');
+    });
+  });
+
+  describe('ftm_get_user_profile', () => {
+    it('returns synthesized profile data with local and external sections', async () => {
+      const result = await mcpServer.handleToolCall('ftm_get_user_profile', {});
+
+      expect(result.isError).toBeUndefined();
+      const body = JSON.parse(result.content[0].text);
+      expect(body).toHaveProperty('profile');
+      expect(body).toHaveProperty('externalSignals');
+      expect(Array.isArray(body.promptContext)).toBe(true);
+      expect(body.profile).toHaveProperty('responseStyle');
+    });
+  });
+
+  describe('ftm_update_user_profile', () => {
+    it('updates scalar and learned list fields', async () => {
+      const result = await mcpServer.handleToolCall('ftm_update_user_profile', {
+        preferredName: 'Avery',
+        responseStyle: 'direct',
+        approvalPreference: 'streamlined',
+        preferredOutputFormats: ['markdown'],
+        activeProjects: ['ftm-app'],
+        topicInterests: ['automation'],
+      });
+
+      expect(result.isError).toBeUndefined();
+      const body = JSON.parse(result.content[0].text);
+      expect(body.profile.preferredName).toBe('Avery');
+      expect(body.profile.responseStyle).toBe('direct');
+      expect(body.profile.approvalPreference).toBe('streamlined');
+      expect(body.profile.preferredOutputFormats[0].label).toBe('markdown');
+      expect(body.profile.activeProjects.some((item: { label: string }) => item.label === 'ftm-app')).toBe(true);
+      expect(body.profile.topicInterests.some((item: { label: string }) => item.label === 'automation')).toBe(true);
     });
   });
 

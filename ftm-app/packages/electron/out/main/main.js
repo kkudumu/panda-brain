@@ -3020,7 +3020,8 @@ async function createWindow() {
     webPreferences: {
       preload: path.join(__dirname$1, "../preload/preload.mjs"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   });
   if (process.env.ELECTRON_RENDERER_URL) {

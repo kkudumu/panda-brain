@@ -1,6 +1,7 @@
 import { FtmStore } from '../../daemon/src/store.js';
 import { Blackboard } from '../../daemon/src/blackboard.js';
-import type { BlackboardContext, Experience, Task } from '../../daemon/src/shared/types.js';
+import { synthesizeUserContext } from '../../daemon/src/profile-context.js';
+import type { BlackboardContext, Experience, LearnedPattern, Task, UserProfile } from '../../daemon/src/shared/types.js';
 
 export interface McpToolDefinition {
   name: string;
@@ -25,6 +26,44 @@ export class FtmMcpServer {
     this.registerTools();
   }
 
+  private upsertPatterns(target: LearnedPattern[], labels: string[]): void {
+    const now = Date.now();
+    for (const rawLabel of labels) {
+      const label = rawLabel.trim();
+      if (!label) continue;
+
+      const existing = target.find((item) => item.label.toLowerCase() === label.toLowerCase());
+      if (existing) {
+        existing.count += 1;
+        existing.lastSeen = now;
+        continue;
+      }
+
+      target.push({ label, count: 1, lastSeen: now });
+    }
+  }
+
+  private updateUserProfileFromArgs(args: Record<string, unknown>): UserProfile {
+    return this.blackboard.updateUserProfile((profile) => {
+      if (typeof args.preferredName === 'string') {
+        profile.preferredName = args.preferredName.trim() || null;
+      }
+      if (args.responseStyle === 'direct' || args.responseStyle === 'collaborative') {
+        profile.responseStyle = args.responseStyle;
+      }
+      if (args.approvalPreference === 'streamlined' || args.approvalPreference === 'hands_on' || args.approvalPreference === 'mixed') {
+        profile.approvalPreference = args.approvalPreference;
+      }
+
+      this.upsertPatterns(profile.preferredOutputFormats, (args.preferredOutputFormats as string[]) ?? []);
+      this.upsertPatterns(profile.activeProjects, (args.activeProjects as string[]) ?? []);
+      this.upsertPatterns(profile.commonTaskTypes, (args.commonTaskTypes as string[]) ?? []);
+      this.upsertPatterns(profile.workflowPatterns, (args.workflowPatterns as string[]) ?? []);
+      this.upsertPatterns(profile.topicInterests, (args.topicInterests as string[]) ?? []);
+      this.upsertPatterns(profile.modelPreferences, (args.modelPreferences as string[]) ?? []);
+    });
+  }
+
   private registerTools(): void {
     // Tool: ftm_get_blackboard
     // Returns current blackboard context (current task, recent decisions, constraints, session metadata)
@@ -35,6 +74,41 @@ export class FtmMcpServer {
       handler: async () => {
         const context = this.blackboard.getContext();
         return { content: [{ type: 'text', text: JSON.stringify(context, null, 2) }] };
+      },
+    });
+
+    this.registerTool({
+      name: 'ftm_get_user_profile',
+      description: 'Get the synthesized FTM user profile, including learned preferences plus runtime-discovered external profile signals.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+      handler: async () => {
+        const profile = synthesizeUserContext(this.blackboard.getUserProfileSnapshot());
+        return { content: [{ type: 'text', text: JSON.stringify(profile, null, 2) }] };
+      },
+    });
+
+    this.registerTool({
+      name: 'ftm_update_user_profile',
+      description: 'Update the learned FTM user profile. Scalars overwrite, list fields are merged as learned preferences.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          preferredName: { type: 'string', description: 'Preferred user name to use in responses' },
+          responseStyle: { type: 'string', enum: ['direct', 'collaborative'] },
+          approvalPreference: { type: 'string', enum: ['streamlined', 'hands_on', 'mixed'] },
+          preferredOutputFormats: { type: 'array', items: { type: 'string' } },
+          activeProjects: { type: 'array', items: { type: 'string' } },
+          commonTaskTypes: { type: 'array', items: { type: 'string' } },
+          workflowPatterns: { type: 'array', items: { type: 'string' } },
+          topicInterests: { type: 'array', items: { type: 'string' } },
+          modelPreferences: { type: 'array', items: { type: 'string' } },
+        },
+        required: [],
+      },
+      handler: async (args) => {
+        const updated = this.updateUserProfileFromArgs(args);
+        const synthesized = synthesizeUserContext(updated);
+        return { content: [{ type: 'text', text: JSON.stringify(synthesized, null, 2) }] };
       },
     });
 

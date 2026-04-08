@@ -123,6 +123,75 @@ describe('OodaLoop — module registration', () => {
 // ---------------------------------------------------------------------------
 
 describe('OodaLoop — full OODA cycle', () => {
+  it('returns a direct reply for simple greetings', async () => {
+    const { loop, bus, blackboard } = buildOoda({ approvalMode: 'plan_first' });
+    blackboard.updateUserProfile((profile) => {
+      profile.preferredName = 'Avery';
+    });
+
+    const approvalEvents: FtmEvent[] = [];
+    bus.on('approval_requested', (evt) => approvalEvents.push(evt));
+
+    const result = await loop.processTask(
+      makeTask({ description: 'hello machine' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Hello Avery.');
+    expect(approvalEvents).toHaveLength(0);
+  });
+
+  it('returns a direct reply for basic capability questions', async () => {
+    const { loop } = buildOoda({ approvalMode: 'plan_first' });
+
+    const result = await loop.processTask(
+      makeTask({ description: 'what can you do' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('quick questions');
+  });
+
+  it('uses a quick conversational reply path for short harmless prompts', async () => {
+    const codex = makeAvailableAdapter('codex', 'I am doing well. What do you need?');
+    const { loop, bus, blackboard } = buildOoda({
+      adapters: [
+        makeAvailableAdapter('claude'),
+        codex,
+        makeAvailableAdapter('gemini'),
+        makeAvailableAdapter('ollama'),
+      ],
+      approvalMode: 'plan_first',
+    });
+    blackboard.updateUserProfile((profile) => {
+      profile.preferredName = 'Avery';
+      profile.responseStyle = 'direct';
+      profile.preferredOutputFormats.push({
+        label: 'concise',
+        count: 1,
+        lastSeen: Date.now(),
+      });
+    });
+
+    const approvalEvents: FtmEvent[] = [];
+    const planEvents: FtmEvent[] = [];
+    bus.on('approval_requested', (evt) => approvalEvents.push(evt));
+    bus.on('plan_generated', (evt) => planEvents.push(evt));
+
+    const result = await loop.processTask(
+      makeTask({ description: 'how are you?' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('I am doing well. What do you need?');
+    expect(approvalEvents).toHaveLength(0);
+    expect(planEvents).toHaveLength(0);
+    expect(codex.startSession).toHaveBeenCalledWith(
+      expect.stringContaining('Address the user as Avery.'),
+      expect.any(Object),
+    );
+  });
+
   it('transitions through all phases in order', async () => {
     const { loop, bus } = buildOoda({ approvalMode: 'auto' });
 
@@ -359,6 +428,19 @@ describe('OodaLoop — guard integration', () => {
 // ---------------------------------------------------------------------------
 
 describe('OodaLoop — approval waiting', () => {
+  it('does not wait for approval when the plan was already auto-approved', async () => {
+    const { loop, bus } = buildOoda({ approvalMode: 'plan_first' });
+
+    bus.on('plan_generated', (evt) => {
+      const plan = evt.data.plan as { id: string };
+      bus.emit('plan_approved', { planId: plan.id });
+    });
+
+    const result = await loop.processTask(makeTask({ description: 'say hello' }));
+
+    expect(result.success).toBe(true);
+  });
+
   it('emits approval_requested when approvalMode is plan_first', async () => {
     const { loop, bus } = buildOoda({ approvalMode: 'plan_first' });
 

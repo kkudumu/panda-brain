@@ -66,6 +66,12 @@ describe('FTM CLI user scenarios', () => {
   it('shows the live daemon state, including the pending task and plan, through `ftm status`', async () => {
     harness = await createHarness({ approvalMode: 'plan_first', withHooks: true });
     process.env.FTM_DAEMON_PORT = String(harness.port);
+    harness.blackboard.updateUserProfile((profile) => {
+      profile.preferredName = 'Avery';
+      profile.responseStyle = 'direct';
+      profile.approvalPreference = 'streamlined';
+      profile.activeProjects.push({ label: 'ftm-app', count: 3, lastSeen: Date.now() });
+    });
 
     const { ws } = await connectWs(harness.port);
     await sendWs(ws, {
@@ -90,6 +96,8 @@ describe('FTM CLI user scenarios', () => {
     expect(output).toContain('Machine:');
     expect(output).toContain('Task:    Delete stale cache files from the production cluster');
     expect(output).toContain('Plan:    Step 0/3');
+    expect(output).toContain('User:    Avery · direct');
+    expect(output).toContain('ftm-app');
 
     ws.close();
   });

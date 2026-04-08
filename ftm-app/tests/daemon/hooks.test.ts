@@ -322,6 +322,19 @@ describe('Learning capture hook', () => {
     expect(experiences[0].tags).toContain('novel_task');
   });
 
+  it('updates the learned user profile on successful task completion', () => {
+    bus.emit('task_completed', {
+      taskId: 'task-1',
+      description: 'Hello machine in markdown',
+      outcome: 'success',
+    });
+
+    const ctx = blackboard.getContext();
+    expect(ctx.userProfile.responseStyle).toBe('direct');
+    expect(ctx.userProfile.commonTaskTypes[0].label).toBe('hello_machine');
+    expect(ctx.userProfile.preferredOutputFormats[0].label).toBe('markdown');
+  });
+
   it('does not record duplicate experience for repeated task types', () => {
     bus.emit('task_completed', {
       taskId: 'task-1',
@@ -395,6 +408,38 @@ describe('Learning capture hook', () => {
 
     const experiences = store.getExperiences({});
     expect(experiences).toHaveLength(0);
+  });
+
+  it('captures workflow and model habits from step_completed events', () => {
+    bus.emit('step_completed', {
+      taskId: 'task-1',
+      description: 'Inspect auth logs',
+      model: 'codex',
+    });
+
+    const ctx = blackboard.getContext();
+    expect(ctx.userProfile.workflowPatterns[0].label).toBe('inspect_auth_logs');
+    expect(ctx.userProfile.modelPreferences[0].label).toBe('codex');
+    expect(ctx.userProfile.topicInterests.some((item) => item.label === 'inspect' || item.label === 'auth')).toBe(true);
+  });
+
+  it('learns name, projects, and approval preferences from task and approval events', () => {
+    bus.emit('task_submitted', {
+      task: {
+        description: 'Call me avery and keep responses short in markdown for the feed-the-machine app',
+      },
+    });
+    bus.emit('approval_requested', { planId: 'plan-1' });
+    bus.emit('plan_modified', { planId: 'plan-1', modifications: { steps: [] } });
+    bus.emit('plan_approved', { planId: 'plan-1' });
+
+    const ctx = blackboard.getContext();
+    expect(ctx.userProfile.preferredName).toBe('Avery');
+    expect(ctx.userProfile.preferredOutputFormats.some((item) => item.label === 'markdown')).toBe(true);
+    expect(ctx.userProfile.preferredOutputFormats.some((item) => item.label === 'concise')).toBe(true);
+    expect(ctx.userProfile.activeProjects.some((item) => item.label === 'feed-the-machine app')).toBe(true);
+    expect(ctx.userProfile.approvalPreference).toBe('hands_on');
+    expect(ctx.userProfile.approvalHistory.modifiedCount).toBe(1);
   });
 });
 

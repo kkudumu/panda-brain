@@ -5,6 +5,7 @@
 
   // Collapse state for each section
   let contextOpen = $state(false);
+  let profileOpen = $state(true);
   let decisionsOpen = $state(false);
   let constraintsOpen = $state(false);
   let historyOpen = $state(false);
@@ -63,6 +64,13 @@
   let decisions = $derived(blackboard?.recentDecisions ?? []);
   let constraints = $derived(blackboard?.activeConstraints ?? []);
   let skills = $derived(blackboard?.sessionMetadata?.skillsInvoked ?? []);
+  let profile = $derived(blackboard?.userProfile ?? null);
+  let commonTaskTypes = $derived(profile?.commonTaskTypes ?? []);
+  let workflowPatterns = $derived(profile?.workflowPatterns ?? []);
+  let topicInterests = $derived(profile?.topicInterests ?? []);
+  let modelPreferences = $derived(profile?.modelPreferences ?? []);
+  let outputPreferences = $derived(profile?.preferredOutputFormats ?? []);
+  let activeProjects = $derived(profile?.activeProjects ?? []);
 </script>
 
 <div class="memory-panel">
@@ -109,6 +117,123 @@
               <span class="context-val">{formatRelative(blackboard.sessionMetadata.startedAt)}</span>
             </div>
           {/if}
+        {/if}
+      </div>
+    {/if}
+  </div>
+
+  <!-- Learned Profile -->
+  <div class="section">
+    <button
+      class="section-toggle"
+      onclick={() => (profileOpen = !profileOpen)}
+      aria-expanded={profileOpen}
+    >
+      <span class="toggle-chevron" class:open={profileOpen}>›</span>
+      <span class="section-label">PROFILE</span>
+      {#if profile}
+        <span class="badge active">{profile.responseStyle}</span>
+      {:else}
+        <span class="badge dim">empty</span>
+      {/if}
+    </button>
+
+    {#if profileOpen}
+      <div class="section-body">
+        {#if !profile}
+          <p class="empty-note">No profile learned yet</p>
+        {:else}
+          {#if profile.preferredName}
+            <div class="context-row">
+              <span class="context-key">name</span>
+              <span class="context-val">{profile.preferredName}</span>
+            </div>
+          {/if}
+          <div class="context-row">
+            <span class="context-key">style</span>
+            <span class="context-val">{profile.responseStyle}</span>
+          </div>
+          <div class="context-row">
+            <span class="context-key">approval</span>
+            <span class="context-val">{profile.approvalPreference}</span>
+          </div>
+
+          {#if outputPreferences.length > 0}
+            <div class="profile-block">
+              <div class="profile-label">output</div>
+              <div class="tag-cloud">
+                {#each outputPreferences.slice(0, 4) as item}
+                  <span class="constraint-tag">{item.label} · {item.count}</span>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          {#if activeProjects.length > 0}
+            <div class="profile-block">
+              <div class="profile-label">projects</div>
+              <div class="tag-cloud">
+                {#each activeProjects.slice(0, 4) as item}
+                  <span class="constraint-tag">{item.label} · {item.count}</span>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          <div class="profile-block">
+            <div class="profile-label">common tasks</div>
+            {#if commonTaskTypes.length === 0}
+              <p class="empty-note">Learning in progress</p>
+            {:else}
+              <div class="tag-cloud">
+                {#each commonTaskTypes.slice(0, 4) as item}
+                  <span class="constraint-tag">{item.label} · {item.count}</span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <div class="profile-block">
+            <div class="profile-label">workflow</div>
+            {#if workflowPatterns.length === 0}
+              <p class="empty-note">No repeated workflow patterns yet</p>
+            {:else}
+              <div class="tag-cloud">
+                {#each workflowPatterns.slice(0, 4) as item}
+                  <span class="constraint-tag">{item.label} · {item.count}</span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <div class="profile-block">
+            <div class="profile-label">focus areas</div>
+            {#if topicInterests.length === 0}
+              <p class="empty-note">No topics learned yet</p>
+            {:else}
+              <div class="tag-cloud">
+                {#each topicInterests.slice(0, 4) as item}
+                  <span class="constraint-tag">{item.label} · {item.count}</span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          {#if modelPreferences.length > 0}
+            <div class="context-row">
+              <span class="context-key">models</span>
+              <span class="context-val">
+                {modelPreferences.slice(0, 3).map((item) => `${item.label} (${item.count})`).join(', ')}
+              </span>
+            </div>
+          {/if}
+
+          <div class="context-row">
+            <span class="context-key">approvals</span>
+            <span class="context-val">
+              {profile.approvalHistory.approvedCount} ok / {profile.approvalHistory.modifiedCount} modified / {profile.approvalHistory.autoApprovedCount} auto
+            </span>
+          </div>
         {/if}
       </div>
     {/if}
@@ -346,6 +471,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .profile-block {
+    margin-top: 10px;
+  }
+
+  .profile-label {
+    color: #6b6b6b;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
   }
 
   /* Decisions */

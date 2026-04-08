@@ -8,6 +8,7 @@
   let logContainer: HTMLElement | null = $state(null);
   let lines: Array<{ time: string; type: string; data: string; category: 'success' | 'error' | 'normal' }> = $state([]);
   let autoScroll = $state(true);
+  let processedEventCount = $state(0);
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -36,20 +37,25 @@
     return 'normal';
   }
 
-  // Watch events and build lines (FIFO, max 200)
+  // Append only new events to avoid effect recursion and duplicate log rows.
   $effect(() => {
     const events = $daemonState.events;
-    if (events.length === 0) return;
+    if (events.length < processedEventCount) {
+      processedEventCount = events.length;
+      lines = [];
+      return;
+    }
+    if (events.length === processedEventCount) return;
 
-    const last = events[events.length - 1];
-    const newLine = {
-      time: formatTime(last.timestamp),
-      type: last.type,
-      data: formatData(last.data),
-      category: getCategory(last.type),
-    };
+    const newLines = events.slice(processedEventCount).map((event) => ({
+      time: formatTime(event.timestamp),
+      type: event.type,
+      data: formatData(event.data),
+      category: getCategory(event.type),
+    }));
 
-    lines = [...lines, newLine].slice(-MAX_LINES);
+    processedEventCount = events.length;
+    lines = [...lines, ...newLines].slice(-MAX_LINES);
   });
 
   // Auto-scroll to bottom when new lines arrive
@@ -83,6 +89,7 @@
 
   function clearLog() {
     lines = [];
+    processedEventCount = $daemonState.events.length;
   }
 </script>
 

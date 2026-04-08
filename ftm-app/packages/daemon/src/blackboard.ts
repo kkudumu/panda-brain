@@ -1,5 +1,5 @@
 import { FtmStore } from './store.js';
-import type { Task, Experience, Playbook, BlackboardContext } from '../shared/types.js';
+import type { Task, Experience, Playbook, BlackboardContext, UserProfile } from '../shared/types.js';
 import { randomUUID } from 'crypto';
 
 // ---------------------------------------------------------------------------
@@ -9,9 +9,24 @@ const KEY_CURRENT_TASK    = 'blackboard:current_task';
 const KEY_DECISIONS       = 'blackboard:decisions';
 const KEY_CONSTRAINTS     = 'blackboard:constraints';
 const KEY_SESSION_META    = 'blackboard:session_metadata';
+const KEY_USER_PROFILE    = 'blackboard:user_profile';
 
 type Decision = { decision: string; reason: string; timestamp: number };
 type SessionMetadata = BlackboardContext['sessionMetadata'];
+type BlackboardUserProfile = BlackboardContext['userProfile'];
+
+function inferSystemPreferredName(): string | null {
+  const raw = process.env.FTM_USER_NAME ?? process.env.USER ?? process.env.USERNAME;
+  if (!raw) return null;
+
+  const token = raw
+    .split(/[.@_\s-]+/)
+    .map((part) => part.trim())
+    .find(Boolean);
+
+  if (!token) return null;
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
 
 // ---------------------------------------------------------------------------
 // Blackboard
@@ -39,6 +54,7 @@ export class Blackboard {
       recentDecisions: this.getRecentDecisions(),
       activeConstraints: this.getConstraints(),
       sessionMetadata: this.getSessionMetadata(),
+      userProfile: this.getUserProfile(),
     };
   }
 
@@ -158,6 +174,49 @@ export class Blackboard {
       skillsInvoked: [],
     };
     this.store.setContext(KEY_SESSION_META, defaults);
+    return defaults;
+  }
+
+  // -------------------------------------------------------------------------
+  // User profile
+  // -------------------------------------------------------------------------
+
+  updateUserProfile(mutator: (profile: UserProfile) => void): UserProfile {
+    const profile = this.getUserProfile();
+    const next = JSON.parse(JSON.stringify(profile)) as UserProfile;
+    mutator(next);
+    next.lastUpdated = Date.now();
+    this.store.setContext(KEY_USER_PROFILE, next);
+    return next;
+  }
+
+  getUserProfileSnapshot(): UserProfile {
+    return this.getUserProfile();
+  }
+
+  private getUserProfile(): BlackboardUserProfile {
+    const stored = this.store.getContext(KEY_USER_PROFILE) as BlackboardUserProfile | null;
+    if (stored) return stored;
+
+    const defaults: BlackboardUserProfile = {
+      lastUpdated: Date.now(),
+      preferredName: inferSystemPreferredName(),
+      responseStyle: 'collaborative',
+      preferredOutputFormats: [],
+      activeProjects: [],
+      approvalPreference: 'mixed',
+      approvalHistory: {
+        requestedCount: 0,
+        approvedCount: 0,
+        modifiedCount: 0,
+        autoApprovedCount: 0,
+      },
+      commonTaskTypes: [],
+      workflowPatterns: [],
+      topicInterests: [],
+      modelPreferences: [],
+    };
+    this.store.setContext(KEY_USER_PROFILE, defaults);
     return defaults;
   }
 }
