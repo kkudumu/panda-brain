@@ -1,0 +1,27 @@
+{
+  "name": "ftm-desktop",
+  "version": "0.1.0",
+  "description": "Feed The Machine — desktop app",
+  "type": "module",
+  "main": "out/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev --config electron-vite.config.ts",
+    "build": "electron-vite build --config electron-vite.config.ts",
+    "preview": "electron-vite preview --config electron-vite.config.ts"
+  },
+  "dependencies": {
+    "@ftm/daemon": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-vite": "^2.3.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

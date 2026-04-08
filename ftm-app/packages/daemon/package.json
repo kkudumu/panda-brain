@@ -1,0 +1,39 @@
+{
+  "name": "@ftm/daemon",
+  "version": "0.1.0",
+  "description": "FTM daemon — state store, model adapters, OODA loop, event bus",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./store": "./dist/store.js",
+    "./blackboard": "./dist/blackboard.js",
+    "./adapters": "./dist/adapters/registry.js",
+    "./router": "./dist/router.js",
+    "./ooda": "./dist/ooda.js",
+    "./event-bus": "./dist/event-bus.js",
+    "./config": "./dist/config.js",
+    "./types": "./dist/shared/types.js",
+    "./modules": "./dist/modules/index.js",
+    "./hooks": "./dist/hooks/index.js",
+    "./server": "./dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/start.ts",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/ws": "^8.5.13",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
