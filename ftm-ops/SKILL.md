@@ -13,6 +13,7 @@ type: operations
 - `stakeholder_drafted` — when a comm draft is written to disk
 - `incident_opened` — when a new incident is logged via brain.py
 - `daily_narrative_complete` — when daily or weekly rollup analysis is written
+- `activity_logged` — when an activity entry is written to the daily file via --log-activity
 
 ### Listens To
 - `task_completed` — update task state in brain.py
@@ -91,22 +92,25 @@ brain.py is at `~/.claude/skills/ftm/bin/brain.py` (configurable via `paths.brai
 python3 ~/.claude/skills/ftm/bin/brain.py --tasks --task-json      # list all tasks as JSON
 python3 ~/.claude/skills/ftm/bin/brain.py --help                   # show all commands
 
-# Capacity (added by Task 4)
+# Activity logging
+python3 ~/.claude/skills/ftm/bin/brain.py --log-activity --category <cat> --title "..." [--notes "..."] [--task-ref N]
+
+# Capacity
 python3 ~/.claude/skills/ftm/bin/brain.py --capacity-log           # log capacity entry
 
-# Stakeholders (added by Task 4)
+# Stakeholders
 python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-add        # add stakeholder
 python3 ~/.claude/skills/ftm/bin/brain.py --stakeholder-list       # list stakeholders
 
-# Incidents (added by Task 4)
+# Incidents
 python3 ~/.claude/skills/ftm/bin/brain.py --incident-add           # open incident
 python3 ~/.claude/skills/ftm/bin/brain.py --incident-list          # list incidents
 
-# Patterns (added by Task 4)
+# Patterns
 python3 ~/.claude/skills/ftm/bin/brain.py --pattern-add            # record pattern observation
 python3 ~/.claude/skills/ftm/bin/brain.py --pattern-list           # list patterns
 
-# Follow-ups (added by Task 4)
+# Follow-ups
 python3 ~/.claude/skills/ftm/bin/brain.py --followup-add           # add follow-up
 python3 ~/.claude/skills/ftm/bin/brain.py --followup-list          # list follow-ups
 ```
@@ -181,6 +185,66 @@ Read `references/daily-weekly-analysis.md` for full protocol.
 Quick reference:
 - "wrap up" / "daily summary" → narrative analysis of today's daily file
 - "weekly rollup" → summarize the week's weekly file + surface open items
+
+---
+
+## Activity Logging Protocol
+
+**brain.py tracks what you do, not just what you plan.** After every significant action during an ftm-ops session, log it via `--log-activity`. This is not optional — it's how the daily file stays current without requiring a manual "wrap up" at end of day.
+
+### When to Log
+
+Log immediately after:
+- **Handling a request** from someone (Slack, email, in-person) → `request_handled`
+- **Completing a task** or closing it → `task_completed`
+- **Updating a task** (status change, new info) → `task_updated`
+- **Drafting comms** (Slack message, email, stakeholder update) → `comms_drafted`
+- **Hitting a blocker** (permissions, waiting on someone, broken tooling) → `blocker_hit`
+- **Making a decision** (architectural choice, prioritization call, policy decision) → `decision_made`
+- **Syncing Jira** (pulling tasks, updating tickets) → `jira_sync`
+- **Logging an incident** (outage, prod issue, escalation) → `incident`
+- **Switching context** (moving between projects/systems) → `context_switch`
+
+### How to Log
+
+One CLI call per action. Keep it lightweight:
+
+```bash
+python3 ~/.claude/skills/ftm/bin/brain.py --log-activity \
+  --category request_handled \
+  --title "Granted Confluence edit access for service account" \
+  --notes "Page 12345 in TEAM space, requested by Jane D" \
+  --task-ref 36
+```
+
+- `--category` (required): One of the 9 categories above
+- `--title` (required): What happened, one line
+- `--notes` (optional): Additional context — who requested it, what system, what page
+- `--task-ref` (optional): brain.py task ID if this relates to a tracked task
+
+### What It Does
+
+1. Creates `daily/YYYY-MM-DD.md` from template if it doesn't exist
+2. Appends a timestamped entry under the correct section:
+
+| Category | Daily File Section |
+|---|---|
+| `request_handled` | Requests & Communications |
+| `task_completed` | Completed |
+| `task_updated` | Today's Focus |
+| `comms_drafted` | Requests & Communications |
+| `blocker_hit` | Blockers & Issues |
+| `decision_made` | Things to Remember |
+| `jira_sync` | Today's Focus |
+| `incident` | Blockers & Issues |
+| `context_switch` | Context Switches |
+
+3. Also writes to the `activity_log` SQLite table for queryability
+4. Returns JSON confirmation
+
+### Anti-Pattern
+
+Do NOT batch-log at end of session. Log as you go. The timestamps matter for capacity analysis and context switch tracking.
 
 ---
 

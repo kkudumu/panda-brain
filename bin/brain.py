@@ -983,6 +983,14 @@ def _cli():
     parser.add_argument("--due-date", type=str, default="",
         help="Due date for --followup-add")
 
+    # --- Activity Logging Commands ---
+    parser.add_argument("--log-activity", action="store_true",
+        help="Log an activity entry to today's daily file (requires --category, --title; optional --notes, --task-ref)")
+    parser.add_argument("--category", type=str, default="",
+        help="Activity category for --log-activity: request_handled, task_completed, task_updated, comms_drafted, blocker_hit, decision_made, jira_sync, incident, context_switch")
+    parser.add_argument("--task-ref", type=int, default=None,
+        help="Optional brain.py task ID to link activity to")
+
     args = parser.parse_args()
 
     # --- Task Management Handlers ---
@@ -1332,8 +1340,165 @@ def _cli():
             conn.close()
         return 0
 
+    # --- Activity Logging Handler ---
+    if args.log_activity:
+        return _handle_log_activity(args)
+
     parser.print_help()
     return 1
+
+
+# --- Activity Logging ---
+
+ACTIVITY_CATEGORIES = {
+    "request_handled": "Requests & Communications",
+    "task_completed": "Completed",
+    "task_updated": "Today's Focus",
+    "comms_drafted": "Requests & Communications",
+    "blocker_hit": "Blockers & Issues",
+    "decision_made": "Things to Remember",
+    "jira_sync": "Today's Focus",
+    "incident": "Blockers & Issues",
+    "context_switch": "Context Switches",
+}
+
+DAILY_TEMPLATE = """# Daily Log — {date} ({day_name})
+
+## Today's Focus
+- [ ] (populated by ftm-ops startup)
+
+## Completed
+
+## Requests & Communications
+
+## Context Switches
+
+## Blockers & Issues
+
+## Things to Remember
+"""
+
+
+def _ensure_daily_file(daily_dir: Path, today: str) -> Path:
+    """Create today's daily file from template if it doesn't exist."""
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    filepath = daily_dir / f"{today}.md"
+    if not filepath.exists() or filepath.stat().st_size <= len(f"# Daily Log — {today}\n") + 5:
+        day_name = date.fromisoformat(today).strftime("%A")
+        filepath.write_text(DAILY_TEMPLATE.format(date=today, day_name=day_name))
+    return filepath
+
+
+def _append_to_section(filepath: Path, section: str, entry: str):
+    """Append an entry under the matching ## section in a daily file."""
+    content = filepath.read_text()
+    lines = content.split("\n")
+
+    # Find the target section
+    target_idx = None
+    for i, line in enumerate(lines):
+        if line.strip() == f"## {section}":
+            target_idx = i
+            break
+
+    if target_idx is None:
+        # Section doesn't exist — append it at the end
+        lines.append(f"\n## {section}")
+        lines.append(entry)
+    else:
+        # Find the next section (or end of file) and insert before it
+        insert_idx = target_idx + 1
+        for j in range(target_idx + 1, len(lines)):
+            if lines[j].startswith("## "):
+                insert_idx = j
+                break
+            insert_idx = j + 1
+
+        # Insert entry before the next section (with a blank line if needed)
+        # Walk back past trailing blank lines to insert tightly
+        while insert_idx > target_idx + 1 and lines[insert_idx - 1].strip() == "":
+            insert_idx -= 1
+
+        lines.insert(insert_idx, entry)
+
+    filepath.write_text("\n".join(lines))
+
+
+def _handle_log_activity(args) -> int:
+    """Handle --log-activity: append timestamped entry to today's daily file."""
+    valid_categories = set(ACTIVITY_CATEGORIES.keys())
+
+    if not args.category:
+        print(json.dumps({"error": "--category is required for --log-activity", "code": "MISSING_CATEGORY"}))
+        return 1
+    if args.category not in valid_categories:
+        print(json.dumps({"error": f"Invalid category '{args.category}'. Valid: {sorted(valid_categories)}", "code": "INVALID_CATEGORY"}))
+        return 1
+    if not args.title:
+        print(json.dumps({"error": "--title is required for --log-activity", "code": "MISSING_TITLE"}))
+        return 1
+
+    today = date.today().isoformat()
+    now_time = datetime.now().strftime("%H:%M")
+    section = ACTIVITY_CATEGORIES[args.category]
+
+    # Build the entry line
+    task_ref = f" (task #{args.task_ref})" if args.task_ref else ""
+    notes_part = f" — {args.notes}" if args.notes else ""
+    entry = f"- [{now_time}] {args.title}{task_ref}{notes_part}"
+
+    # For task_completed, use checkbox format
+    if args.category == "task_completed":
+        entry = f"- [x] [{now_time}] {args.title}{task_ref}{notes_part}"
+
+    # Ensure daily file exists and append
+    filepath = _ensure_daily_file(DAILY_DIR, today)
+    _append_to_section(filepath, section, entry)
+
+    # Also log to SQLite activity_log table for queryability
+    _ensure_activity_log_schema()
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.execute(
+            """INSERT INTO activity_log (date, time, category, title, notes, task_ref)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [today, now_time, args.category, args.title, args.notes or "", args.task_ref],
+        )
+        conn.commit()
+        row_id = cur.lastrowid
+    finally:
+        conn.close()
+
+    print(json.dumps({
+        "id": row_id,
+        "logged": True,
+        "file": str(filepath),
+        "section": section,
+        "category": args.category,
+        "title": args.title,
+    }))
+    return 0
+
+
+def _ensure_activity_log_schema():
+    """Create activity_log table if it doesn't exist."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY,
+                date TEXT,
+                time TEXT,
+                category TEXT,
+                title TEXT,
+                notes TEXT,
+                task_ref INTEGER,
+                created_at TEXT DEFAULT (datetime('now'))
+            )"""
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
