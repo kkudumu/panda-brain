@@ -22,6 +22,267 @@ Think of it like this: regular AI is a blank whiteboard every time you walk into
 
 ---
 
+## How It Works — Full Visual Flow
+
+### 1. High-level: what FTM does
+
+```mermaid
+flowchart LR
+    U["User"]
+    CC["Claude Code<br/>(host)"]
+    FTM["FTM Skill Pack<br/>26 skills + 16 hooks"]
+    BB[("Blackboard<br/>~/.claude/ftm-state/<br/>context · experiences · patterns")]
+    Council{{"Multi-AI Council<br/>Claude · Codex · Gemini"}}
+    Work["Real Work<br/>code · tests · docs · browser · git"]
+
+    U -->|"paste ticket / idea / bug"| CC
+    CC -->|"/ftm · /ftm-debug · /ftm-brainstorm ..."| FTM
+    FTM <-->|"load + write memory"| BB
+    FTM -->|"hard decisions"| Council
+    Council --> FTM
+    FTM -->|"approved plan"| Work
+    Work -->|"result + learnings"| BB
+    Work --> U
+```
+
+FTM turns Claude Code from a stateless chatbot into an assistant that **remembers across conversations, plans before acting, and runs whole workflows** — not single steps.
+
+### 2. Request flow: the OODA loop
+
+Every `/ftm` request enters `ftm-mind`, which runs an Observe-Orient-Decide-Act loop before touching code.
+
+```mermaid
+flowchart TD
+    Start(["User input"]) --> Observe
+
+    subgraph OODA["ftm-mind · OODA loop"]
+        Observe["Observe<br/>• capture request<br/>• detect task shape<br/>• load session state<br/>• snapshot git"]
+        Orient["Orient<br/>• load blackboard<br/>  (experiences + patterns)<br/>• size complexity<br/>• check manifest + MCPs<br/>• check approval gates"]
+        Decide{"Decide<br/>mode?"}
+        Observe --> Orient --> Decide
+    end
+
+    Decide -->|"micro"| Direct["Direct action<br/>no plan"]
+    Decide -->|"small"| DirectV["Direct + verify"]
+    Decide -->|"medium"| ShortPlan["Short plan → execute"]
+    Decide -->|"large"| Route["Route to specialist skill"]
+
+    Route --> Brainstorm["ftm-brainstorm<br/>(plan)"]
+    Route --> Executor["ftm-executor<br/>(parallel agents<br/>in worktrees)"]
+    Route --> Debug["ftm-debug<br/>(war room)"]
+    Route --> Council["ftm-council<br/>(3-AI debate)"]
+
+    Direct --> Act
+    DirectV --> Act
+    ShortPlan --> Act
+    Brainstorm --> Act
+    Executor --> Act
+    Debug --> Act
+    Council --> Act
+
+    Act["Act<br/>• do the work<br/>• update blackboard<br/>• emit events"] -->|"new info"| Observe
+    Act -->|"complete"| Done(["Answer + stop"])
+```
+
+**Escalation rule (ADaPT):** try the smaller tier first. Only escalate if it fails, the user asks for more, or the task is obviously big from the start.
+
+### 3. Skill layer: what each skill does
+
+```mermaid
+flowchart TB
+    subgraph Core["Core"]
+        Mind["ftm-mind<br/>brain · routes everything"]
+        Exec["ftm-executor<br/>hands · parallel agents"]
+        Ops["ftm-ops<br/>tasks · capacity · comms"]
+        Cfg["ftm-config<br/>model profiles"]
+    end
+
+    subgraph Think["Thinking & Research"]
+        Brain["ftm-brainstorm"]
+        Res["ftm-researcher"]
+        Coun["ftm-council"]
+        Chat["ftm-council-chat"]
+    end
+
+    subgraph Build["Building & Debugging"]
+        Dbg["ftm-debug"]
+        Aud["ftm-audit"]
+        Gate["ftm-codex-gate"]
+        Br["ftm-browse"]
+        Git["ftm-git<br/>(secret scan)"]
+    end
+
+    subgraph Know["Codebase Intelligence"]
+        Map["ftm-map<br/>(code graph)"]
+        Int["ftm-intent<br/>(living docs)"]
+        Diag["ftm-diagram<br/>(auto mermaid)"]
+    end
+
+    subgraph Quality["Quality & Learning"]
+        Ver["ftm-verify<br/>(dual-model audit)"]
+        Retro["ftm-retro"]
+        Cap["ftm-capture"]
+        Dash["ftm-dashboard"]
+    end
+
+    subgraph Session["Workflow & Session"]
+        Rou["ftm-routine"]
+        Pause["ftm-pause / resume"]
+        Up["ftm-upgrade"]
+    end
+
+    Mind --> Think
+    Mind --> Build
+    Mind --> Know
+    Mind --> Quality
+    Mind --> Session
+    Mind --> Exec
+    Exec -->|"after each commit"| Int
+    Exec -->|"after each commit"| Diag
+    Exec -->|"when stuck"| Coun
+    Exec -->|"validation"| Gate
+    Exec -->|"post-exec"| Ver
+```
+
+### 4. Memory: how it gets smarter
+
+```mermaid
+flowchart LR
+    Task["Task happens"] --> Learn["learning-capture hook"]
+    Learn --> Exp["Experience<br/>(single event)"]
+    Exp -->|"seen 3+ times<br/>with same outcome"| Pat["Pattern<br/>(promoted rule)"]
+
+    subgraph Blackboard["Blackboard · persistent across sessions"]
+        Ctx["Context<br/>current work,<br/>recent decisions"]
+        Exp
+        Pat
+    end
+
+    Ctx -.->|"feeds"| Next["Next ftm-mind<br/>Orient phase"]
+    Exp -.->|"feeds"| Next
+    Pat -.->|"feeds"| Next
+```
+
+**Cold start is fine.** First 10–20 sessions build context fast. By session 20+, FTM knows your stack, conventions, and which plans you push back on.
+
+### 5. Automation hooks: things that run without you asking
+
+```mermaid
+flowchart LR
+    subgraph Triggers["Claude Code events"]
+        Tool["tool use"]
+        Edit["file edit"]
+        Commit["git commit"]
+        SessionEnd["session end"]
+        Compact["pre-compaction"]
+        Send["Slack/Gmail send"]
+        Start["session start"]
+    end
+
+    subgraph Hooks["FTM hooks (16)"]
+        EL["event-logger"]
+        LC["learning-capture"]
+        PG["plan-gate"]
+        PCT["post-commit-trigger"]
+        PS["pre/post-compaction"]
+        DG["drafts-gate"]
+        SS["session-snapshot"]
+        BE["blackboard-enforcer"]
+        TL["task-loader"]
+    end
+
+    Tool --> EL
+    Edit --> LC
+    Edit --> PG
+    Commit --> PCT
+    PCT --> MapSync
+    PCT --> IntSync
+    PCT --> DiagSync
+    Compact --> PS
+    Send --> DG
+    SessionEnd --> SS
+    SessionEnd --> BE
+    Start --> TL
+
+    MapSync["ftm-map sync"]
+    IntSync["intent docs update"]
+    DiagSync["diagram update"]
+```
+
+### 6. Standalone app: daemon + desktop
+
+FTM also ships as a standalone runtime that orchestrates Claude, Codex, Gemini, and Ollama as interchangeable backends.
+
+```mermaid
+flowchart TB
+    subgraph UIs["Clients"]
+        Electron["Electron App<br/>(Svelte 5)"]
+        CLI["@ftm/cli<br/>terminal"]
+        MCP["@ftm/mcp<br/>MCP server"]
+    end
+
+    subgraph Daemon["@ftm/daemon · port 4040"]
+        Server["WebSocket server"]
+        OODA2["OODA loop"]
+        Modules["Modules<br/>council · executor<br/>debug · verify"]
+        Adapters["Model adapters<br/>claude · codex<br/>gemini · ollama"]
+        Store[("SQLite store")]
+        BB2[("Blackboard")]
+        EventBus["Event bus"]
+    end
+
+    Electron <-->|"WebSocket"| Server
+    CLI <-->|"WebSocket"| Server
+    MCP <-->|"shared SQLite"| Store
+
+    Server --> OODA2
+    OODA2 --> Modules
+    Modules --> Adapters
+    Adapters -->|"spawn"| External
+    OODA2 <--> BB2
+    OODA2 <--> Store
+    Modules --> EventBus
+    EventBus --> Server
+
+    subgraph External["External AI CLIs"]
+        C1["claude"]
+        C2["codex"]
+        C3["gemini"]
+        C4["ollama"]
+    end
+```
+
+### 7. End-to-end example: "triage this Jira ticket"
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant CC as Claude Code
+    participant Mind as ftm-mind
+    participant BB as Blackboard
+    participant Res as ftm-researcher
+    participant Exec as ftm-executor
+    participant Ver as ftm-verify
+
+    U->>CC: /ftm <jira-url>
+    CC->>Mind: route request
+    Mind->>BB: load context + experiences
+    BB-->>Mind: "seen similar ticket 2 weeks ago"
+    Mind->>Res: gather context (Jira, Slack, code)
+    Res-->>Mind: synthesized facts
+    Mind-->>U: plan (code + tests + docs)
+    U->>Mind: approve
+    Mind->>Exec: run plan
+    Exec->>Exec: parallel agents in worktrees
+    Exec-->>Mind: done
+    Mind->>Ver: dual-model audit
+    Ver-->>Mind: clean · auto-fixed 1 issue
+    Mind->>BB: write experience + update patterns
+    Mind-->>U: summary + links
+```
+
+---
+
 ## Install
 
 **Everything** (26 skills + 15 hooks):
