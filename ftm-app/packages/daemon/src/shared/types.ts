@@ -8,6 +8,103 @@ export interface Session {
   status: SessionStatus;
 }
 
+export interface Workspace {
+  id: string;
+  rootPath: string;
+  name: string;
+  createdAt: number;
+  lastUpdated: number;
+}
+
+export type TaskLaneStatus = 'active' | 'paused' | 'completed' | 'archived';
+
+export interface TaskLane {
+  id: string;
+  workspaceId: string;
+  title: string;
+  status: TaskLaneStatus;
+  createdAt: number;
+  lastUpdated: number;
+  activeSummaryId?: string;
+}
+
+export type WorkspaceMessageRole = 'user' | 'assistant' | 'system' | 'tool';
+
+export interface WorkspaceMessage {
+  id: string;
+  workspaceId: string;
+  laneId?: string;
+  sessionId: string;
+  role: WorkspaceMessageRole;
+  kind: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  createdAt: number;
+  summaryId?: string;
+}
+
+export interface WorkspaceArtifact {
+  id: string;
+  workspaceId: string;
+  laneId?: string;
+  messageId?: string;
+  type: string;
+  title?: string;
+  path?: string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: number;
+}
+
+export interface WorkspaceState {
+  workspaceId: string;
+  activeTaskId?: string;
+  activeLaneId?: string;
+  decisions: Array<{ decision: string; reason: string; timestamp: number }>;
+  constraints: string[];
+  goals: string[];
+  openQuestions: string[];
+  handoffNotes: string[];
+  updatedAt: number;
+}
+
+export type SummaryKind = 'workspace' | 'lane' | 'session' | 'handoff' | 'task';
+
+export interface SummaryRecord {
+  id: string;
+  workspaceId: string;
+  laneId?: string;
+  modelSessionId?: string;
+  kind: SummaryKind;
+  content: string;
+  sourceMessageCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ModelSessionHandle {
+  id: string;
+  workspaceId: string;
+  laneId?: string;
+  modelName: string;
+  sessionId: string;
+  lastUsed: number;
+  archived: boolean;
+}
+
+export interface RetrievalHit {
+  sourceType: 'message' | 'artifact' | 'summary';
+  sourceId: string;
+  workspaceId: string;
+  laneId?: string;
+  text: string;
+  tags: string[];
+  filePaths: string[];
+  issueKeys: string[];
+  importance: number;
+  createdAt: number;
+}
+
 // Playbook — reusable automation recipe triggered by keyword/pattern
 export interface Playbook {
   id: string;
@@ -101,6 +198,9 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'c
 export interface Task {
   id: string;
   description: string;
+  workingDir?: string;
+  workspaceId?: string;
+  laneId?: string;
   status: TaskStatus;
   createdAt: number;
   updatedAt: number;
@@ -114,6 +214,7 @@ export interface PlanStep {
   description: string;
   status: TaskStatus;
   model?: string;
+  skill?: string;
   requiresApproval?: boolean;
   files?: string[];
 }
@@ -121,6 +222,7 @@ export interface PlanStep {
 export interface Plan {
   id: string;
   taskId: string;
+  laneId?: string;
   steps: PlanStep[];
   status: 'pending' | 'approved' | 'executing' | 'completed' | 'failed';
   currentStep: number;
@@ -155,6 +257,13 @@ export interface UserProfile {
 
 export interface BlackboardContext {
   currentTask: Task | null;
+  currentWorkspace: Workspace | null;
+  currentLane: TaskLane | null;
+  workspaceState: WorkspaceState | null;
+  laneSummary: SummaryRecord | null;
+  workspaceSummary: SummaryRecord | null;
+  activeModelSessions: ModelSessionHandle[];
+  retrievalContext: RetrievalHit[];
   recentDecisions: Array<{ decision: string; reason: string; timestamp: number }>;
   activeConstraints: string[];
   sessionMetadata: {

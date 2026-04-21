@@ -1,5 +1,9 @@
 <script lang="ts">
   import { submitTask, isConnected } from '../lib/daemon-client.js';
+  import {
+    workingDirectory,
+    setWorkingDirectory,
+  } from '../lib/working-directory.js';
 
   // State
   let value = $state('');
@@ -10,6 +14,27 @@
   let statusMsg = $state('');
   let statusTimer: ReturnType<typeof setTimeout> | null = null;
   let textarea: HTMLTextAreaElement | null = $state(null);
+  // Derived short label for the cwd pill
+  let cwdLabel = $derived(
+    $workingDirectory
+      ? $workingDirectory.split('/').filter(Boolean).slice(-2).join('/')
+      : null
+  );
+
+  async function pickFolder() {
+    const ftm = (
+      window as unknown as {
+        ftm?: { openFolder?: () => Promise<string | null> };
+      }
+    ).ftm;
+    if (!ftm?.openFolder) return;
+    const chosen = await ftm.openFolder();
+    if (chosen) setWorkingDirectory(chosen);
+  }
+
+  function clearDir() {
+    setWorkingDirectory(null);
+  }
 
   // Auto-resize textarea
   function resize() {
@@ -36,7 +61,7 @@
     isSubmitting = true;
 
     try {
-      await submitTask(text);
+      await submitTask(text, $workingDirectory ?? undefined);
       history = [text, ...history.slice(0, 49)];
       historyIndex = -1;
       value = '';
@@ -169,6 +194,16 @@
     ></textarea>
 
     <button
+      class="folder-btn"
+      onclick={pickFolder}
+      title="Choose working directory"
+      aria-label="Choose working directory"
+    >
+      <span class="folder-icon">⌂</span>
+      <span class="folder-label">Browse</span>
+    </button>
+
+    <button
       class="submit-btn"
       disabled={!$isConnected || !value.trim() || isSubmitting}
       onclick={handleSubmit}
@@ -185,7 +220,16 @@
     {:else if !$isConnected}
       <span class="status-msg disconnected">Daemon offline</span>
     {:else}
-      <span class="hint">Enter to submit · Shift+Enter for newline · ↑↓ for history</span>
+      <div class="meta-row">
+        <span class="hint">Enter to submit · Shift+Enter for newline · ↑↓ for history</span>
+        {#if cwdLabel}
+          <button class="cwd-pill" onclick={clearDir} title="Clear working directory: {$workingDirectory}">
+            <span class="cwd-icon">⌂</span>
+            <span class="cwd-text">{cwdLabel}</span>
+            <span class="cwd-clear">×</span>
+          </button>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>
@@ -265,6 +309,48 @@
     cursor: not-allowed;
   }
 
+  .folder-btn {
+    flex-shrink: 0;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    min-width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease;
+    padding: 0 8px;
+  }
+
+  .folder-btn:hover {
+    background: #222;
+    border-color: #444;
+  }
+
+  .folder-icon {
+    color: #666;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .folder-label {
+    color: #777;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .folder-btn:hover .folder-icon {
+    color: #aaa;
+  }
+
+  .folder-btn:hover .folder-label {
+    color: #bbb;
+  }
+
   .submit-btn {
     flex-shrink: 0;
     background: #00ff88;
@@ -305,10 +391,63 @@
     min-height: 16px;
   }
 
+  .meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   .hint {
     color: #333;
     font-size: 11px;
     user-select: none;
+  }
+
+  .cwd-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    padding: 2px 7px 2px 6px;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease;
+    max-width: 220px;
+    overflow: hidden;
+  }
+
+  .cwd-pill:hover {
+    border-color: #ff444466;
+    background: #1e1414;
+  }
+
+  .cwd-icon {
+    color: #00ff8888;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .cwd-text {
+    color: #00ff88aa;
+    font-size: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.03em;
+  }
+
+  .cwd-clear {
+    color: #444;
+    font-size: 12px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .cwd-pill:hover .cwd-clear {
+    color: #ff4444;
   }
 
   .status-msg {
@@ -328,5 +467,11 @@
   @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
+  }
+
+  @media (max-width: 640px) {
+    .folder-label {
+      display: none;
+    }
   }
 </style>

@@ -34,7 +34,15 @@ export class ClaudeAdapter extends BaseAdapter {
   }
 
   async startSession(prompt: string, opts?: SessionOpts): Promise<NormalizedResponse> {
-    const args = ['-p', prompt, '--output-format', 'json'];
+    const args = [
+      '-p',
+      prompt,
+      '--output-format',
+      'json',
+      '--dangerously-skip-permissions',
+      '--permission-mode',
+      'bypassPermissions',
+    ];
     if (opts?.model) args.push('--model', opts.model);
     if (opts?.maxTokens) args.push('--max-tokens', String(opts.maxTokens));
     if (opts?.systemPrompt) args.push('--system-prompt', opts.systemPrompt);
@@ -51,7 +59,17 @@ export class ClaudeAdapter extends BaseAdapter {
   }
 
   async resumeSession(sessionId: string, prompt: string): Promise<NormalizedResponse> {
-    const args = ['-p', prompt, '--output-format', 'json', '--resume', sessionId];
+    const args = [
+      '-p',
+      prompt,
+      '--output-format',
+      'json',
+      '--resume',
+      sessionId,
+      '--dangerously-skip-permissions',
+      '--permission-mode',
+      'bypassPermissions',
+    ];
     const result = await this.spawnCli('claude', args);
 
     if (result.exitCode !== 0 && result.stdout.trim() === '') {

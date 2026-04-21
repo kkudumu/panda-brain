@@ -78,7 +78,11 @@ export class CouncilModule implements FtmModule {
     const rounds: CouncilRound[] = [];
 
     for (let round = 1; round <= this.maxRounds; round++) {
-      const positions = await this.pollModels(prompt, context.task.sessionId);
+      const positions = await this.pollModels(
+        prompt,
+        context.task.sessionId,
+        context.task.workingDir,
+      );
 
       const councilRound = this.evaluatePositions(round, positions);
       rounds.push(councilRound);
@@ -134,6 +138,7 @@ export class CouncilModule implements FtmModule {
   private async pollModels(
     prompt: string,
     sessionId: string,
+    workingDir?: string,
   ): Promise<CouncilPosition[]> {
     const roleMap: Array<{ model: string; role: 'planning' | 'execution' | 'review' }> = [
       { model: 'claude', role: 'planning' },
@@ -153,7 +158,11 @@ export class CouncilModule implements FtmModule {
 
         const response: NormalizedResponse = await adapter.startSession(
           `Council deliberation question:\n\n${prompt}\n\nProvide your analysis and recommendation.`,
-          { systemPrompt: `You are participating in a multi-model council. Give your honest, independent assessment.` },
+          {
+            systemPrompt:
+              'You are participating in a multi-model council. Give your honest, independent assessment.',
+            workingDir,
+          },
         );
 
         return {

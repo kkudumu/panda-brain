@@ -35,3 +35,11 @@ evals/results/
 ftm-browse/user-data/
 ~/.ftm-browse/user-data/
 .personal-patterns
+
+# ftm-app build artifacts
+ftm-app/packages/daemon/dist/
+ftm-app/packages/electron/out/renderer/
+ftm-app/**/tsconfig.tsbuildinfo
+
+# Playwright MCP artifacts
+.playwright-mcp/

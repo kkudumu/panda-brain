@@ -47,7 +47,7 @@ export class GeminiAdapter extends BaseAdapter {
   }
 
   async startSession(prompt: string, opts?: SessionOpts): Promise<NormalizedResponse> {
-    const args = ['-p', prompt, '--output-format', 'json'];
+    const args = ['-p', prompt, '--output-format', 'json', '--yolo'];
     if (opts?.model) args.push('--model', opts.model);
 
     const result = await this.spawnCli('gemini', args, { cwd: opts?.workingDir });
@@ -63,7 +63,7 @@ export class GeminiAdapter extends BaseAdapter {
 
   async resumeSession(sessionId: string, prompt: string): Promise<NormalizedResponse> {
     // Gemini uses --resume with an index or session identifier
-    const args = ['-p', prompt, '--output-format', 'json', '--resume', sessionId];
+    const args = ['-p', prompt, '--output-format', 'json', '--resume', sessionId, '--yolo'];
     const result = await this.spawnCli('gemini', args);
 
     if (result.exitCode !== 0 && result.stdout.trim() === '') {

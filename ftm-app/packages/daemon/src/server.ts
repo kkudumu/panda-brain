@@ -1,10 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { WsMessage, WsResponse, FtmEvent, Task, MachineState } from './shared/types.js';
+import type { WsMessage, WsResponse, FtmEvent, Task, MachineState, Plan } from './shared/types.js';
 import { FtmEventBus } from './event-bus.js';
 import { OodaLoop } from './ooda.js';
 import { FtmStore } from './store.js';
 import { Blackboard } from './blackboard.js';
 import { synthesizeUserContext } from './profile-context.js';
+import path from 'node:path';
 
 export class FtmServer {
   private wss: WebSocketServer | null = null;
@@ -78,15 +79,50 @@ export class FtmServer {
     switch (msg.type) {
       case 'submit_task': {
         const now = Date.now();
+        const workingDir =
+          typeof msg.payload.workingDir === 'string'
+            ? msg.payload.workingDir
+            : process.cwd();
+        const workspace = this.blackboard.ensureWorkspace(
+          workingDir,
+          path.basename(workingDir) || 'workspace',
+        );
+        const lane = this.blackboard.createTaskLane(
+          workspace.id,
+          this.deriveLaneTitle(msg.payload.description as string),
+        );
         const task: Task = {
           id: `task-${now}-${++this.taskCounter}`,
           description: msg.payload.description as string,
+          workingDir,
+          workspaceId: workspace.id,
+          laneId: lane.id,
           status: 'pending',
           createdAt: now,
           updatedAt: now,
           sessionId: this.sessionId,
         };
         this.store.createTask(task);
+        this.blackboard.recordWorkspaceMessage({
+          workspaceId: workspace.id,
+          laneId: lane.id,
+          sessionId: this.sessionId,
+          role: 'user',
+          kind: 'task_submission',
+          content: task.description,
+          metadata: { taskId: task.id },
+        });
+        this.blackboard.saveRetrievalHit({
+          sourceType: 'message',
+          sourceId: task.id,
+          workspaceId: workspace.id,
+          laneId: lane.id,
+          text: task.description,
+          tags: ['task', 'user'],
+          filePaths: [workingDir],
+          issueKeys: this.extractIssueKeys(task.description),
+          importance: 1,
+        });
         this.eventBus.emitTyped('task_submitted', { task });
 
         // Process task asynchronously
@@ -96,7 +132,7 @@ export class FtmServer {
           type: 'task_submitted',
           id: msg.id,
           success: true,
-          payload: { taskId: task.id },
+          payload: { taskId: task.id, workspaceId: workspace.id, laneId: lane.id },
         });
         break;
       }
@@ -201,11 +237,20 @@ export class FtmServer {
   // Forward all event bus events to connected WebSocket clients
   private setupEventForwarding(): void {
     this.eventBus.on('*', (event: FtmEvent) => {
+      const normalizedEvent = this.normalizeEvent(event);
+      if (normalizedEvent.type === 'plan_generated' && normalizedEvent.data.plan) {
+        this.store.savePlan(normalizedEvent.data.plan as Plan);
+      }
+      if (normalizedEvent.type === 'plan_approved' && typeof normalizedEvent.data.planId === 'string') {
+        this.store.updatePlan(normalizedEvent.data.planId as string, { status: 'approved' });
+      }
+      this.store.logEvent(normalizedEvent);
+      this.captureWorkspaceEvent(normalizedEvent);
       this.broadcast({
         type: 'event',
         id: `evt-${Date.now()}`,
         success: true,
-        payload: { event },
+        payload: { event: normalizedEvent },
       });
     });
 
@@ -258,9 +303,70 @@ export class FtmServer {
       currentPlan: this.ooda.getCurrentPlan(),
       phase: this.ooda.getPhase(),
       blackboard: this.blackboard.getContext(),
+      recentWorkspaces: this.store.getRecentWorkspaces(10),
       profileContext,
       connectedClients: this.clients.size,
     };
+  }
+
+  private deriveLaneTitle(description: string): string {
+    const normalized = description.replace(/\s+/g, ' ').trim();
+    if (!normalized) return 'Untitled task lane';
+    return normalized.length > 96 ? `${normalized.slice(0, 93)}...` : normalized;
+  }
+
+  private extractIssueKeys(text: string): string[] {
+    return Array.from(new Set(text.match(/[A-Z][A-Z0-9]+-\d+/g) ?? []));
+  }
+
+  private normalizeEvent(event: FtmEvent): FtmEvent {
+    const typedEvent = event.data._eventType;
+    if (typeof typedEvent !== 'string' || typedEvent.length === 0) {
+      return event;
+    }
+
+    const { _eventType: _ignored, ...data } = event.data;
+    return {
+      ...event,
+      type: typedEvent,
+      data,
+    };
+  }
+
+  private captureWorkspaceEvent(event: FtmEvent): void {
+    const taskId = typeof event.data.taskId === 'string' ? event.data.taskId : undefined;
+    const task = taskId ? this.store.getTask(taskId) : this.ooda.getCurrentTask();
+    const workspaceId = task?.workspaceId;
+    const laneId = task?.laneId;
+    if (!workspaceId) return;
+
+    const content = JSON.stringify({ type: event.type, data: event.data });
+    this.blackboard.recordWorkspaceMessage({
+      workspaceId,
+      laneId,
+      sessionId: event.sessionId,
+      role: event.type === 'error' ? 'system' : 'assistant',
+      kind: event.type,
+      content,
+      metadata: event.data,
+      createdAt: event.timestamp,
+    });
+
+    if (event.type === 'task_completed') {
+      const output =
+        typeof event.data.result === 'string'
+          ? event.data.result
+          : typeof (event.data.result as { output?: string } | undefined)?.output === 'string'
+            ? ((event.data.result as { output?: string }).output ?? '')
+            : '';
+      this.blackboard.saveSummary({
+        workspaceId,
+        laneId,
+        kind: 'task',
+        content: output || 'Task completed.',
+        sourceMessageCount: 1,
+      });
+    }
   }
 
   // Graceful shutdown

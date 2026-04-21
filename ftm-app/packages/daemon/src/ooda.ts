@@ -11,6 +11,10 @@ import { FtmEventBus } from './event-bus.js';
 import { Blackboard } from './blackboard.js';
 import { ModelRouter } from './router.js';
 import { synthesizeUserContext } from './profile-context.js';
+import { PlannerModule } from './modules/planner.js';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import type { ModelAdapter, NormalizedResponse, SessionOpts } from './shared/types.js';
 
 type OodaPhase = 'idle' | 'observe' | 'orient' | 'decide' | 'act' | 'complete' | 'error';
 
@@ -18,6 +22,24 @@ interface OrientResult {
   complexity: 'micro' | 'small' | 'medium' | 'large' | 'xl';
   matchedModules: FtmModule[];
   guardFlags: string[];
+}
+
+interface ParsedIssueContext {
+  issueKey?: string;
+  title?: string;
+  description?: string;
+  acceptanceCriteria: string[];
+}
+
+interface AgenticPlanPayload {
+  selected_skill?: string;
+  requires_approval?: boolean;
+  steps?: Array<{
+    description?: string;
+    requiresApproval?: boolean;
+    requires_approval?: boolean;
+    skill?: string;
+  }>;
 }
 
 /**
@@ -70,14 +92,6 @@ export class OodaLoop {
     this.blackboard.setCurrentTask(task);
 
     try {
-      if (this.isDirectReplyTask(task.description)) {
-        return this.completeDirectReply(task);
-      }
-
-      if (this.isQuickReplyTask(task.description)) {
-        return await this.completeQuickReply(task);
-      }
-
       // ── OBSERVE ────────────────────────────────────────────────────────────
       this.setPhase('observe');
       const context = await this.observe(task);
@@ -118,6 +132,10 @@ export class OodaLoop {
       this.currentTask = null;
       this.currentPlan = null;
     }
+  }
+
+  private getTaskWorkingDir(task: Task): string {
+    return task.workingDir ?? process.cwd();
   }
 
   // ---------------------------------------------------------------------------
@@ -183,55 +201,505 @@ export class OodaLoop {
    * LLM-powered decomposition will replace this heuristic once adapters are live.
    */
   private async decide(task: Task, analysis: OrientResult): Promise<Plan> {
-    const steps: PlanStep[] = this.buildSteps(task, analysis);
+    const planner = this.getPlannerModule(analysis);
+    const basePlan =
+      (await this.buildModelFirstPlan(task, analysis)) ??
+      (planner
+        ? planner.decompose(task.description, task.id).plan
+        : this.buildFallbackPlan(task.id, this.normalizeTaskDescription(task.description)));
+
+    const steps: PlanStep[] = this.prependGuardSteps(basePlan.steps, analysis.guardFlags);
 
     const plan: Plan = {
-      id: `plan-${Date.now()}`,
+      ...basePlan,
       taskId: task.id,
+      laneId: task.laneId ?? basePlan.laneId,
       steps,
       status: 'pending',
       currentStep: 0,
-      createdAt: Date.now(),
     };
 
     this.eventBus.emitTyped('plan_generated', { taskId: task.id, plan });
     return plan;
   }
 
+  private async buildModelFirstPlan(task: Task, analysis: OrientResult): Promise<Plan | null> {
+    try {
+      const adapter = await this.router.route('planning');
+      const response = await this.runWithPersistentSession(
+        adapter,
+        this.buildPlanningPrompt(task.description, analysis),
+        {
+          workingDir: this.getTaskWorkingDir(task),
+          systemPrompt: [
+            'You are the planning layer for Feed The Machine.',
+            'Read the raw user input directly and infer intent from it.',
+            'Ignore page chrome, accessibility navigation, and repeated UI labels when they are not relevant to the actual task.',
+            'Return only valid JSON.',
+          ].join(' '),
+          temperature: 0.2,
+        },
+      );
+
+      return this.parseModelPlan(task.id, response.text);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Builds plan steps from the task and orient analysis.
    * Guard flags get prepended as validation steps; the main task follows.
    */
-  private buildSteps(task: Task, analysis: OrientResult): PlanStep[] {
-    const steps: PlanStep[] = [];
+  private prependGuardSteps(steps: PlanStep[], guardFlags: string[]): PlanStep[] {
+    const guardedSteps: PlanStep[] = [];
+
+    const pushGuardStep = (description: string) => {
+      guardedSteps.push({
+        index: guardedSteps.length,
+        description,
+        status: 'pending',
+        requiresApproval: true,
+      });
+    };
 
     // Add a confirmation step for each guard flag so the executor can pause
-    if (analysis.guardFlags.includes('destructive_operation')) {
-      steps.push({
-        index: steps.length,
-        description: 'Confirm: destructive operation detected — verify intent before proceeding',
-        status: 'pending',
-        requiresApproval: true,
-      });
+    if (guardFlags.includes('destructive_operation')) {
+      pushGuardStep('Confirm: destructive operation detected — verify intent before proceeding');
     }
 
-    if (analysis.guardFlags.includes('production_target')) {
-      steps.push({
-        index: steps.length,
-        description: 'Confirm: task targets a production system — proceed with caution',
-        status: 'pending',
-        requiresApproval: true,
-      });
+    if (guardFlags.includes('production_target')) {
+      pushGuardStep('Confirm: task targets a production system — proceed with caution');
     }
 
-    // Main execution step
-    steps.push({
-      index: steps.length,
-      description: task.description,
+    return [
+      ...guardedSteps,
+      ...steps.map((step, index) => ({
+        ...step,
+        index: guardedSteps.length + index,
+      })),
+    ];
+  }
+
+  private buildFallbackPlan(taskId: string, description: string): Plan {
+    return {
+      id: `plan-${Date.now()}`,
+      taskId,
+      laneId: this.currentTask?.laneId,
+      steps: [
+        {
+          index: 0,
+          description,
+          status: 'pending',
+        },
+      ],
       status: 'pending',
-    });
+      currentStep: 0,
+      createdAt: Date.now(),
+    };
+  }
 
-    return steps;
+  private getPlannerModule(analysis: OrientResult): PlannerModule | null {
+    return (
+      analysis.matchedModules.find(
+        (module): module is PlannerModule => module instanceof PlannerModule,
+      ) ?? null
+    );
+  }
+
+  private buildPlanningPrompt(description: string, _analysis: OrientResult): string {
+    const skillBundle = this.loadPlanningSkillBundle();
+    const availableSkills = this.loadAvailableSkillNames();
+
+    return [
+      'You are running the standalone FTM app.',
+      'Your job is to behave like the checked-in ftm router + ftm-mind skill system, but inside this standalone host.',
+      'Do not invent your own routing framework. Follow the skill corpus below.',
+      'Choose the smallest correct next move.',
+      'If a specialized ftm skill is the right route, set selected_skill to that exact name. Otherwise selected_skill should be "ftm-mind".',
+      'Return only valid JSON.',
+      'JSON shape:',
+      '{"selected_skill":"ftm-mind","requires_approval":false,"steps":[{"description":"...","requires_approval":false,"skill":"ftm-mind"}]}',
+      'Rules:',
+      '- Use 1-8 steps.',
+      '- Each step must be a concrete action sentence.',
+      '- Preserve user intent from raw pasted content.',
+      '- Ignore page chrome, accessibility nav text, repeated UI labels, and boilerplate when they are not the task.',
+      '- If the task is just a direct answer, return one step with the answer-oriented action and use ftm-mind.',
+      `Available skills: ${availableSkills.join(', ')}`,
+      '',
+      'Canonical skill corpus:',
+      skillBundle,
+      '',
+      'Raw user task:',
+      description,
+    ].join('\n');
+  }
+
+  private parseModelPlan(taskId: string, raw: string): Plan | null {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    try {
+      const parsed = JSON.parse(match[0]) as AgenticPlanPayload;
+      const selectedSkill = this.normalizeSkillName(parsed.selected_skill);
+
+      const steps = (parsed.steps ?? [])
+        .map((step) => ({
+          description: step.description?.trim() ?? '',
+          requiresApproval:
+            step.requiresApproval === true || step.requires_approval === true,
+          skill: this.normalizeSkillName(step.skill) ?? selectedSkill,
+        }))
+        .filter((step) => step.description.length > 0)
+        .slice(0, 8)
+        .map((step, index): PlanStep => ({
+          index,
+          description: step.description,
+          status: 'pending',
+          requiresApproval: step.requiresApproval,
+          skill: step.skill ?? undefined,
+        }));
+
+      if (steps.length === 0) return null;
+
+      return {
+        id: `plan-${Date.now()}`,
+        taskId,
+        laneId: this.currentTask?.laneId,
+        steps,
+        status: 'pending',
+        currentStep: 0,
+        createdAt: Date.now(),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeTaskDescription(description: string): string {
+    const trimmed = description.trim();
+    if (!trimmed.includes('\n')) {
+      return trimmed;
+    }
+
+    const parsed = this.parseIssueContext(trimmed);
+    if (parsed.title || parsed.acceptanceCriteria.length > 0) {
+      const lines: string[] = [];
+      const title = parsed.issueKey && parsed.title
+        ? `${parsed.issueKey}: ${parsed.title}`
+        : parsed.title ?? parsed.issueKey ?? 'Work item';
+
+      lines.push(`Plan and execute this work item: ${title}`);
+
+      if (parsed.description) {
+        lines.push(`Context: ${parsed.description}`);
+      }
+
+      const numberedSteps = [
+        `Review the current implementation and locate the files or form logic affected by ${parsed.title ?? 'this work item'}.`,
+        ...parsed.acceptanceCriteria,
+        'Verify the final behavior, including validation and edge cases, before finishing.',
+      ];
+
+      numberedSteps.forEach((step, index) => {
+        lines.push(`${index + 1}. ${step}`);
+      });
+
+      return lines.join('\n');
+    }
+
+    return this.stripChromeLines(trimmed);
+  }
+
+  private buildExecutionPrompt(plan: Plan, step: PlanStep): string {
+    const taskDescription = this.currentTask?.description ?? '';
+    const priorSteps = plan.steps
+      .filter((candidate) => candidate.index < step.index)
+      .map((candidate) => `- ${candidate.description}`)
+      .join('\n');
+
+    return [
+      'You are executing one step inside the standalone FTM app.',
+      `Selected skill context: ${step.skill ?? 'ftm-mind'}`,
+      '',
+      'Full user task:',
+      taskDescription,
+      '',
+      'Current step:',
+      step.description,
+      '',
+      ...(priorSteps ? ['Previously completed steps:', priorSteps, ''] : []),
+      'Carry out the step in the spirit of the selected ftm skill.',
+      'Be agentic and use tools as needed.',
+    ].join('\n');
+  }
+
+  private buildSkillExecutionPrompt(skillName: string, plan: Plan, step: PlanStep): string {
+    const skillBundle = this.loadSkillExecutionBundle(skillName);
+    const approvalMode = this.router.getConfig().execution.approvalMode;
+
+    return [
+      `You are executing as ${skillName} inside the standalone FTM app.`,
+      'Mirror the checked-in skill behavior as closely as possible.',
+      'The standalone daemon/UI is only the host. The skill corpus is the authority.',
+      `Current approval mode: ${approvalMode}`,
+      `Plan step ${step.index + 1} of ${plan.steps.length}: ${step.description}`,
+      '',
+      'Skill corpus:',
+      skillBundle,
+    ].join('\n');
+  }
+
+  private normalizeSkillName(skillName?: string | null): string | null {
+    if (!skillName) return null;
+    const normalized = skillName.trim();
+    if (!normalized) return null;
+    return normalized.startsWith('ftm-') || normalized === 'ftm'
+      ? normalized
+      : `ftm-${normalized}`;
+  }
+
+  private loadPlanningSkillBundle(): string {
+    const parts = [
+      this.readRepoFile('ftm/SKILL.md'),
+      this.readRepoFile('ftm-mind/SKILL.md'),
+      this.readRepoFile('ftm-mind/references/orient-protocol.md'),
+      this.readRepoFile('ftm-mind/references/decide-act-protocol.md'),
+      this.readRepoFile('ftm-mind/references/complexity-sizing.md'),
+      this.readRepoFile('ftm-mind/references/direct-execution.md'),
+    ].filter(Boolean);
+
+    return parts.join('\n\n');
+  }
+
+  private loadSkillExecutionBundle(skillName: string): string {
+    const normalized = this.normalizeSkillName(skillName) ?? 'ftm-mind';
+    const skillDir = normalized === 'ftm' ? 'ftm' : normalized;
+    const skillDoc = this.readRepoFile(path.join(skillDir, 'SKILL.md'));
+
+    if (normalized === 'ftm-mind') {
+      return [
+        skillDoc,
+        this.readRepoFile('ftm-mind/references/orient-protocol.md'),
+        this.readRepoFile('ftm-mind/references/decide-act-protocol.md'),
+        this.readRepoFile('ftm-mind/references/direct-execution.md'),
+      ].filter(Boolean).join('\n\n');
+    }
+
+    return skillDoc || this.readRepoFile('ftm-mind/SKILL.md');
+  }
+
+  private loadAvailableSkillNames(): string[] {
+    try {
+      const manifest = this.readRepoFile('ftm-manifest.json');
+      if (!manifest) return ['ftm', 'ftm-mind'];
+      const parsed = JSON.parse(manifest) as { skills?: Array<{ name?: string; enabled?: boolean }> };
+      const names = (parsed.skills ?? [])
+        .filter((skill) => skill.enabled !== false && typeof skill.name === 'string')
+        .map((skill) => skill.name!.trim())
+        .filter(Boolean);
+      return names.length > 0 ? names : ['ftm', 'ftm-mind'];
+    } catch {
+      return ['ftm', 'ftm-mind'];
+    }
+  }
+
+  private readRepoFile(relativePath: string): string {
+    const absolutePath = path.resolve(process.cwd(), relativePath);
+    if (!existsSync(absolutePath)) {
+      return '';
+    }
+
+    try {
+      return readFileSync(absolutePath, 'utf8');
+    } catch {
+      return '';
+    }
+  }
+
+  private parseIssueContext(description: string): ParsedIssueContext {
+    const lines = description
+      .split('\n')
+      .map((line) => line.replace(/\t/g, ' ').trim())
+      .filter(Boolean);
+
+    const cleaned = this.stripKnownUiChrome(lines);
+    const issueIndex = cleaned.findIndex((line) => /^[A-Z][A-Z0-9]+-\d+$/.test(line));
+    const issueKey = issueIndex >= 0 ? cleaned[issueIndex] : undefined;
+
+    let title: string | undefined;
+    if (issueIndex >= 0) {
+      title = cleaned.slice(issueIndex + 1).find((line) => this.isLikelyIssueTitle(line));
+    }
+
+    const descriptionLines = this.collectSection(cleaned, 'Description');
+    const acceptanceLines = this.collectSection(cleaned, 'Acceptance Criteria');
+    const acceptanceCriteria = this.normalizeAcceptanceCriteria(acceptanceLines);
+
+    return {
+      issueKey,
+      title,
+      description: this.compactSection(descriptionLines),
+      acceptanceCriteria,
+    };
+  }
+
+  private stripChromeLines(description: string): string {
+    const lines = description
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    return this.stripKnownUiChrome(lines).join('\n').trim();
+  }
+
+  private stripKnownUiChrome(lines: string[]): string[] {
+    const chromeLines = new Set([
+      'Skip to:',
+      'Top Bar',
+      'Main Content',
+      'Sidebar',
+      'Jira homepage',
+      'Search',
+      'Create',
+      'Ask Rovo',
+      'Recent',
+      'Recommended',
+      'Spaces',
+      'General',
+      'Test Plan',
+      'Key details',
+      'Subtasks',
+      'Add subtask',
+      'Linked work items',
+      'Add linked work item',
+      'Activity',
+      'All',
+      'Comments',
+      'History',
+      'Work log',
+      'Approvals',
+      'Add a comment…',
+      'Status update...',
+      'Thanks...',
+      'Agree...',
+      'To Do',
+      'Improve Story',
+      'Details',
+      'Start date',
+      'Due date',
+      'Sprint',
+      'Assignee',
+      'Reporter',
+      'Story Points',
+      'Priority',
+      'Labels',
+      'GTS Team',
+      'OKR',
+      'Capacity',
+      'Dependency',
+      'Health Indicator',
+      'Size',
+      'Parent',
+      'Development',
+      'Automation',
+      'Rule executions',
+      'Configure',
+      'Open Change Request Salesforce',
+      'Netwrix Salesforce',
+      'None',
+      'Add option',
+    ]);
+
+    return lines.filter((line) => {
+      if (chromeLines.has(line)) return false;
+      if (/^\d+\+$/.test(line)) return false;
+      if (/^Created\s/i.test(line)) return false;
+      if (/^Updated\s/i.test(line)) return false;
+      if (/^Pro tip:/i.test(line)) return false;
+      if (/^press\s+[A-Z]\s+to comment$/i.test(line)) return false;
+      if (/^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\s*$/.test(line) && chromeLines.has(line)) return false;
+      return true;
+    });
+  }
+
+  private collectSection(lines: string[], sectionName: string): string[] {
+    const start = lines.findIndex((line) => this.normalizeSectionHeading(line) === this.normalizeSectionHeading(sectionName));
+    if (start < 0) return [];
+
+    const collected: string[] = [];
+    for (let index = start + 1; index < lines.length; index++) {
+      const line = lines[index];
+      if (this.isSectionBoundary(line)) {
+        break;
+      }
+      collected.push(line);
+    }
+
+    return collected;
+  }
+
+  private isSectionBoundary(line: string): boolean {
+    return [
+      'Subtasks',
+      'Acceptance Criteria',
+      'Linked work items',
+      'Activity',
+      'Details',
+      'Approvals',
+      'Development',
+      'Automation',
+      'Configure',
+      'Comments',
+      'History',
+      'Work log',
+    ].some((section) => this.normalizeSectionHeading(line) === this.normalizeSectionHeading(section));
+  }
+
+  private normalizeSectionHeading(line: string): string {
+    return line.replace(/[:\s]+$/g, '').trim().toLowerCase();
+  }
+
+  private normalizeAcceptanceCriteria(lines: string[]): string[] {
+    const cleaned = lines
+      .map((line) => line.replace(/^\[\s?[xX ]?\]\s*/, '').trim())
+      .filter(Boolean);
+
+    if (cleaned.length > 0) {
+      return cleaned.map((line) => this.toImperativeStep(line));
+    }
+
+    return [];
+  }
+
+  private toImperativeStep(line: string): string {
+    const normalized = line.replace(/\s+/g, ' ').trim();
+    if (!normalized) return normalized;
+
+    if (/^(form|internal app path|standard sso path|form validation)\b/i.test(normalized)) {
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    }
+
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+
+  private compactSection(lines: string[]): string | undefined {
+    const cleaned = lines
+      .filter((line) => !/^Description$/i.test(line))
+      .map((line) => line.replace(/^[-•]\s+/, '').trim())
+      .filter(Boolean);
+
+    if (cleaned.length === 0) return undefined;
+    return cleaned.join(' ');
+  }
+
+  private isLikelyIssueTitle(line: string): boolean {
+    if (!line) return false;
+    if (/^[A-Z][A-Z0-9]+-\d+$/.test(line)) return false;
+    if (line.length < 12) return false;
+    if (/^(Description|Acceptance Criteria|Subtasks|Activity|Details)$/i.test(line)) return false;
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -246,6 +714,9 @@ export class OodaLoop {
   private async act(plan: Plan): Promise<ModuleResult> {
     plan.status = 'executing';
     const outputs: string[] = [];
+    const workingDir = this.currentTask
+      ? this.getTaskWorkingDir(this.currentTask)
+      : process.cwd();
 
     for (const step of plan.steps) {
       this.eventBus.emitTyped('step_started', {
@@ -267,9 +738,16 @@ export class OodaLoop {
 
       // Dispatch to the execution adapter
       const adapter = await this.router.route('execution');
-      const response = await adapter.startSession(
-        `Execute this step: ${step.description}`,
-        { workingDir: process.cwd() },
+      const sessionOpts = step.skill
+        ? {
+            workingDir,
+            systemPrompt: this.buildSkillExecutionPrompt(step.skill, plan, step),
+          }
+        : { workingDir };
+      const response = await this.runWithPersistentSession(
+        adapter,
+        this.buildExecutionPrompt(plan, step),
+        sessionOpts,
       );
 
       step.status = 'completed';
@@ -383,7 +861,8 @@ export class OodaLoop {
     const outputFormats = profile.preferredOutputFormats.slice(0, 3).map((item) => item.label);
 
     const adapter = await this.router.route('execution');
-    const response = await adapter.startSession(
+    const response = await this.runWithPersistentSession(
+      adapter,
       [
         'Reply directly to the user in one or two short sentences.',
         'Do not make a plan.',
@@ -394,7 +873,7 @@ export class OodaLoop {
         ...synthesized.promptContext.map((line) => `Profile context: ${line}`),
         `User message: ${task.description}`,
       ].join('\n'),
-      { workingDir: process.cwd() },
+      { workingDir: this.getTaskWorkingDir(task) },
     );
 
     const result: ModuleResult = {
@@ -473,6 +952,35 @@ export class OodaLoop {
     return this.eventBus.getEventLog().some(
       (event) => event.type === 'plan_approved' && event.data?.planId === planId,
     );
+  }
+
+  private async runWithPersistentSession(
+    adapter: ModelAdapter,
+    prompt: string,
+    opts?: SessionOpts,
+  ): Promise<NormalizedResponse> {
+    const laneId = this.currentTask?.laneId;
+    const workspaceId = this.currentTask?.workspaceId;
+
+    const existingSession =
+      laneId ? this.blackboard.getActiveModelSession(laneId, adapter.name) : null;
+
+    const response = existingSession
+      ? await adapter.resumeSession(existingSession.sessionId, prompt)
+      : await adapter.startSession(prompt, opts);
+
+    if (workspaceId && response.sessionId) {
+      this.blackboard.saveModelSession({
+        id: existingSession?.id,
+        workspaceId,
+        laneId,
+        modelName: adapter.name,
+        sessionId: response.sessionId,
+        archived: false,
+      });
+    }
+
+    return response;
   }
 
   /**

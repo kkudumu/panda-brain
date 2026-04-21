@@ -33,7 +33,7 @@ export abstract class BaseAdapter implements ModelAdapter {
     },
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve) => {
-      const timeoutMs = opts?.timeout ?? 5 * 60 * 1000; // 5 minutes default
+      const timeoutMs = opts?.timeout ?? 20 * 60 * 1000; // 20 minutes default for agentic runs
 
       const proc = spawn(command, args, {
         cwd: opts?.cwd,

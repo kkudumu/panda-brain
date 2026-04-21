@@ -110,7 +110,19 @@
   let isError = $derived($machineState === 'error' || $currentTask?.status === 'failed');
   let errorMsg = $derived($currentTask?.error ?? 'An error occurred');
   let elapsedForCurrent = $derived(stepElapsed[currentStep] ?? 0);
-  let resultText = $derived(($currentTask?.result ?? '').trim());
+  // Strip raw JSON lines (fallback safety net for adapter output leaking through)
+  function cleanResult(raw: string): string {
+    return raw
+      .split('\n')
+      .filter(line => {
+        const t = line.trim();
+        if (!t) return false;
+        try { JSON.parse(t); return false; } catch { return true; }
+      })
+      .join('\n')
+      .trim();
+  }
+  let resultText = $derived(cleanResult($currentTask?.result ?? ''));
   let displayStep = $derived(totalSteps > 0 ? Math.min(currentStep + 1, totalSteps) : 0);
 </script>
 

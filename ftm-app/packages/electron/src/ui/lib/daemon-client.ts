@@ -253,8 +253,10 @@ export function send(type: string, payload: Record<string, unknown> = {}): Promi
 }
 
 // Convenience methods
-export async function submitTask(description: string): Promise<string> {
-  const response = await send('submit_task', { description });
+export async function submitTask(description: string, workingDir?: string): Promise<string> {
+  const payload: Record<string, unknown> = { description };
+  if (workingDir) payload.workingDir = workingDir;
+  const response = await send('submit_task', payload);
   return response.payload.taskId as string;
 }
 
@@ -299,16 +301,26 @@ function handleMessage(msg: WsResponse): void {
 
   // Handle broadcast messages
   switch (msg.type) {
-    case 'state_snapshot':
+    case 'state_snapshot': {
+      const snapshotState = (msg.payload.machineState as MachineState) ?? 'idle';
+      // Terminal states from a previous session — don't restore them on connect.
+      // The user just opened the app; show idle, not a stale "complete" or "error".
+      const freshState: MachineState =
+        snapshotState === 'complete' || snapshotState === 'error' ? 'idle' : snapshotState;
+      const stalePreviousTask =
+        freshState === 'idle' && snapshotState !== 'idle'
+          ? null
+          : (msg.payload.currentTask as Task | null) ?? null;
       daemonState.update(s => ({
         ...s,
-        machineState: (msg.payload.machineState as MachineState) ?? s.machineState,
-        currentTask: (msg.payload.currentTask as Task | null) ?? s.currentTask,
-        currentPlan: (msg.payload.currentPlan as Plan | null) ?? s.currentPlan,
+        machineState: freshState,
+        currentTask: stalePreviousTask,
+        currentPlan: freshState === 'idle' ? null : (msg.payload.currentPlan as Plan | null) ?? s.currentPlan,
         phase: (msg.payload.phase as string) ?? s.phase,
         blackboard: (msg.payload.blackboard as BlackboardContext | null) ?? s.blackboard,
       }));
       break;
+    }
 
     case 'machine_state':
       daemonState.update(s => ({

@@ -12,6 +12,12 @@ interface CodexJsonOutput {
   };
   delta?: string;
   final?: string;
+  // Streaming format: {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
+  item?: {
+    type?: string;
+    text?: string;
+    message?: string;
+  };
   tool_calls?: Array<{
     name?: string;
     function?: {
@@ -25,6 +31,8 @@ interface CodexJsonOutput {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    input_tokens?: number;
+    output_tokens?: number;
   };
   model?: string;
   id?: string;
@@ -51,7 +59,12 @@ export class CodexAdapter extends BaseAdapter {
   }
 
   async startSession(prompt: string, opts?: SessionOpts): Promise<NormalizedResponse> {
-    const args = ['exec', prompt, '--json'];
+    const args = [
+      'exec',
+      prompt,
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+    ];
     if (opts?.model) args.push('-m', opts.model);
 
     const result = await this.spawnCli('codex', args, { cwd: opts?.workingDir });
@@ -133,13 +146,18 @@ export class CodexAdapter extends BaseAdapter {
       new Set(textParts.map((part) => part.trim()).filter(Boolean)),
     ).join('\n');
 
+    // Find token usage from turn.completed event if present
+    const turnCompleted = parsedObjects.find(p => p.type === 'turn.completed');
+    const usage = turnCompleted?.usage ?? lastParsed?.usage;
+
     return {
-      text: dedupedText || trimmed,
+      // Only fall back to raw trimmed if we genuinely got nothing — never dump JSON
+      text: dedupedText || '',
       toolCalls,
       sessionId: '',
       tokenUsage: {
-        input: lastParsed?.usage?.prompt_tokens ?? 0,
-        output: lastParsed?.usage?.completion_tokens ?? 0,
+        input: usage?.prompt_tokens ?? usage?.input_tokens ?? 0,
+        output: usage?.completion_tokens ?? usage?.output_tokens ?? 0,
         cached: 0,
       },
     };
@@ -169,6 +187,10 @@ export class CodexAdapter extends BaseAdapter {
   }
 
   private extractText(parsed: CodexJsonOutput): string {
+    // Streaming format: {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
+    if (parsed.type === 'item.completed' && parsed.item?.type === 'agent_message') {
+      return parsed.item.text ?? parsed.item.message ?? '';
+    }
     if (parsed.response) return parsed.response;
     if (parsed.output) return parsed.output;
     if (parsed.content) return parsed.content;

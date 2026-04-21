@@ -226,6 +226,7 @@ export class VerifyModule implements FtmModule {
         `plan_step_${step.index}`,
         `Plan step: ${step.description}`,
         cmd,
+        context.task.workingDir,
       );
       checks.push(check);
     }
@@ -276,32 +277,33 @@ export class VerifyModule implements FtmModule {
     });
 
     // TypeScript compile check
-    const tsCheck = await this.runTypeScriptCheck();
+    const tsCheck = await this.runTypeScriptCheck(context.task.workingDir);
     checks.push(tsCheck);
 
     // Test suite check (npm test / vitest)
-    const testCheck = await this.runTestCheck();
+    const testCheck = await this.runTestCheck(context.task.workingDir);
     checks.push(testCheck);
 
     // Lint check
-    const lintCheck = await this.runLintCheck();
+    const lintCheck = await this.runLintCheck(context.task.workingDir);
     checks.push(lintCheck);
 
     return checks;
   }
 
-  private async runTypeScriptCheck(): Promise<VerificationCheck> {
+  private async runTypeScriptCheck(workingDir?: string): Promise<VerificationCheck> {
     return this.runShellCheck(
       'typescript',
       'TypeScript compilation check',
       'npx tsc --noEmit 2>&1 | head -50',
+      workingDir,
       { successOnEmpty: true, timeout: 30_000 },
     );
   }
 
-  private async runTestCheck(): Promise<VerificationCheck> {
+  private async runTestCheck(workingDir?: string): Promise<VerificationCheck> {
     // Detect test runner
-    const testCmd = await this.detectTestCommand();
+    const testCmd = await this.detectTestCommand(workingDir);
 
     if (!testCmd) {
       return {
@@ -313,23 +315,26 @@ export class VerifyModule implements FtmModule {
       };
     }
 
-    return this.runShellCheck('tests', 'Test suite', testCmd, {
+    return this.runShellCheck('tests', 'Test suite', testCmd, workingDir, {
       timeout: 120_000,
     });
   }
 
-  private async runLintCheck(): Promise<VerificationCheck> {
+  private async runLintCheck(workingDir?: string): Promise<VerificationCheck> {
     return this.runShellCheck(
       'lint',
       'Lint check',
       'npx eslint . --max-warnings 0 2>&1 | head -50',
+      workingDir,
       { successOnEmpty: true, timeout: 30_000 },
     );
   }
 
-  private async detectTestCommand(): Promise<string | null> {
+  private async detectTestCommand(workingDir?: string): Promise<string | null> {
     try {
-      const { stdout } = await execAsync('cat package.json 2>/dev/null');
+      const { stdout } = await execAsync('cat package.json 2>/dev/null', {
+        cwd: workingDir ?? process.cwd(),
+      });
       const pkg = JSON.parse(stdout) as { scripts?: Record<string, string> };
       if (pkg.scripts?.test && !pkg.scripts.test.includes('echo')) {
         return 'npm test -- --passWithNoTests 2>&1 | tail -30';
@@ -393,6 +398,7 @@ export class VerifyModule implements FtmModule {
         systemPrompt:
           'You are a QA engineer. Be direct and actionable. Do not repeat the check results verbatim.',
         temperature: 0.2,
+        workingDir: context.task.workingDir,
       });
 
       return {
@@ -416,13 +422,13 @@ export class VerifyModule implements FtmModule {
     name: string,
     description: string,
     command: string,
+    workingDir?: string,
     opts: { successOnEmpty?: boolean; timeout?: number } = {},
   ): Promise<VerificationCheck> {
     try {
       const { stdout, stderr } = await execAsync(command, {
         timeout: opts.timeout ?? 15_000,
-        // Run in current working directory
-        cwd: process.cwd(),
+        cwd: workingDir ?? process.cwd(),
         env: process.env,
       });
 

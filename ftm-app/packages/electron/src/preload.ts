@@ -13,6 +13,11 @@ contextBridge.exposeInMainWorld('ftm', {
   // Platform info
   platform: process.platform,
 
+  // Native folder picker — returns selected path string or null
+  openFolder: (): Promise<string | null> => ipcRenderer.invoke('open-folder'),
+  listDirectory: (dirPath: string) => ipcRenderer.invoke('list-directory', dirPath),
+  readTextFile: (filePath: string) => ipcRenderer.invoke('read-text-file', filePath),
+
   // IPC events
   onDaemonEvent: (callback: (event: unknown) => void) => {
     ipcRenderer.on('daemon-event', (_event, data) => callback(data));

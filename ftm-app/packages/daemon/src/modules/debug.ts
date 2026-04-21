@@ -106,7 +106,10 @@ export class DebugModule implements FtmModule {
       data: { phase: 'hypothesising', taskId: context.task.id },
     });
 
-    const hypotheses = await this.generateHypotheses(context.task.description);
+    const hypotheses = await this.generateHypotheses(
+      context.task.description,
+      context.task.workingDir,
+    );
     timeline.hypothesesGeneratedAt = Date.now();
 
     emit({
@@ -150,6 +153,7 @@ export class DebugModule implements FtmModule {
       context.task.description,
       hypotheses,
       steps,
+      context.task.workingDir,
     );
 
     timeline.completedAt = Date.now();
@@ -204,7 +208,10 @@ export class DebugModule implements FtmModule {
   // Hypothesis generation
   // ---------------------------------------------------------------------------
 
-  private async generateHypotheses(errorDescription: string): Promise<Hypothesis[]> {
+  private async generateHypotheses(
+    errorDescription: string,
+    workingDir?: string,
+  ): Promise<Hypothesis[]> {
     try {
       const adapter = await this.router.route('planning');
       const response = await adapter.startSession(
@@ -225,6 +232,7 @@ export class DebugModule implements FtmModule {
           systemPrompt:
             'You are an expert software debugger. Always respond with valid JSON.',
           temperature: 0.3,
+          workingDir,
         },
       );
 
@@ -393,7 +401,10 @@ export class DebugModule implements FtmModule {
           .filter(Boolean)
           .join('\n');
 
-        const response = await adapter.startSession(prompt, { temperature: 0.2 });
+        const response = await adapter.startSession(prompt, {
+          temperature: 0.2,
+          workingDir: context.task.workingDir,
+        });
 
         step.findings = response.text;
         priorFindings += `\n- ${step.description}: ${response.text.substring(0, 200)}`;
@@ -424,6 +435,7 @@ export class DebugModule implements FtmModule {
     errorDescription: string,
     hypotheses: Hypothesis[],
     steps: InvestigationStep[],
+    workingDir?: string,
   ): Promise<{ rootCause: string; confidence: ConfidenceLevel; proposedFix: string }> {
     const investigationSummary = steps
       .map((s) => `- ${s.description}: ${s.findings ?? 'no findings'}`)
@@ -454,6 +466,7 @@ export class DebugModule implements FtmModule {
         systemPrompt:
           'You are a senior software engineer. Respond with valid JSON only.',
         temperature: 0.2,
+        workingDir,
       });
 
       return this.parseDiagnosis(response.text);

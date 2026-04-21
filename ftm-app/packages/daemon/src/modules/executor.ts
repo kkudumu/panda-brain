@@ -282,7 +282,9 @@ export class ExecutorModule implements FtmModule {
     const adapter = await this.router.route(tier);
 
     const prompt = this.buildStepPrompt(step, context);
-    return adapter.startSession(prompt, { workingDir: process.cwd() });
+    return adapter.startSession(prompt, {
+      workingDir: context.task.workingDir ?? process.cwd(),
+    });
   }
 
   private buildStepPrompt(step: PlanStep, context: TaskContext): string {

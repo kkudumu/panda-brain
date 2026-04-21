@@ -1,12 +1,12 @@
-import { app, BrowserWindow, nativeImage, Tray, Menu } from "electron";
+import { ipcMain, dialog, app, BrowserWindow, nativeImage, Tray, Menu } from "electron";
 import path, { join } from "path";
+import fs, { existsSync, mkdirSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { spawn } from "child_process";
-import { existsSync, mkdirSync, readFileSync } from "fs";
-import { homedir } from "os";
+import os, { homedir } from "os";
 import { parse } from "yaml";
 import { WebSocketServer, WebSocket } from "ws";
 import __cjs_mod__ from "node:module";
@@ -75,6 +75,7 @@ class FtmStore {
         id          TEXT    PRIMARY KEY,
         session_id  TEXT    NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         description TEXT    NOT NULL,
+        working_dir TEXT,
         status      TEXT    NOT NULL DEFAULT 'pending',
         created_at  INTEGER NOT NULL,
         updated_at  INTEGER NOT NULL,
@@ -145,6 +146,10 @@ class FtmStore {
 
       CREATE INDEX IF NOT EXISTS idx_patterns_category ON patterns(category);
     `);
+    const taskColumns = this.db.prepare("PRAGMA table_info(tasks)").all();
+    if (!taskColumns.some((column) => column.name === "working_dir")) {
+      this.db.exec("ALTER TABLE tasks ADD COLUMN working_dir TEXT");
+    }
   }
   // -------------------------------------------------------------------------
   // Prepared statements
@@ -160,7 +165,7 @@ class FtmStore {
       ),
       // Tasks
       insertTask: this.db.prepare(
-        "INSERT INTO tasks (id, session_id, description, status, created_at, updated_at, result, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO tasks (id, session_id, description, working_dir, status, created_at, updated_at, result, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ),
       selectTask: this.db.prepare(
         "SELECT * FROM tasks WHERE id = ?"
@@ -285,6 +290,7 @@ class FtmStore {
       task.id,
       task.sessionId,
       task.description,
+      task.workingDir ?? null,
       task.status,
       task.createdAt,
       task.updatedAt,
@@ -300,6 +306,7 @@ class FtmStore {
   updateTask(id, updates) {
     this.buildUpdate("tasks", id, updates, {
       description: "description",
+      workingDir: "working_dir",
       status: "status",
       updatedAt: "updated_at",
       result: "result",
@@ -317,6 +324,7 @@ class FtmStore {
       id: row.id,
       sessionId: row.session_id,
       description: row.description,
+      workingDir: row.working_dir ?? void 0,
       status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -530,6 +538,14 @@ const KEY_CURRENT_TASK = "blackboard:current_task";
 const KEY_DECISIONS = "blackboard:decisions";
 const KEY_CONSTRAINTS = "blackboard:constraints";
 const KEY_SESSION_META = "blackboard:session_metadata";
+const KEY_USER_PROFILE = "blackboard:user_profile";
+function inferSystemPreferredName() {
+  const raw = process.env.FTM_USER_NAME ?? process.env.USER ?? process.env.USERNAME;
+  if (!raw) return null;
+  const token = raw.split(/[.@_\s-]+/).map((part) => part.trim()).find(Boolean);
+  if (!token) return null;
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
 class Blackboard {
   constructor(store) {
     this.store = store;
@@ -546,7 +562,8 @@ class Blackboard {
       currentTask: this.getCurrentTask(),
       recentDecisions: this.getRecentDecisions(),
       activeConstraints: this.getConstraints(),
-      sessionMetadata: this.getSessionMetadata()
+      sessionMetadata: this.getSessionMetadata(),
+      userProfile: this.getUserProfile()
     };
   }
   // -------------------------------------------------------------------------
@@ -641,6 +658,44 @@ class Blackboard {
       skillsInvoked: []
     };
     this.store.setContext(KEY_SESSION_META, defaults);
+    return defaults;
+  }
+  // -------------------------------------------------------------------------
+  // User profile
+  // -------------------------------------------------------------------------
+  updateUserProfile(mutator) {
+    const profile = this.getUserProfile();
+    const next = JSON.parse(JSON.stringify(profile));
+    mutator(next);
+    next.lastUpdated = Date.now();
+    this.store.setContext(KEY_USER_PROFILE, next);
+    return next;
+  }
+  getUserProfileSnapshot() {
+    return this.getUserProfile();
+  }
+  getUserProfile() {
+    const stored = this.store.getContext(KEY_USER_PROFILE);
+    if (stored) return stored;
+    const defaults = {
+      lastUpdated: Date.now(),
+      preferredName: inferSystemPreferredName(),
+      responseStyle: "collaborative",
+      preferredOutputFormats: [],
+      activeProjects: [],
+      approvalPreference: "mixed",
+      approvalHistory: {
+        requestedCount: 0,
+        approvedCount: 0,
+        modifiedCount: 0,
+        autoApprovedCount: 0
+      },
+      commonTaskTypes: [],
+      workflowPatterns: [],
+      topicInterests: [],
+      modelPreferences: []
+    };
+    this.store.setContext(KEY_USER_PROFILE, defaults);
     return defaults;
   }
 }
@@ -813,76 +868,105 @@ class CodexAdapter extends BaseAdapter {
     if (!trimmed) {
       return this.emptyResponse();
     }
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const parsedObjects = this.parseJsonObjects(trimmed);
+    if (parsedObjects.length === 0) {
       return {
         text: trimmed,
         toolCalls: [],
         sessionId: "",
         tokenUsage: { input: 0, output: 0, cached: 0 }
       };
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      return {
-        text: trimmed,
-        toolCalls: [],
-        sessionId: "",
-        tokenUsage: { input: 0, output: 0, cached: 0 }
-      };
-    }
-    let text = "";
-    if (parsed.response) {
-      text = parsed.response;
-    } else if (parsed.output) {
-      text = parsed.output;
-    } else if (parsed.content) {
-      text = parsed.content;
-    } else if (parsed.choices && parsed.choices.length > 0) {
-      text = parsed.choices[0].message?.content ?? "";
     }
     const toolCalls = [];
-    if (parsed.tool_calls) {
-      for (const tc of parsed.tool_calls) {
-        const name = tc.name ?? tc.function?.name ?? "";
-        let args = tc.arguments ?? {};
-        if (tc.function?.arguments && typeof tc.function.arguments === "string") {
+    const textParts = [];
+    let lastParsed = null;
+    for (const parsed of parsedObjects) {
+      lastParsed = parsed;
+      const text = this.extractText(parsed);
+      if (text) {
+        textParts.push(text);
+      }
+      if (parsed.tool_calls) {
+        for (const tc of parsed.tool_calls) {
+          const name = tc.name ?? tc.function?.name ?? "";
+          let args = tc.arguments ?? {};
+          if (tc.function?.arguments && typeof tc.function.arguments === "string") {
+            try {
+              args = JSON.parse(tc.function.arguments);
+            } catch {
+              args = { raw: tc.function.arguments };
+            }
+          } else if (tc.function?.arguments && typeof tc.function.arguments === "object") {
+            args = tc.function.arguments;
+          }
+          toolCalls.push({ name, arguments: args, result: tc.result });
+        }
+      }
+      if (parsed.choices && parsed.choices.length > 0) {
+        const choiceToolCalls = parsed.choices[0].message?.tool_calls ?? [];
+        for (const tc of choiceToolCalls) {
+          let args = {};
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
             args = { raw: tc.function.arguments };
           }
-        } else if (tc.function?.arguments && typeof tc.function.arguments === "object") {
-          args = tc.function.arguments;
+          toolCalls.push({ name: tc.function.name, arguments: args });
         }
-        toolCalls.push({ name, arguments: args, result: tc.result });
       }
     }
-    if (parsed.choices && parsed.choices.length > 0) {
-      const choiceToolCalls = parsed.choices[0].message?.tool_calls ?? [];
-      for (const tc of choiceToolCalls) {
-        let args = {};
-        try {
-          args = JSON.parse(tc.function.arguments);
-        } catch {
-          args = { raw: tc.function.arguments };
-        }
-        toolCalls.push({ name: tc.function.name, arguments: args });
-      }
-    }
+    const dedupedText = Array.from(
+      new Set(textParts.map((part) => part.trim()).filter(Boolean))
+    ).join("\n");
+    const turnCompleted = parsedObjects.find((p) => p.type === "turn.completed");
+    const usage = turnCompleted?.usage ?? lastParsed?.usage;
     return {
-      text,
+      // Only fall back to raw trimmed if we genuinely got nothing — never dump JSON
+      text: dedupedText || "",
       toolCalls,
       sessionId: "",
-      // Codex may not provide token usage — return zeros
       tokenUsage: {
-        input: parsed.usage?.prompt_tokens ?? 0,
-        output: parsed.usage?.completion_tokens ?? 0,
+        input: usage?.prompt_tokens ?? usage?.input_tokens ?? 0,
+        output: usage?.completion_tokens ?? usage?.output_tokens ?? 0,
         cached: 0
       }
     };
+  }
+  parseJsonObjects(raw) {
+    const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+    const parsed = [];
+    for (const line of lines) {
+      try {
+        parsed.push(JSON.parse(line));
+      } catch {
+      }
+    }
+    if (parsed.length > 0) {
+      return parsed;
+    }
+    try {
+      return [JSON.parse(raw)];
+    } catch {
+      return [];
+    }
+  }
+  extractText(parsed) {
+    if (parsed.type === "item.completed" && parsed.item?.type === "agent_message") {
+      return parsed.item.text ?? parsed.item.message ?? "";
+    }
+    if (parsed.response) return parsed.response;
+    if (parsed.output) return parsed.output;
+    if (parsed.content) return parsed.content;
+    if (parsed.text) return parsed.text;
+    if (parsed.final) return parsed.final;
+    if (parsed.message?.content) return parsed.message.content;
+    if (parsed.choices && parsed.choices.length > 0) {
+      return parsed.choices[0].message?.content ?? "";
+    }
+    if (parsed.type === "response.output_text.delta" && parsed.delta) {
+      return parsed.delta;
+    }
+    return "";
   }
 }
 class GeminiAdapter extends BaseAdapter {
@@ -1329,6 +1413,273 @@ class ModelRouter {
     );
   }
 }
+const EXTERNAL_PROFILE_CACHE_TTL_MS = 3e4;
+let cachedExternalSignals = null;
+function safeReadText(filePath) {
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+function safeReadJson(filePath) {
+  const text = safeReadText(filePath);
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+function walkMarkdownFiles(rootDir, maxDepth = 4) {
+  const results = [];
+  function visit(currentDir, depth) {
+    if (depth > maxDepth) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".git")) continue;
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      results.push(fullPath);
+    }
+  }
+  visit(rootDir, 0);
+  return results;
+}
+function parseTopLevelYamlValue(content, key) {
+  const match = content.match(new RegExp(`^${key}:\\s*([^#\\n]+)`, "m"));
+  return match?.[1]?.trim() ?? null;
+}
+function titleCaseFirstToken(raw) {
+  if (!raw) return null;
+  const token = raw.split(/[.@_\s-]+/).map((part) => part.trim()).find(Boolean);
+  if (!token) return null;
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
+function mergePatterns(primary, secondary) {
+  const merged = /* @__PURE__ */ new Map();
+  for (const item of [...primary, ...secondary]) {
+    const key = item.label.trim().toLowerCase();
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...item });
+      continue;
+    }
+    existing.count += item.count;
+    existing.lastSeen = Math.max(existing.lastSeen, item.lastSeen);
+  }
+  return Array.from(merged.values()).sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return right.lastSeen - left.lastSeen;
+  }).slice(0, 8);
+}
+function extractMarkdownBullet(content, needle) {
+  const line = content.split("\n").map((value) => value.trim()).find((value) => value.startsWith("-") && value.toLowerCase().includes(needle.toLowerCase()));
+  return line ? line.replace(/^-+\s*/, "").trim() : null;
+}
+function collectSessionMetaProjects(homeDir) {
+  const sessionMetaDir = path.join(homeDir, ".claude", "usage-data", "session-meta");
+  let entries = [];
+  try {
+    entries = fs.readdirSync(sessionMetaDir).filter((fileName) => fileName.endsWith(".json")).slice(-400);
+  } catch {
+    return [];
+  }
+  const counts = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    const filePath = path.join(sessionMetaDir, entry);
+    const payload = safeReadJson(filePath);
+    const projectPath = payload?.project_path;
+    if (!projectPath || projectPath === "/" || projectPath.startsWith(path.join(homeDir, ".claude"))) {
+      continue;
+    }
+    const label = path.basename(projectPath) || projectPath;
+    const existing = counts.get(label.toLowerCase());
+    if (existing) {
+      existing.count += 1;
+      existing.lastSeen = Date.now();
+      continue;
+    }
+    counts.set(label.toLowerCase(), {
+      label,
+      count: 1,
+      lastSeen: Date.now()
+    });
+  }
+  return Array.from(counts.values()).filter((item) => item.count >= 2).sort((left, right) => right.count - left.count).slice(0, 5);
+}
+function discoverProfileMarkdownFiles(claudeRoot) {
+  return walkMarkdownFiles(claudeRoot, 4).filter((filePath) => {
+    const normalized = filePath.toLowerCase();
+    return normalized.includes("profile") || normalized.includes("preferences") || normalized.includes("communication-style") || normalized.includes("voice") || normalized.includes("work-style");
+  }).slice(0, 40);
+}
+function loadExternalProfileSignals() {
+  const now = Date.now();
+  if (cachedExternalSignals && now - cachedExternalSignals.loadedAt < EXTERNAL_PROFILE_CACHE_TTL_MS) {
+    return cachedExternalSignals.value;
+  }
+  const homeDir = os.homedir();
+  const sourcePaths = /* @__PURE__ */ new Set();
+  const communicationStyle = /* @__PURE__ */ new Set();
+  const approvalGuidance = /* @__PURE__ */ new Set();
+  const workStyleNotes = /* @__PURE__ */ new Set();
+  let preferredName = null;
+  let modelProfile = null;
+  let approvalMode = null;
+  const claudeBlackboardPath = path.join(homeDir, ".claude", "ftm-state", "blackboard", "context.json");
+  const claudeBlackboard = safeReadJson(claudeBlackboardPath);
+  if (claudeBlackboard) {
+    sourcePaths.add(claudeBlackboardPath);
+    const prefs = claudeBlackboard.user_preferences;
+    if (prefs?.communication_style) {
+      communicationStyle.add(prefs.communication_style);
+    }
+    if (prefs?.approval_gates) {
+      approvalGuidance.add(prefs.approval_gates);
+    }
+    if (prefs?.default_model_profile) {
+      modelProfile = prefs.default_model_profile;
+    }
+  }
+  const claudeConfigPath = path.join(homeDir, ".claude", "ftm-config.yml");
+  const claudeConfig = safeReadText(claudeConfigPath);
+  if (claudeConfig) {
+    sourcePaths.add(claudeConfigPath);
+    modelProfile = modelProfile ?? parseTopLevelYamlValue(claudeConfig, "profile");
+    const parsedApprovalMode = parseTopLevelYamlValue(claudeConfig, "approval_mode");
+    if (parsedApprovalMode === "auto" || parsedApprovalMode === "plan_first" || parsedApprovalMode === "always_ask") {
+      approvalMode = parsedApprovalMode;
+      approvalGuidance.add(`Claude execution approval mode is ${parsedApprovalMode}.`);
+    }
+  }
+  const claudeRoot = path.join(homeDir, ".claude");
+  for (const markdownPath of discoverProfileMarkdownFiles(claudeRoot)) {
+    const content = safeReadText(markdownPath);
+    if (!content) continue;
+    sourcePaths.add(markdownPath);
+    const heading = content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? null;
+    preferredName = preferredName ?? titleCaseFirstToken(heading);
+    const communicationNeedles = [
+      "concise",
+      "technical",
+      "direct",
+      "professional",
+      "confident",
+      "natural",
+      "emoji",
+      "hedging"
+    ];
+    for (const needle of communicationNeedles) {
+      const match = extractMarkdownBullet(content, needle);
+      if (match) {
+        communicationStyle.add(match);
+      }
+    }
+    const workStyleNeedles = [
+      "direct, concrete guidance",
+      "deep debugging",
+      "building and creation",
+      "context switching",
+      "fast executor",
+      "quick wins",
+      "sauce",
+      "respond well"
+    ];
+    for (const needle of workStyleNeedles) {
+      const match = extractMarkdownBullet(content, needle);
+      if (match) {
+        workStyleNotes.add(match);
+      }
+    }
+  }
+  const recurringProjects = collectSessionMetaProjects(homeDir);
+  if (recurringProjects.length > 0) {
+    sourcePaths.add(path.join(homeDir, ".claude", "usage-data", "session-meta"));
+  }
+  const value = {
+    preferredName,
+    communicationStyle: Array.from(communicationStyle),
+    approvalGuidance: Array.from(approvalGuidance),
+    modelProfile,
+    approvalMode,
+    recurringProjects,
+    workStyleNotes: Array.from(workStyleNotes),
+    sourcePaths: Array.from(sourcePaths)
+  };
+  cachedExternalSignals = { loadedAt: now, value };
+  return value;
+}
+function inferResponseStyle(profile, external) {
+  if (profile.responseStyle === "direct") {
+    return "direct";
+  }
+  const joined = external.communicationStyle.join(" ").toLowerCase();
+  if (joined.includes("concise") || joined.includes("direct") || joined.includes("technical") || joined.includes("confident")) {
+    return "direct";
+  }
+  return profile.responseStyle;
+}
+function inferApprovalPreference(profile, external) {
+  if (profile.approvalPreference !== "mixed") {
+    return profile.approvalPreference;
+  }
+  if (external.approvalMode === "always_ask") {
+    return "hands_on";
+  }
+  if (external.approvalMode === "auto") {
+    return "streamlined";
+  }
+  return profile.approvalPreference;
+}
+function synthesizeUserContext(profile) {
+  const externalSignals = loadExternalProfileSignals();
+  const mergedProfile = {
+    ...profile,
+    preferredName: profile.preferredName ?? externalSignals.preferredName,
+    responseStyle: inferResponseStyle(profile, externalSignals),
+    approvalPreference: inferApprovalPreference(profile, externalSignals),
+    activeProjects: mergePatterns(profile.activeProjects, externalSignals.recurringProjects)
+  };
+  const promptContext = [];
+  if (mergedProfile.preferredName) {
+    promptContext.push(`Preferred name: ${mergedProfile.preferredName}`);
+  }
+  promptContext.push(`Preferred response style: ${mergedProfile.responseStyle}`);
+  promptContext.push(`Approval preference: ${mergedProfile.approvalPreference}`);
+  if (externalSignals.modelProfile) {
+    promptContext.push(`Claude profile in use elsewhere: ${externalSignals.modelProfile}`);
+  }
+  if (externalSignals.approvalMode) {
+    promptContext.push(`Claude-side approval mode: ${externalSignals.approvalMode}`);
+  }
+  if (mergedProfile.activeProjects.length > 0) {
+    promptContext.push(`Recurring projects: ${mergedProfile.activeProjects.slice(0, 5).map((item) => item.label).join(", ")}`);
+  }
+  if (externalSignals.communicationStyle.length > 0) {
+    promptContext.push(`External communication signals: ${externalSignals.communicationStyle.slice(0, 3).join(" | ")}`);
+  }
+  if (externalSignals.workStyleNotes.length > 0) {
+    promptContext.push(`External work-style notes: ${externalSignals.workStyleNotes.slice(0, 3).join(" | ")}`);
+  }
+  if (externalSignals.approvalGuidance.length > 0) {
+    promptContext.push(`Approval guidance: ${externalSignals.approvalGuidance.slice(0, 2).join(" | ")}`);
+  }
+  return {
+    profile: mergedProfile,
+    externalSignals,
+    promptContext
+  };
+}
 class OodaLoop {
   phase = "idle";
   modules = [];
@@ -1359,6 +1710,12 @@ class OodaLoop {
     this.currentTask = task;
     this.blackboard.setCurrentTask(task);
     try {
+      if (this.isDirectReplyTask(task.description)) {
+        return this.completeDirectReply(task);
+      }
+      if (this.isQuickReplyTask(task.description)) {
+        return await this.completeQuickReply(task);
+      }
       this.setPhase("observe");
       const context = await this.observe(task);
       this.setPhase("orient");
@@ -1367,8 +1724,12 @@ class OodaLoop {
       const plan = await this.decide(task, analysis);
       this.currentPlan = plan;
       if (this.router.getConfig().execution.approvalMode !== "auto") {
-        this.eventBus.emitTyped("approval_requested", { taskId: task.id, plan });
-        await this.waitForApproval(plan);
+        if (this.hasApprovalEvent(plan.id)) {
+          plan.status = "approved";
+        } else {
+          this.eventBus.emitTyped("approval_requested", { taskId: task.id, plan });
+          await this.waitForApproval(plan);
+        }
       }
       this.setPhase("act");
       const result = await this.act(plan);
@@ -1385,6 +1746,9 @@ class OodaLoop {
       this.currentTask = null;
       this.currentPlan = null;
     }
+  }
+  getTaskWorkingDir(task) {
+    return task.workingDir ?? process.cwd();
   }
   // ---------------------------------------------------------------------------
   // OBSERVE
@@ -1487,6 +1851,7 @@ class OodaLoop {
   async act(plan) {
     plan.status = "executing";
     const outputs = [];
+    const workingDir = this.currentTask ? this.getTaskWorkingDir(this.currentTask) : process.cwd();
     for (const step of plan.steps) {
       this.eventBus.emitTyped("step_started", {
         planId: plan.id,
@@ -1502,7 +1867,7 @@ class OodaLoop {
       const adapter = await this.router.route("execution");
       const response = await adapter.startSession(
         `Execute this step: ${step.description}`,
-        { workingDir: process.cwd() }
+        { workingDir }
       );
       step.status = "completed";
       plan.currentStep = step.index + 1;
@@ -1518,6 +1883,107 @@ class OodaLoop {
       success: true,
       output: outputs.join("\n\n")
     };
+  }
+  isDirectReplyTask(description) {
+    const normalized = description.trim().toLowerCase();
+    if (!normalized) return false;
+    return [
+      "hello",
+      "hello machine",
+      "hi",
+      "hi machine",
+      "hey",
+      "hey machine",
+      "good morning",
+      "good afternoon",
+      "good evening",
+      "thanks",
+      "thank you",
+      "help",
+      "what can you do",
+      "who are you"
+    ].includes(normalized);
+  }
+  isQuickReplyTask(description) {
+    const normalized = description.trim().toLowerCase();
+    if (!normalized || this.isDirectReplyTask(description)) return false;
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+    if (wordCount > 12) return false;
+    const blockerSignals = [
+      "write",
+      "implement",
+      "build",
+      "create",
+      "refactor",
+      "fix",
+      "debug",
+      "run",
+      "execute",
+      "install",
+      "deploy",
+      "delete",
+      "remove",
+      "production",
+      "file",
+      "code",
+      "function",
+      "script"
+    ];
+    return !blockerSignals.some((signal) => normalized.includes(signal));
+  }
+  completeDirectReply(task) {
+    this.setPhase("observe");
+    const profile = synthesizeUserContext(this.blackboard.getUserProfileSnapshot()).profile;
+    const result = {
+      success: true,
+      output: this.buildDirectReply(task.description, profile.preferredName)
+    };
+    this.setPhase("complete");
+    this.eventBus.emitTyped("task_completed", { taskId: task.id, result });
+    return result;
+  }
+  buildDirectReply(description, preferredName) {
+    const normalized = description.trim().toLowerCase();
+    if (normalized.includes("thank")) {
+      return "You're welcome.";
+    }
+    if (normalized === "help" || normalized === "what can you do") {
+      return "I can answer quick questions, plan work, and run longer coding tasks.";
+    }
+    if (normalized === "who are you") {
+      return "I am Feed The Machine, your terminal-first helper.";
+    }
+    return `Hello ${preferredName ?? "user"}.`;
+  }
+  async completeQuickReply(task) {
+    this.setPhase("observe");
+    this.eventBus.emitTyped("memory_retrieved", { taskId: task.id });
+    this.setPhase("orient");
+    this.setPhase("act");
+    const synthesized = synthesizeUserContext(this.blackboard.getUserProfileSnapshot());
+    const profile = synthesized.profile;
+    const outputFormats = profile.preferredOutputFormats.slice(0, 3).map((item) => item.label);
+    const adapter = await this.router.route("execution");
+    const response = await adapter.startSession(
+      [
+        "Reply directly to the user in one or two short sentences.",
+        "Do not make a plan.",
+        "Do not describe internal execution.",
+        ...profile.preferredName ? [`Address the user as ${profile.preferredName}.`] : [],
+        `Prefer a ${profile.responseStyle} tone.`,
+        ...outputFormats.length > 0 ? [`Honor these output format preferences when they make sense: ${outputFormats.join(", ")}.`] : [],
+        ...synthesized.promptContext.map((line) => `Profile context: ${line}`),
+        `User message: ${task.description}`
+      ].join("\n"),
+      { workingDir: this.getTaskWorkingDir(task) }
+    );
+    const result = {
+      success: true,
+      output: response.text.trim() || "Task completed."
+    };
+    this.setPhase("complete");
+    this.eventBus.emitTyped("task_completed", { taskId: task.id, result });
+    return result;
   }
   // ---------------------------------------------------------------------------
   // Helpers
@@ -1557,6 +2023,11 @@ class OodaLoop {
    */
   waitForApproval(plan) {
     return new Promise((resolve) => {
+      if (this.hasApprovalEvent(plan.id)) {
+        plan.status = "approved";
+        resolve();
+        return;
+      }
       const handler = (event) => {
         if (event.data?.planId === plan.id) {
           plan.status = "approved";
@@ -1566,6 +2037,11 @@ class OodaLoop {
       };
       this.eventBus.on("plan_approved", handler);
     });
+  }
+  hasApprovalEvent(planId) {
+    return this.eventBus.getEventLog().some(
+      (event) => event.type === "plan_approved" && event.data?.planId === planId
+    );
   }
   /**
    * Transition to the given phase and broadcast an ooda_phase event.
@@ -1646,6 +2122,7 @@ class FtmServer {
         const task = {
           id: `task-${now}-${++this.taskCounter}`,
           description: msg.payload.description,
+          workingDir: typeof msg.payload.workingDir === "string" ? msg.payload.workingDir : void 0,
           status: "pending",
           createdAt: now,
           updatedAt: now,
@@ -1680,6 +2157,7 @@ class FtmServer {
         if (plan) {
           this.store.updatePlan(planId, modifications);
         }
+        this.eventBus.emitTyped("plan_modified", { planId, modifications });
         this.sendTo(ws, {
           type: "plan_modified",
           id: msg.id,
@@ -1795,12 +2273,14 @@ class FtmServer {
   }
   // Get current daemon state snapshot
   getStateSnapshot() {
+    const profileContext = synthesizeUserContext(this.blackboard.getUserProfileSnapshot());
     return {
       machineState: this.machineState,
       currentTask: this.ooda.getCurrentTask(),
       currentPlan: this.ooda.getCurrentPlan(),
       phase: this.ooda.getPhase(),
       blackboard: this.blackboard.getContext(),
+      profileContext,
       connectedClients: this.clients.size
     };
   }
@@ -2733,15 +3213,166 @@ function registerAutoLogHook(eventBus, store) {
   });
 }
 const ERROR_ESCALATION_THRESHOLD = 3;
+const MAX_PATTERN_COUNT = 5;
+const STOP_WORDS = /* @__PURE__ */ new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "at",
+  "be",
+  "by",
+  "do",
+  "for",
+  "from",
+  "hello",
+  "how",
+  "i",
+  "in",
+  "is",
+  "it",
+  "machine",
+  "my",
+  "of",
+  "on",
+  "or",
+  "please",
+  "the",
+  "this",
+  "to",
+  "update",
+  "with",
+  "write",
+  "you",
+  "your"
+]);
+const FORMAT_WORDS = /* @__PURE__ */ new Set([
+  "markdown",
+  "json",
+  "bullet",
+  "bullets",
+  "brief",
+  "concise",
+  "detailed",
+  "verbose",
+  "short",
+  "steps"
+]);
+const PROJECT_QUALIFIERS = /* @__PURE__ */ new Set([
+  "app",
+  "repo",
+  "service",
+  "module",
+  "project",
+  "workflow",
+  "dashboard",
+  "agent"
+]);
 function normalizeTaskType(description) {
   if (!description) return "unknown";
-  return description.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().split(/\s+/).slice(0, 4).join("_");
+  return description.toLowerCase().replace(/\b(?:in|as|with)\s+(markdown|json|bullet|bullets|brief|concise|detailed|verbose|short|steps)\b/g, " ").replace(/[^a-z0-9\s]/g, "").trim().split(/\s+/).filter((word) => !FORMAT_WORDS.has(word)).slice(0, 4).join("_");
 }
 function normalizeErrorType(message) {
   if (!message) return "unknown_error";
   return message.toLowerCase().replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/g, "<uuid>").replace(/\/[^\s]+/g, "<path>").replace(/\d+/g, "<n>").replace(/[^a-z\s<>_]/g, "").trim().split(/\s+/).slice(0, 6).join("_");
 }
+function extractTopics(description) {
+  if (!description) return [];
+  const tokens = description.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((token) => token.length >= 4 && !STOP_WORDS.has(token));
+  return Array.from(new Set(tokens)).slice(0, 3);
+}
+function isDirectResponseTask(description) {
+  if (!description) return false;
+  const normalized = description.trim().toLowerCase();
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return words.length <= 6 || /^(hi|hello|hey|help|thanks|thank you|who are you|what can you do)\b/.test(normalized);
+}
+function inferPreferredName(description) {
+  if (!description) return null;
+  const match = description.match(/\b(?:call me|my name is|i am|i'm)\s+([a-z][a-z'-]{1,24})\b/i);
+  if (!match?.[1]) return null;
+  const token = match[1].toLowerCase();
+  if (STOP_WORDS.has(token)) return null;
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
+function extractOutputPreferences(description) {
+  if (!description) return [];
+  const normalized = description.toLowerCase();
+  const preferences = [];
+  if (normalized.includes("markdown") || normalized.includes(".md")) preferences.push("markdown");
+  if (normalized.includes("json")) preferences.push("json");
+  if (normalized.includes("bullet") || normalized.includes("bullets")) preferences.push("bullets");
+  if (normalized.includes("step by step") || normalized.includes("steps")) preferences.push("steps");
+  if (normalized.includes("short") || normalized.includes("brief") || normalized.includes("concise")) preferences.push("concise");
+  if (normalized.includes("verbose") || normalized.includes("detailed")) preferences.push("detailed");
+  return preferences;
+}
+function extractProjects(description) {
+  if (!description) return [];
+  const normalized = description.toLowerCase();
+  const labels = /* @__PURE__ */ new Set();
+  for (const match of normalized.matchAll(/\b([a-z0-9_-]{3,})\s+(app|repo|service|module|project|workflow|dashboard|agent)\b/g)) {
+    const [, name, qualifier] = match;
+    if (name && qualifier && !STOP_WORDS.has(name) && PROJECT_QUALIFIERS.has(qualifier)) {
+      labels.add(`${name} ${qualifier}`);
+    }
+  }
+  for (const match of normalized.matchAll(/\b(app|repo|service|module|project|workflow|dashboard|agent)\s+([a-z0-9_-]{3,})\b/g)) {
+    const [, qualifier, name] = match;
+    if (name && qualifier && !STOP_WORDS.has(name) && PROJECT_QUALIFIERS.has(qualifier)) {
+      labels.add(`${name} ${qualifier}`);
+    }
+  }
+  return Array.from(labels).slice(0, 3);
+}
+function upsertPattern(items, label, limit = MAX_PATTERN_COUNT) {
+  if (!label) return;
+  const existing = items.find((item) => item.label === label);
+  if (existing) {
+    existing.count += 1;
+    existing.lastSeen = Date.now();
+  } else {
+    items.push({ label, count: 1, lastSeen: Date.now() });
+  }
+  items.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return b.lastSeen - a.lastSeen;
+  });
+  if (items.length > limit) items.splice(limit);
+}
+function refreshApprovalPreference(profile) {
+  const { requestedCount, modifiedCount, autoApprovedCount } = profile.approvalHistory;
+  if (modifiedCount > 0 && modifiedCount >= autoApprovedCount) {
+    profile.approvalPreference = "hands_on";
+    return;
+  }
+  if (autoApprovedCount >= 2 && modifiedCount === 0) {
+    profile.approvalPreference = "streamlined";
+    return;
+  }
+  if (requestedCount === 0 && autoApprovedCount > 0) {
+    profile.approvalPreference = "streamlined";
+    return;
+  }
+  profile.approvalPreference = "mixed";
+}
 function registerLearningCaptureHook(eventBus, store, blackboard) {
+  eventBus.on("task_submitted", (event) => {
+    const { task } = event.data;
+    const description = task?.description;
+    blackboard.updateUserProfile((profile) => {
+      const preferredName = inferPreferredName(description);
+      if (preferredName) {
+        profile.preferredName = preferredName;
+      }
+      for (const format of extractOutputPreferences(description)) {
+        upsertPattern(profile.preferredOutputFormats, format);
+      }
+      for (const project of extractProjects(description)) {
+        upsertPattern(profile.activeProjects, project);
+      }
+    });
+  });
   eventBus.on("error", (event) => {
     const {
       taskId,
@@ -2812,6 +3443,60 @@ function registerLearningCaptureHook(eventBus, store, blackboard) {
         `[LearningCaptureHook] Novel task type captured — taskId=${taskId ?? "unknown"} taskType=${taskType}`
       );
     }
+    blackboard.updateUserProfile((profile) => {
+      if (isDirectResponseTask(description)) {
+        profile.responseStyle = "direct";
+      }
+      const preferredName = inferPreferredName(description);
+      if (preferredName) {
+        profile.preferredName = preferredName;
+      }
+      upsertPattern(profile.commonTaskTypes, taskType);
+      for (const topic of extractTopics(description)) {
+        upsertPattern(profile.topicInterests, topic);
+      }
+      for (const format of extractOutputPreferences(description)) {
+        upsertPattern(profile.preferredOutputFormats, format);
+      }
+      for (const project of extractProjects(description)) {
+        upsertPattern(profile.activeProjects, project);
+      }
+    });
+  });
+  eventBus.on("step_completed", (event) => {
+    const {
+      description,
+      model
+    } = event.data;
+    blackboard.updateUserProfile((profile) => {
+      upsertPattern(profile.workflowPatterns, normalizeTaskType(description));
+      upsertPattern(profile.modelPreferences, model);
+      for (const topic of extractTopics(description)) {
+        upsertPattern(profile.topicInterests, topic);
+      }
+    });
+  });
+  eventBus.on("approval_requested", () => {
+    blackboard.updateUserProfile((profile) => {
+      profile.approvalHistory.requestedCount += 1;
+      refreshApprovalPreference(profile);
+    });
+  });
+  eventBus.on("plan_approved", (event) => {
+    const { autoApproved } = event.data;
+    blackboard.updateUserProfile((profile) => {
+      profile.approvalHistory.approvedCount += 1;
+      if (autoApproved) {
+        profile.approvalHistory.autoApprovedCount += 1;
+      }
+      refreshApprovalPreference(profile);
+    });
+  });
+  eventBus.on("plan_modified", () => {
+    blackboard.updateUserProfile((profile) => {
+      profile.approvalHistory.modifiedCount += 1;
+      refreshApprovalPreference(profile);
+    });
   });
 }
 function buildSessionSummary(sessionId, store, blackboard, endedAt) {
@@ -3010,9 +3695,9 @@ let mainWindow = null;
 let tray = null;
 async function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
-    minWidth: 600,
+    width: 1280,
+    height: 840,
+    minWidth: 980,
     minHeight: 500,
     title: "Feed The Machine",
     backgroundColor: "#0a0a0a",
@@ -3046,6 +3731,87 @@ function createTray() {
   tray.setToolTip("Feed The Machine");
   tray.setContextMenu(contextMenu);
 }
+ipcMain.handle("open-folder", async () => {
+  console.log("[Electron:file-browser] open-folder dialog requested");
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory", "createDirectory"],
+    title: "Choose working directory"
+  });
+  const chosen = result.canceled ? null : result.filePaths[0] ?? null;
+  console.log("[Electron:file-browser] open-folder result", {
+    canceled: result.canceled,
+    chosen
+  });
+  return chosen;
+});
+ipcMain.handle("list-directory", async (_event, dirPath) => {
+  const startedAt = Date.now();
+  console.log("[Electron:file-browser] list-directory start", { dirPath });
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  console.log("[Electron:file-browser] list-directory read complete", {
+    dirPath,
+    count: entries.length,
+    ms: Date.now() - startedAt
+  });
+  const payload = entries.map((entry) => ({
+    name: entry.name,
+    path: path.join(dirPath, entry.name),
+    kind: entry.isDirectory() ? "directory" : "file"
+  })).sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  console.log("[Electron:file-browser] list-directory payload ready", {
+    dirPath,
+    count: payload.length,
+    ms: Date.now() - startedAt
+  });
+  return payload;
+});
+ipcMain.handle("read-text-file", async (_event, filePath) => {
+  const startedAt = Date.now();
+  console.log("[Electron:file-browser] read-text-file start", { filePath });
+  const stat = fs.statSync(filePath);
+  const maxBytes = 2e5;
+  if (stat.size > maxBytes) {
+    console.log("[Electron:file-browser] read-text-file too-large", {
+      filePath,
+      size: stat.size,
+      ms: Date.now() - startedAt
+    });
+    return {
+      kind: "too_large",
+      content: "",
+      size: stat.size
+    };
+  }
+  const buffer = fs.readFileSync(filePath);
+  const sample = buffer.subarray(0, Math.min(buffer.length, 512));
+  const isBinary = sample.includes(0);
+  if (isBinary) {
+    console.log("[Electron:file-browser] read-text-file binary", {
+      filePath,
+      size: stat.size,
+      ms: Date.now() - startedAt
+    });
+    return {
+      kind: "binary",
+      content: "",
+      size: stat.size
+    };
+  }
+  const payload = {
+    kind: "text",
+    content: buffer.toString("utf8"),
+    size: stat.size
+  };
+  console.log("[Electron:file-browser] read-text-file text", {
+    filePath,
+    size: stat.size,
+    ms: Date.now() - startedAt
+  });
+  return payload;
+});
 app.whenReady().then(async () => {
   try {
     await startDaemon();
