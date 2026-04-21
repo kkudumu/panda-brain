@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feed The Machine — System Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --border: #2a2a35;
+      --accent: #7c6af7;
+      --accent2: #5eead4;
+      --accent3: #f472b6;
+      --text: #e2e2e8;
+      --text-muted: #8888a0;
+      --green: #4ade80;
+      --yellow: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'SF Pro Display', 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 40px 24px 60px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124, 106, 247, 0.12);
+      border: 1px solid rgba(124, 106, 247, 0.3);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 0%, #a89fef 60%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 400;
+    }
+
+    /* ── Stats strip ── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .stat-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .stat-num {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+    }
+
+    /* ── Diagram card ── */
+    .diagram-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 1400px;
+      margin: 0 auto 48px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 32px 64px rgba(0,0,0,0.5);
+      overflow: auto;
+    }
+
+    .diagram-card .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ── Layer legend ── */
+    .legend {
+      max-width: 1400px;
+      margin: 0 auto 48px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .legend-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .legend-item:hover {
+      border-color: rgba(124, 106, 247, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .legend-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .legend-text h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .legend-text p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* ── Mermaid theme overrides ── */
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="badge">System Architecture</div>
+    <h1>Feed The Machine</h1>
+    <p class="subtitle">Multi-model AI orchestration daemon — OODA loop · Blackboard memory · Safety guardrails · Full-stack</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-dot" style="background:#4ade80"></div>
+      <span class="stat-num">368</span>
+      <span class="stat-label">tests · 18 suites</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:#7c6af7"></div>
+      <span class="stat-num">26</span>
+      <span class="stat-label">Claude Code skills</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:#5eead4"></div>
+      <span class="stat-num">4</span>
+      <span class="stat-label">model adapters</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:#f472b6"></div>
+      <span class="stat-num">15</span>
+      <span class="stat-label">automation hooks</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:#fbbf24"></div>
+      <span class="stat-num">4</span>
+      <span class="stat-label">packages in monorepo</span>
+    </div>
+    <div class="stat">
+      <div class="stat-dot" style="background:#f87171"></div>
+      <span class="stat-num">npm</span>
+      <span class="stat-label">feed-the-machine</span>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1e1e2e",
+    "primaryTextColor": "#e2e2e8",
+    "primaryBorderColor": "#3d3d52",
+    "lineColor": "#6666aa",
+    "secondaryColor": "#16161f",
+    "tertiaryColor": "#12121a",
+    "edgeLabelBackground": "#1a1a24",
+    "clusterBkg": "#13131b",
+    "clusterBorder": "#2e2e42",
+    "titleColor": "#a89fef",
+    "nodeTextColor": "#e2e2e8",
+    "fontFamily": "SF Pro Display, Inter, system-ui, sans-serif"
+  }
+}}%%
+graph TB
+    subgraph Interfaces["⬡  Interfaces — 3 entry points"]
+        CLI["@ftm/cli\nTypeScript\nsubmit · status · history · approve · doctor"]
+        ELECTRON["ftm-desktop\nElectron + Svelte 5\nAnimated ASCII machine UI"]
+        MCP["@ftm/mcp\nMCP Server\n7 tools · stdio JSON-RPC"]
+    end
+
+    subgraph Transport["⇄  Transport Layer"]
+        WS["WebSocket Server\nport 4040\nbi-directional event streaming"]
+    end
+
+    subgraph Daemon["⚙  @ftm/daemon — Core Engine"]
+        OODA["OODA Loop\nobserve → orient → decide → act"]
+        ROUTER["ModelRouter\nquality · balanced · budget profiles"]
+        BB["Blackboard\ncontext · decisions · constraints\nexperiences · patterns"]
+        EB["EventBus\ntyped event log · wildcard subscriptions"]
+        STORE["SQLite Store\nbetter-sqlite3\nsessions · tasks · plans · events · memory"]
+
+        subgraph Modules["Modules  (12)"]
+            MIND["mind — cognitive routing"]
+            PLANNER["planner — step decomposition + domain tagging"]
+            EXECUTOR["executor — step execution + retry + artifacts"]
+            GUARD["guard — pre-flight safety rules"]
+            MEMORY["memory — experience CRUD + pattern promotion"]
+            COUNCIL["council — multi-model deliberation"]
+            DEBUG["debug — hypothesis-driven investigation"]
+            VERIFY["verify — post-execution validation"]
+            DAILY["daily-log — structured audit trail"]
+        end
+
+        subgraph Adapters["Model Adapters"]
+            CLAUDE["Claude\nclaude CLI"]
+            CODEX["Codex\ncodex CLI"]
+            GEMINI["Gemini\ngemini CLI"]
+            OLLAMA["Ollama\nlocal models"]
+        end
+
+        subgraph Hooks["Lifecycle Hooks  (6)"]
+            GUARD_H["guard-hook\ndestructive patterns + secret scanning"]
+            LOG_H["auto-log-hook\ntask_completed → daily_log"]
+            PLAN_H["plan-gate-hook\nenforces plan-before-edit"]
+            LEARN_H["learning-capture-hook\npromotes patterns after 3+ confirmations"]
+            SESSION_H["session-end-hook\nblackboard flush"]
+        end
+    end
+
+    subgraph SkillPack["⬡  Skill Pack — Claude Code extension"]
+        FTM_ROUTER["ftm router"]
+        FTM_MIND["ftm-mind\nOODA skill"]
+        FTM_BRAIN["ftm-brainstorm\nparallel research"]
+        FTM_EXEC["ftm-executor\nplan execution"]
+        FTM_DEBUG["ftm-debug\nwar room"]
+        FTM_COUNCIL["ftm-council\nmulti-model debate"]
+        MORE["+ 20 more skills"]
+        SHELL_HOOKS["15 shell hooks\nPreToolUse · PostToolUse · session events"]
+    end
+
+    subgraph Observability["◎  Observability"]
+        EVENTS["Event log · SQLite\nevery task · step · guard trigger · daily log"]
+        DASHBOARD["ftm-dashboard\nsession + weekly analytics"]
+    end
+
+    CLI -->|WebSocket| WS
+    ELECTRON -->|WebSocket| WS
+    MCP -->|"stdio JSON-RPC · shared SQLite"| STORE
+
+    WS --> OODA
+    OODA --> ROUTER
+    OODA --> BB
+    OODA --> EB
+    BB --> STORE
+    EB --> STORE
+
+    ROUTER -->|health check + fallback| CLAUDE
+    ROUTER --> CODEX
+    ROUTER --> GEMINI
+    ROUTER --> OLLAMA
+
+    OODA --> GUARD
+    OODA --> PLANNER
+    OODA --> EXECUTOR
+    OODA --> COUNCIL
+    OODA --> MEMORY
+    OODA --> DEBUG
+
+    EB -->|event subscription| LOG_H
+    EB --> GUARD_H
+    EB --> LEARN_H
+    EB --> SESSION_H
+
+    SHELL_HOOKS -.->|Claude Code hooks| FTM_ROUTER
+    FTM_ROUTER --> FTM_MIND
+    FTM_MIND -->|routes| FTM_BRAIN
+    FTM_MIND -->|routes| FTM_EXEC
+    FTM_MIND -->|routes| FTM_DEBUG
+    FTM_MIND -->|routes| FTM_COUNCIL
+
+    EVENTS --> DASHBOARD
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(94,234,212,0.1)">⬡</div>
+      <div class="legend-text">
+        <h3>Interfaces</h3>
+        <p>CLI, Electron desktop app, and MCP server — three independent entry points sharing one SQLite store</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(124,106,247,0.1)">⚙</div>
+      <div class="legend-text">
+        <h3>OODA Loop</h3>
+        <p>Cognitive core — Observe, Orient, Decide, Act. Every task is classified and planned before any model is called</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(244,114,182,0.1)">⇄</div>
+      <div class="legend-text">
+        <h3>ModelRouter</h3>
+        <p>Routes to Claude / Codex / Gemini / Ollama based on configurable quality, balanced, or budget profiles with health-checked fallback</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(74,222,128,0.1)">◈</div>
+      <div class="legend-text">
+        <h3>Blackboard</h3>
+        <p>Multi-layer memory: current task → decisions → constraints → per-task experiences → global patterns. Survives daemon restarts via SQLite</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(251,191,36,0.1)">⚡</div>
+      <div class="legend-text">
+        <h3>Safety Guardrails</h3>
+        <p>Guard hook pattern-matches 15+ destructive commands and 8 secret token patterns. Plan-gate blocks edits until a plan is approved</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background:rgba(248,113,113,0.1)">◎</div>
+      <div class="legend-text">
+        <h3>Observability</h3>
+        <p>Every event persisted to SQLite. Auto-log hook generates structured daily_log entries with duration and outcome per task</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>feed-the-machine · v1.7.19 · MIT License · <a href="https://github.com/kkudumu/feed-the-machine">github.com/kkudumu/feed-the-machine</a></p>
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#1e1e2e',
+        primaryTextColor: '#e2e2e8',
+        primaryBorderColor: '#3d3d52',
+        lineColor: '#6666aa',
+        secondaryColor: '#16161f',
+        tertiaryColor: '#12121a',
+        edgeLabelBackground: '#1a1a24',
+        clusterBkg: '#13131b',
+        clusterBorder: '#2e2e42',
+        titleColor: '#a89fef',
+        nodeTextColor: '#e2e2e8',
+        fontFamily: 'SF Pro Display, Inter, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 20,
+        nodeSpacing: 40,
+        rankSpacing: 60,
+        useMaxWidth: true,
+      },
+    });
+  </script>
+</body>
+</html>

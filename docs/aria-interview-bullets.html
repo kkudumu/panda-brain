@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feed The Machine — ARIA Interview Talking Points</title>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --surface3: #232330;
+      --border: #2a2a35;
+      --border-hover: #3d3d52;
+      --accent: #7c6af7;
+      --accent2: #5eead4;
+      --accent3: #f472b6;
+      --accent4: #fbbf24;
+      --accent5: #4ade80;
+      --accent6: #f87171;
+      --text: #e2e2e8;
+      --text-muted: #8888a0;
+      --text-dim: #555568;
+      --code-bg: #1a1a28;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'SF Pro Text', 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      min-height: 100vh;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124, 106, 247, 0.12);
+      border: 1px solid rgba(124, 106, 247, 0.3);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      padding: 4px 13px;
+      border-radius: 100px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 0%, #a89fef 55%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.15;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* ── Tip bar ── */
+    .tip {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(94, 234, 212, 0.06);
+      border: 1px solid rgba(94, 234, 212, 0.2);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 44px;
+      font-size: 13.5px;
+      color: var(--accent2);
+    }
+
+    .tip-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── Section cards ── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .section:hover {
+      border-color: var(--border-hover);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px 18px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      flex: 1;
+    }
+
+    .section-title h2 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .section-title .jd-quote {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .section-count {
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+
+    .chevron {
+      color: var(--text-dim);
+      font-size: 12px;
+      transition: transform 0.2s;
+      margin-left: 4px;
+    }
+
+    .section.open .chevron {
+      transform: rotate(90deg);
+    }
+
+    .section-body {
+      display: none;
+      padding: 0;
+    }
+
+    .section.open .section-body {
+      display: block;
+    }
+
+    /* ── Bullet items ── */
+    .bullet {
+      display: flex;
+      gap: 14px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .bullet:last-child {
+      border-bottom: none;
+    }
+
+    .bullet:hover {
+      background: var(--surface2);
+    }
+
+    .bullet-marker {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-top: 9px;
+      flex-shrink: 0;
+    }
+
+    .bullet p {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12.5px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      color: var(--accent2);
+      padding: 1px 6px;
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+
+    /* ── One-liner section ── */
+    .oneliner {
+      background: linear-gradient(135deg, rgba(124,106,247,0.1) 0%, rgba(94,234,212,0.06) 100%);
+      border: 1px solid rgba(124, 106, 247, 0.3);
+      border-radius: 16px;
+      padding: 28px 28px;
+      margin-top: 8px;
+    }
+
+    .oneliner-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .oneliner blockquote {
+      font-size: 17px;
+      font-weight: 500;
+      line-height: 1.6;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      border-left: 3px solid var(--accent);
+      padding-left: 20px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-top: 48px;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Expand all toggle ── */
+    .controls {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 16px;
+    }
+
+    .toggle-all {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .toggle-all:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="badge">ARIA Interview Prep</div>
+    <h1>Feed The Machine — Talking Points</h1>
+    <p class="subtitle">8 JD requirements mapped to concrete code. Study before. Show the diagram first.</p>
+  </header>
+
+  <div class="tip">
+    <span class="tip-icon">◎</span>
+    <span>Show the architecture diagram first, then use these bullets to anchor every answer back to specific files and systems you built.</span>
+  </div>
+
+  <div class="controls">
+    <button class="toggle-all" onclick="toggleAll()">Expand all</button>
+  </div>
+
+  <!-- 1 -->
+  <div class="section open" id="s1">
+    <div class="section-header" onclick="toggle('s1')">
+      <div class="section-icon" style="background:rgba(124,106,247,0.12)">🧠</div>
+      <div class="section-title">
+        <h2>Design and build LLM-powered applications</h2>
+        <div class="jd-quote">JD: "Architect and develop production-grade systems leveraging large language models"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#7c6af7"></div>
+        <p>Built a production TypeScript daemon (<code>@ftm/daemon</code>) that orchestrates Claude, Codex, Gemini, and Ollama as interchangeable backends through a unified <code>ModelAdapter</code> interface — swap models with a config change, zero code changes.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#7c6af7"></div>
+        <p>Implemented the OODA cognitive loop (<code>ooda.ts</code>) as the reasoning core: every task goes through Observe → Orient → Decide → Act before any model is called. This prevents the most common LLM failure mode — acting before understanding.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#7c6af7"></div>
+        <p>Built 26 skills (markdown instruction sets) for Claude Code covering the full developer workflow: research, planning, execution, debugging, code review, CI gate, multi-model debate, and daily activity logging.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#7c6af7"></div>
+        <p>Shipped an Electron desktop app (<code>ftm-desktop</code>, Svelte 5) with an animated ASCII machine UI that streams live task state over WebSocket.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="section" id="s2">
+    <div class="section-header" onclick="toggle('s2')">
+      <div class="section-icon" style="background:rgba(94,234,212,0.1)">⚙️</div>
+      <div class="section-title">
+        <h2>Build and maintain AI integration pipelines</h2>
+        <div class="jd-quote">JD: "Design robust, scalable API integrations between AI models and internal systems"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>Designed a 4-adapter registry (<code>AdapterRegistry</code>) with health-checking and TTL-cached availability — the router automatically falls back through <code>claude → codex → gemini → ollama</code> when a model is unavailable, with no user-visible disruption.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>Built 3 configurable model profiles (<code>quality</code>, <code>balanced</code>, <code>budget</code>) that assign different models to planning, execution, and review roles — cost-optimized routing without sacrificing plan quality.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>The MCP server (<code>@ftm/mcp</code>) exposes 7 tools over stdio JSON-RPC, letting any MCP-compatible AI CLI (Claude, Codex, Gemini) read and write to the same shared SQLite store without port conflicts.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>Integrated with Claude Code's hook system (15 shell hooks): <code>PreToolUse</code>, <code>PostToolUse</code>, session start/end — these fire automatically and enforce guard rules, plan gates, and secret scanning without the user having to remember.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="section" id="s3">
+    <div class="section-header" onclick="toggle('s3')">
+      <div class="section-icon" style="background:rgba(244,114,182,0.1)">🔧</div>
+      <div class="section-title">
+        <h2>Develop full-stack AI features end-to-end</h2>
+        <div class="jd-quote">JD: "Own the complete development of AI features across the stack"</div>
+      </div>
+      <span class="section-count">3 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f472b6"></div>
+        <p>Owned the full stack: TypeScript daemon + WebSocket API + Electron/Svelte frontend + CLI + MCP server + 26 Claude Code skills + 15 shell automation hooks.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f472b6"></div>
+        <p>Built the WebSocket server (<code>server.ts</code>) that streams every internal event to connected clients in real time — the UI and CLI show live task progress, step-by-step execution, and guard triggers as they happen.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f472b6"></div>
+        <p>The CLI (<code>@ftm/cli</code>) supports <code>submit</code>, <code>status</code>, <code>history</code>, <code>approve</code>, and <code>doctor</code> commands — the approve command implements human-in-the-loop confirmation gates for high-risk plan steps before execution continues.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="section" id="s4">
+    <div class="section-header" onclick="toggle('s4')">
+      <div class="section-icon" style="background:rgba(251,191,36,0.1)">🚀</div>
+      <div class="section-title">
+        <h2>Architect and manage CI/CD pipelines for AI systems</h2>
+        <div class="jd-quote">JD: "Build automated deployment pipelines, model evaluation frameworks, safe rollout strategies"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#fbbf24"></div>
+        <p>Set up semantic-release with automated CHANGELOG generation, conventional commits enforcement via commitlint, and Husky pre-commit hooks — every merge to main produces a versioned npm publish automatically.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#fbbf24"></div>
+        <p>Built a guard module (<code>guard.ts</code>) with configurable rules that block destructive operations (pattern-matched: <code>rm -rf</code>, <code>DROP TABLE</code>, <code>force push</code>) and credential leakage (regex-scanned: AWS keys, GitHub tokens, OpenAI keys, Slack tokens, private key PEM headers) before any model call can execute them.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#fbbf24"></div>
+        <p>The plan-gate hook (<code>ftm-plan-gate.sh</code>) is a <code>PreToolUse</code> gate that blocks <code>Edit</code>/<code>Write</code> tool calls until a plan has been presented and acknowledged — a safety mechanism wired into Claude Code's execution lifecycle, not the model's prompt.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#fbbf24"></div>
+        <p>368 tests across 18 suites (Vitest) covering daemon, CLI, MCP, Electron, and integration paths — test suite runs in CI on every PR.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="section" id="s5">
+    <div class="section-header" onclick="toggle('s5')">
+      <div class="section-icon" style="background:rgba(74,222,128,0.1)">◈</div>
+      <div class="section-title">
+        <h2>Implement RAG and retrieval systems</h2>
+        <div class="jd-quote">JD: "Design and build retrieval-augmented generation systems grounded in internal knowledge"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#4ade80"></div>
+        <p>Built the Blackboard (<code>blackboard.ts</code>) as a multi-layer memory store: <code>current_task</code> → <code>recent_decisions</code> → <code>active_constraints</code> → <code>experiences</code> (task-specific) → <code>patterns</code> (promoted after 3+ confirmations). Every OODA cycle loads relevant past experiences before planning.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#4ade80"></div>
+        <p>The <code>MemoryModule</code> handles explicit "remember this" / "recall" / "search memory" commands and implicit post-completion saves — each experience is tagged by task type for semantic retrieval.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#4ade80"></div>
+        <p>The <code>learning-capture-hook</code> promotes recurring patterns from per-task experiences to a global pattern store after 3+ confirmations, so the system gets measurably smarter with repeated use.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#4ade80"></div>
+        <p>The <code>ftm-brainstorm</code> skill dispatches 7 parallel research agents (web + GitHub vectors) and a reconciler that merges findings, maps disagreements, and scores confidence — then uses those structured findings to ground every suggestion in cited evidence.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="section" id="s6">
+    <div class="section-header" onclick="toggle('s6')">
+      <div class="section-icon" style="background:rgba(248,113,113,0.1)">⚗️</div>
+      <div class="section-title">
+        <h2>Evaluate and fine-tune AI models</h2>
+        <div class="jd-quote">JD: "Lead benchmarking, evaluation, and fine-tuning of foundation models"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>Built a <code>promptfoo</code>-based evaluation harness (<code>promptfooconfig.yaml</code>) for testing skill trigger accuracy — validates that brainstorm skill fires on "help me think through X" and does not fire on "what is Y."</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>Implemented 3 configurable model profiles (<code>quality / balanced / budget</code>) with per-role model assignment — this is the foundation for systematic model comparison: swap profiles, run evals, measure output quality vs cost.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>The council module (<code>council.ts</code>) dispatches the same problem to Claude, Codex, and Gemini in parallel, collects positions, and synthesizes <code>consensus / majority / split</code> verdicts — multi-model evaluation baked into the runtime, not a one-off experiment.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>Adapter health caching (1-minute TTL) and fallback ordering give the system automatic A/B routing between models based on availability, producing natural comparison data across real tasks.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="section" id="s7">
+    <div class="section-header" onclick="toggle('s7')">
+      <div class="section-icon" style="background:rgba(124,106,247,0.1)">📐</div>
+      <div class="section-title">
+        <h2>Establish AI engineering best practices</h2>
+        <div class="jd-quote">JD: "Define coding standards, testing frameworks, and architectural patterns for AI development"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#a78bfa"></div>
+        <p>Wrote <code>STYLE.md</code> defining AI-ergonomic code standards: 1000-line file limit, 50-line function limit, no barrel files, direct imports only — rules designed so any AI agent can read one file and understand it without needing 10 others as context.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#a78bfa"></div>
+        <p>Defined a skip-stop protocol in the OODA skill: the system classifies query complexity (<code>micro / small / medium / large</code>) and applies proportional tool budgets — prevents the LLM from escalating to multi-step planning for a rename.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#a78bfa"></div>
+        <p>Built <code>CLAUDE.md</code> with testing standards that mandate real API contracts before writing mocks, fixture-based test data, and multi-step mock fidelity — written in response to two production bugs caused by assumed API shapes.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#a78bfa"></div>
+        <p>The guard module's rule system is composable: add a <code>GuardRule</code> object, no changes to the execution path — open/closed principle applied to LLM safety.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <div class="section" id="s8">
+    <div class="section-header" onclick="toggle('s8')">
+      <div class="section-icon" style="background:rgba(94,234,212,0.1)">📡</div>
+      <div class="section-title">
+        <h2>Build AI observability and monitoring tooling</h2>
+        <div class="jd-quote">JD: "Latency monitoring, output quality evaluation, hallucination detection, cost dashboards, alerting"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>Every internal event (task received, step started, step completed, guard triggered, model called, session ended) is emitted through a typed <code>EventBus</code> and persisted to SQLite — full audit trail, zero data loss on daemon restart.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>The <code>auto-log-hook</code> converts <code>task_completed</code> events into structured <code>daily_log</code> entries with duration, outcome, and summary — queryable by date, task type, and model.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p><code>ftm-dashboard</code> skill generates session and weekly analytics: tasks completed, success rate, model usage breakdown, patterns promoted.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#5eead4"></div>
+        <p>The <code>doctor</code> CLI command checks daemon health, adapter availability, SQLite integrity, and WebSocket connectivity — a single command that surfaces the full observability picture for on-call diagnosis.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9 -->
+  <div class="section" id="s9">
+    <div class="section-header" onclick="toggle('s9')">
+      <div class="section-icon" style="background:rgba(248,113,113,0.1)">🔒</div>
+      <div class="section-title">
+        <h2>Drive security and compliance in AI systems</h2>
+        <div class="jd-quote">JD: "Data privacy best practices, guardrails for sensitive data, compliance with security standards"</div>
+      </div>
+      <span class="section-count">4 points</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="section-body">
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>The guard hook pattern-matches 15+ destructive shell command signatures and 8 secret token patterns (AWS, GitHub, OpenAI, Slack, PEM headers) before any model output can be written to disk or executed.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>The <code>ftm-git.sh</code> hook is a pre-commit secret scanner — blocks commits containing credentials before they reach the remote, regardless of which AI wrote the code.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>Human-in-the-loop is enforced at the architecture level: the plan-gate hook blocks execution until a plan is approved; the <code>approve</code> CLI command is the only way to unblock high-risk steps; no model can bypass this via prompt.</p>
+      </div>
+      <div class="bullet">
+        <div class="bullet-marker" style="background:#f87171"></div>
+        <p>The MCP server uses stdio JSON-RPC (not HTTP) so it never opens a network port — the only communication channel is the subprocess stdin/stdout, which stays inside the user's machine.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- One-liner -->
+  <div class="oneliner">
+    <div class="oneliner-label">One-liner · "tell me about yourself in this role"</div>
+    <blockquote>
+      "I built an AI orchestration system from scratch — daemon, adapters, memory, safety gates, a desktop app, and a 26-skill extension pack for Claude Code — that routes real tasks across Claude, Codex, Gemini, and Ollama, learns from every session, and enforces safety at the infrastructure level rather than trusting the model's judgment."
+    </blockquote>
+  </div>
+
+  <footer class="footer">
+    <p>feed-the-machine · v1.7.19 · Senior AI Engineer, ARIA Team · Klaviyo</p>
+  </footer>
+
+</div>
+
+<script>
+  function toggle(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+  }
+
+  let allOpen = true;
+  function toggleAll() {
+    const sections = document.querySelectorAll('.section');
+    allOpen = !allOpen;
+    sections.forEach(s => {
+      if (allOpen) s.classList.add('open');
+      else s.classList.remove('open');
+    });
+    document.querySelector('.toggle-all').textContent = allOpen ? 'Collapse all' : 'Expand all';
+  }
+</script>
+</body>
+</html>
